@@ -10,7 +10,7 @@
 
 SAMPLE_RATE = None  # Auto: se detecta del dispositivo
 
-BLOCKSIZE = 128     # Fijo: 128 samples para ultra-baja latencia
+BLOCKSIZE = 256    # Fijo: 128 samples para ultra-baja latencia
 
 DTYPE = 'float32'   # Sin conversiones (máxima eficiencia)
 
