@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Monitor</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎚️ Audio Monitor</h1>
+            <div id="device-info"></div>
+            <div id="latency-info">Latencia estimada: <span id="latency">--</span>ms</div>
+        </header>
+
+        <main>
+            <div id="channels-grid"></div>
+        </main>
+
+        <footer>
+            <div id="status">Desconectado</div>
+        </footer>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
