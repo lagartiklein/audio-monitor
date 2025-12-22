@@ -2,8 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="description" content="Sistema de monitoreo de audio multi-canal de ultra-baja latencia">
+    <title>Audio Monitor - Ultra Low Latency</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
 </head>
@@ -11,19 +13,50 @@
     <div class="container">
         <header>
             <h1>🎚️ Audio Monitor</h1>
-            <div id="device-info"></div>
-            <div id="latency-info">Latencia estimada: <span id="latency">--</span>ms</div>
+            <div id="device-info" class="info-text">Conectando al servidor...</div>
+            
+            <!-- Métricas de latencia -->
+            <div class="metrics-panel">
+                <div class="metric">
+                    <span class="metric-label">Latencia</span>
+                    <span id="latency" class="metric-value">--</span>
+                    <span class="metric-unit">ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Buffer</span>
+                    <span id="buffer-health" class="metric-value">--</span>
+                    <span class="metric-unit">%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Red</span>
+                    <span id="network-latency" class="metric-value">--</span>
+                    <span class="metric-unit">ms</span>
+                </div>
+            </div>
         </header>
 
         <main>
             <div id="channels-grid"></div>
+            
+            <!-- Mensaje de ayuda inicial -->
+            <div id="help-message" class="help-message">
+                <p>🔌 Conectando al servidor...</p>
+                <p>Por favor espera un momento</p>
+            </div>
         </main>
 
         <footer>
-            <div id="status">Desconectado</div>
+            <div id="status" class="status-connecting">Conectando...</div>
+            <button id="audio-init-btn" class="init-button" style="display:none;">
+                🔊 Iniciar Audio (Click aquí)
+            </button>
+            <div class="footer-info">
+                <small>💡 Usa audífonos para mejor experiencia</small>
+            </div>
         </footer>
     </div>
 
+    <!-- Scripts -->
     <script src="/app.js"></script>
 </body>
 </html>
