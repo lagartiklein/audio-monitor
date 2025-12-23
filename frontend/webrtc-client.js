@@ -23,8 +23,8 @@ class WebRTCClient {
             useFec: true,
             forceOpus: true,
             targetLatency: 15, // ms objetivo
-            maxLatency: 50,    // ms máximo aceptable
-            bufferSize: 3      // buffers en jitter buffer
+            maxLatency: 30,    // ms máximo aceptable
+            bufferSize: 2      // buffers en jitter buffer
         };
         
         // Métricas
@@ -82,8 +82,7 @@ class WebRTCClient {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun.voipbuster.com:3478' }
+                { urls: 'stun:stun2.l.google.com:19302' }
             ],
             iceTransportPolicy: 'all',
             bundlePolicy: 'max-bundle',
@@ -210,10 +209,12 @@ class WebRTCClient {
             
             if (this.metrics.connectionState === 'connected') {
                 this.metrics.connected = true;
+                this.connected = true;
             } else if (this.metrics.connectionState === 'failed' || 
                        this.metrics.connectionState === 'disconnected' ||
                        this.metrics.connectionState === 'closed') {
                 this.metrics.connected = false;
+                this.connected = false;
                 this.handleDisconnected();
             }
         };
@@ -372,6 +373,7 @@ class WebRTCClient {
         
         this.mediaStream = stream;
         this.metrics.connected = true;
+        this.connected = true;
         this.metrics.lastPacketTime = Date.now();
         
         // Notificar conexión exitosa
@@ -536,9 +538,9 @@ class WebRTCClient {
         let qualityScore = 100;
         
         // Penalizar por latencia
-        if (latency > 50) qualityScore -= 40;
-        else if (latency > 30) qualityScore -= 20;
-        else if (latency > 20) qualityScore -= 10;
+        if (latency > 30) qualityScore -= 40;
+        else if (latency > 20) qualityScore -= 20;
+        else if (latency > 15) qualityScore -= 10;
         else if (latency > 10) qualityScore -= 5;
         
         // Penalizar por pérdida de paquetes

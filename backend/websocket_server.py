@@ -1,6 +1,6 @@
 """
 WebSocket Server - Servidor Flask + SocketIO completo
-Con envío de audio en tiempo real
+Con envío de audio en tiempo real y soporte WebRTC
 """
 
 from flask import Flask, send_from_directory, request
@@ -11,12 +11,17 @@ import json
 import struct
 import numpy as np
 import config_webrtc as config
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 # === VARIABLES GLOBALES ===
 audio_capture = None
 channel_manager = None
 audio_thread = None
 running = False
+webrtc_server = None
 
 def init_server(capture, manager):
     """Inicializar referencias globales"""
@@ -28,6 +33,11 @@ def init_server(capture, manager):
     start_audio_thread()
     
     print("[*] WebSocket server inicializado")
+
+def set_webrtc_server(server):
+    """Configurar el servidor WebRTC globalmente"""
+    global webrtc_server
+    webrtc_server = server
 
 def start_audio_thread():
     """Inicia el thread que envía audio a los clientes"""
@@ -146,7 +156,9 @@ def handle_connect():
         'channels': channel_manager.num_channels,
         'sample_rate': config.SAMPLE_RATE,
         'blocksize': config.BLOCKSIZE,
-        'jitter_buffer_ms': config.JITTER_BUFFER_MS
+        'jitter_buffer_ms': config.JITTER_BUFFER_MS,
+        'supports_webrtc': config.WEBRTC_ENABLED,
+        'webrtc_enabled': config.WEBRTC_ENABLED
     }
     emit('device_info', device_info)
     
@@ -160,6 +172,15 @@ def handle_disconnect():
     """Cliente se desconecta"""
     client_id = request.sid
     channel_manager.unsubscribe_client(client_id)
+    
+    if webrtc_server:
+        # Cerrar conexión WebRTC también
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(webrtc_server.close_connection(client_id))
+        except Exception as e:
+            logger.error(f"Error cerrando conexión WebRTC: {e}")
     
     if config.VERBOSE:
         print(f"[-] Cliente desconectado: {client_id[:8]}...")
@@ -197,6 +218,72 @@ def handle_ping(data):
     emit('pong', {
         'client_timestamp': data.get('timestamp', 0),
         'server_timestamp': int(time.time() * 1000)
+    })
+
+@socketio.on('webrtc_offer')
+def handle_webrtc_offer(data):
+    """Cliente envía oferta WebRTC"""
+    client_id = request.sid
+    sdp = data.get('sdp')
+    
+    try:
+        if webrtc_server:
+            # Ejecutar en un thread separado para evitar bloqueos
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            answer_sdp = loop.run_until_complete(
+                webrtc_server.handle_offer(client_id, sdp)
+            )
+            
+            emit('webrtc_answer', {
+                'sdp': answer_sdp,
+                'clientId': client_id
+            })
+        else:
+            emit('webrtc_error', {
+                'error': 'Servidor WebRTC no disponible'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error procesando oferta WebRTC: {e}")
+        emit('webrtc_error', {
+            'error': str(e),
+            'clientId': client_id
+        })
+
+@socketio.on('webrtc_ice_candidate')
+def handle_webrtc_ice_candidate(data):
+    """Cliente envía candidato ICE"""
+    client_id = request.sid
+    candidate = data.get('candidate')
+    
+    try:
+        if webrtc_server:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            loop.run_until_complete(
+                webrtc_server.add_ice_candidate(client_id, candidate)
+            )
+    except Exception as e:
+        logger.error(f"Error procesando ICE candidate: {e}")
+
+@socketio.on('webrtc_subscribe')
+def handle_webrtc_subscribe(data):
+    """Suscripción via WebRTC DataChannel fallback"""
+    client_id = request.sid
+    channels = data.get('channels', [])
+    gains = data.get('gains', {})
+    
+    # Convertir gains keys a int
+    gains = {int(k): float(v) for k, v in gains.items()}
+    
+    channel_manager.subscribe_client(client_id, channels, gains)
+    
+    emit('webrtc_subscribed', {
+        'channels': channels,
+        'clientId': client_id
     })
 
 # Manejar shutdown
