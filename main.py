@@ -14,8 +14,8 @@ import atexit
 
 from backend.audio_capture import AudioCapture
 from backend.channel_manager import ChannelManager
-from backend.websocket_server import app, socketio, init_server, stop_audio_thread
-import config_webrtc as config
+from backend.websocket_server import app, socketio, init_server, stop_audio_thread, set_webrtc_server
+import config
 
 def get_local_ip():
     """Obtiene la IP local para acceso desde red"""
@@ -31,19 +31,16 @@ def get_local_ip():
 # Variables globales para cleanup
 audio_capture = None
 channel_manager = None
+webrtc_server = None  # ← AGREGAR ESTA LÍNEA
 
 def cleanup():
     """Limpieza completa del sistema"""
     print("\n[*] Realizando limpieza completa...")
     
-    # Importar componentes WebRTC si existen
-    try:
-        from backend.webrtc_bridge import webrtc_bridge
-        if webrtc_bridge:
-            webrtc_bridge.stop()
-            print("[*] WebRTC Bridge detenido")
-    except ImportError:
-        pass
+    # Detener WebRTC Server
+    if webrtc_server:
+        webrtc_server.stop()
+        print("[*] WebRTC Server detenido")
     
     # Detener thread de audio del WebSocket server
     stop_audio_thread()
@@ -74,10 +71,10 @@ def check_webrtc_dependencies():
         return False
 
 def main():
-    global audio_capture, channel_manager
+    global audio_capture, channel_manager, webrtc_server  # ← AGREGAR webrtc_server AQUÍ
     
     print("=" * 70)
-    print("  🎚️  Audio Monitor - WebRTC Ultra Low Latencia (<15ms)")
+    print("  🎛️  Audio Monitor - WebRTC Ultra Low Latencia (<15ms)")
     print("=" * 70)
     print()
     
@@ -140,11 +137,30 @@ def main():
         print("[*] Inicializando channel manager...")
         channel_manager = ChannelManager(num_channels)
         
-        # 3. Inicializar servidores
-        print("[*] Inicializando servidores...")
+        # ========================================
+        # 3. INICIALIZAR WEBRTC SERVER (NUEVO)
+        # ========================================
+        if config.WEBRTC_ENABLED:
+            print("[*] Inicializando WebRTC Server...")
+            from backend.webrtc_server import WebRTCServer
+            
+            webrtc_server = WebRTCServer(audio_capture, channel_manager)
+            
+            # Iniciar el servidor WebRTC
+            webrtc_server.start()
+            print("[✓] WebRTC Server iniciado")
+            
+            # Registrar el servidor en websocket_server
+            set_webrtc_server(webrtc_server)
+            print("[✓] WebRTC Server registrado en WebSocket handler")
+        else:
+            print("[⚠] WebRTC deshabilitado - solo WebSocket disponible")
+        
+        # 4. Inicializar servidores WebSocket
+        print("[*] Inicializando servidor WebSocket...")
         init_server(audio_capture, channel_manager)
         
-        # 4. Obtener URLs
+        # 5. Obtener URLs
         local_ip = get_local_ip()
         url_local = f"http://localhost:{config.PORT}"
         url_network = f"http://{local_ip}:{config.PORT}"
@@ -179,7 +195,7 @@ def main():
         print("=" * 70)
         print()
         
-        # 5. Abrir navegador en thread separado
+        # 6. Abrir navegador en thread separado
         def open_browser():
             time.sleep(2)
             try:
@@ -191,7 +207,7 @@ def main():
         browser_thread = threading.Thread(target=open_browser, daemon=True)
         browser_thread.start()
         
-        # 6. Iniciar servidor Flask (bloqueante)
+        # 7. Iniciar servidor Flask (bloqueante)
         print("[*] Iniciando servidor Flask-SocketIO...")
         socketio.run(
             app, 

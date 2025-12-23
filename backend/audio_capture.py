@@ -8,7 +8,7 @@ import numpy as np
 import queue
 import threading
 import time
-import config_webrtc as config
+import config
 
 class AudioCapture:
     def __init__(self):

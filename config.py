@@ -1,57 +1,50 @@
-# Configuración del Sistema de Monitoreo de Audio
+# config.py - Configuración unificada del sistema
 
-# Optimizado para latencia <25ms - AUTO-CONFIGURACIÓN
+# === CONFIGURACIÓN WEBRTC ===
+WEBRTC_ENABLED = True
+WEBRTC_AUDIO_CODEC = 'opus'
+OPUS_BITRATE = 96000
+OPUS_COMPLEXITY = 10
+OPUS_FRAME_DURATION = 20
+OPUS_PACKET_LOSS_PERC = 10
 
+# ICE Servers
+STUN_SERVERS = [
+    'stun:stun.l.google.com:19302',
+    'stun:stun1.l.google.com:19302',
+    'stun:stun2.l.google.com:19302'
+]
 
+# Buffer y Latencia
+TARGET_LATENCY_MS = 15
+MAX_LATENCY_MS = 30
+INITIAL_PLAYOUT_DELAY = 0.020
+MAX_PLAYOUT_DELAY = 0.100
+JITTER_BUFFER_FACTOR = 2.0
 
-# === CONFIGURACIÓN DE AUDIO (AUTO) ===
+# WebRTC Specific
+DATA_CHANNEL_PROTOCOL = 'audio-monitor-v1'
+MAX_PACKET_SIZE = 1200
+USE_DTX = False
+USE_FEC = True
 
-# Estos valores se ajustan automáticamente según la interfaz detectada
+# === CONFIGURACIÓN BÁSICA ===
+SAMPLE_RATE = 44100
+BLOCKSIZE = 256
+DTYPE = 'float32'
+CHANNELS_MAX = 32
+QUEUE_SIZE = 10
+MAX_CLIENTS = 8
+JITTER_BUFFER_MS = 30
 
-SAMPLE_RATE = None  # Auto: se detecta del dispositivo
-
-BLOCKSIZE = 256     # Fijo: 128 samples para ultra-baja latencia
-
-DTYPE = 'float32'   # Sin conversiones (máxima eficiencia)
-
-
-
-# === CONFIGURACIÓN DE RED ===
-
-HOST = '0.0.0.0'    # Accesible desde red local
-
+# Red
+HOST = '0.0.0.0'
 PORT = 5100
 
+# WebSocket
+PING_INTERVAL = 5
+PING_TIMEOUT = 10
 
-
-# === LÍMITES DEL SISTEMA ===
-
-CHANNELS_MAX = 32       # Máximo de canales a procesar
-
-QUEUE_SIZE = 10         # Buffers en cola (aumentado para estabilidad)
-
-MAX_CLIENTS = 8         # Máximo de clientes simultáneos
-
-
-
-# === CONFIGURACIÓN DE CLIENTE (AUTO) ===
-
-# Se calcula automáticamente según latencia de red y sample rate
-
-JITTER_BUFFER_MS = None  # Auto: ajustado dinámicamente
-
-
-
-# === WEBSOCKET ===
-
-PING_INTERVAL = 5       # Segundos entre pings
-
-PING_TIMEOUT = 10       # Timeout para considerar desconectado
-
-
-
-# === DEBUG ===
-
-VERBOSE = True          # Mostrar información detallada
-
-SHOW_METRICS = False    # Mostrar métricas de rendimiento (cada 5s)
+# Debug
+VERBOSE = True
+SHOW_METRICS = True
