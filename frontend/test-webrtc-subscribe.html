@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test WebRTC Subscribe</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body { 
+            font-family: monospace; 
+            background: #1a1a1a; 
+            color: #0f0; 
+            padding: 20px; 
+        }
+        .log { 
+            background: #000; 
+            border: 1px solid #0f0; 
+            padding: 10px; 
+            margin: 10px 0; 
+            max-height: 400px; 
+            overflow-y: auto; 
+        }
+        button { 
+            background: #0f0; 
+            color: #000; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        button:hover { background: #0c0; }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .warning { color: #ff0; }
+    </style>
+</head>
+<body>
+    <h1>🔬 Test WebRTC Subscribe</h1>
+    
+    <div>
+        <button onclick="test1()">1. Connect WebSocket</button>
+        <button onclick="test2()">2. Send Subscribe (WebSocket)</button>
+        <button onclick="test3()">3. Send Subscribe (WebRTC format)</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <h2>Log:</h2>
+    <div id="log" class="log"></div>
+    
+    <script>
+        let socket = null;
+        let clientId = null;
+        
+        function log(msg, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const className = type;
+            const line = document.createElement('div');
+            line.className = className;
+            line.textContent = `[${time}] ${msg}`;
+            logDiv.appendChild(line);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(msg);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // TEST 1: Conectar WebSocket
+        function test1() {
+            log('🔌 TEST 1: Conectando WebSocket...', 'info');
+            
+            socket = io({
+                transports: ['websocket'],
+                upgrade: false
+            });
+            
+            socket.on('connect', () => {
+                clientId = socket.id;
+                log(`✅ WebSocket conectado! ID: ${clientId}`, 'success');
+            });
+            
+            socket.on('disconnect', () => {
+                log('❌ WebSocket desconectado', 'error');
+            });
+            
+            socket.on('device_info', (info) => {
+                log(`✅ Device info recibido:`, 'success');
+                log(`   - Canales: ${info.channels}`, 'info');
+                log(`   - Sample rate: ${info.sample_rate}`, 'info');
+                log(`   - WebRTC enabled: ${info.webrtc_enabled}`, 'info');
+            });
+            
+            socket.on('subscribed', (data) => {
+                log(`✅ Suscripción WebSocket confirmada:`, 'success');
+                log(`   - Channels: ${JSON.stringify(data.channels)}`, 'success');
+            });
+            
+            socket.on('webrtc_subscribed', (data) => {
+                log(`✅ Suscripción WebRTC confirmada:`, 'success');
+                log(`   - Channels: ${JSON.stringify(data.channels)}`, 'success');
+            });
+        }
+        
+        // TEST 2: Enviar suscripción WebSocket normal
+        function test2() {
+            if (!socket || !socket.connected) {
+                log('❌ ERROR: WebSocket no conectado. Ejecuta Test 1 primero.', 'error');
+                return;
+            }
+            
+            log('📤 TEST 2: Enviando suscripción WebSocket...', 'info');
+            
+            const data = {
+                channels: [0],
+                gains: { 0: 1.0 }
+            };
+            
+            log(`   Data: ${JSON.stringify(data)}`, 'info');
+            
+            socket.emit('subscribe', data);
+            
+            log('✅ Suscripción WebSocket enviada', 'success');
+            log('⏳ Esperando confirmación del servidor...', 'warning');
+        }
+        
+        // TEST 3: Enviar suscripción formato WebRTC
+        function test3() {
+            if (!socket || !socket.connected) {
+                log('❌ ERROR: WebSocket no conectado. Ejecuta Test 1 primero.', 'error');
+                return;
+            }
+            
+            log('📤 TEST 3: Enviando suscripción WebRTC...', 'info');
+            
+            const data = {
+                channels: [0],
+                gains: { 0: 1.0 },
+                clientId: clientId
+            };
+            
+            log(`   Data: ${JSON.stringify(data)}`, 'info');
+            
+            socket.emit('webrtc_subscribe', data);
+            
+            log('✅ Suscripción WebRTC enviada', 'success');
+            log('⏳ Esperando confirmación del servidor...', 'warning');
+        }
+        
+        // Auto-start
+        log('🚀 Test tool ready', 'success');
+        log('📋 Sigue los pasos en orden: 1 → 2 → 3', 'info');
+    </script>
+</body>
+</html>

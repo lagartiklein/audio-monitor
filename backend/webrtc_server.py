@@ -1,6 +1,5 @@
 """
-WebRTC Server - CORREGIDO para enviar audio correctamente
-El problema era que no se agregaba el MediaStreamTrack a la PeerConnection
+WebRTC Server - Versión MEJORADA (combina vieja + nueva)
 """
 
 import asyncio
@@ -51,6 +50,8 @@ class AudioStreamTrack(MediaStreamTrack):
             
             if audio_data is None or len(audio_data) == 0:
                 # Generar silencio
+                if config.VERBOSE:
+                    print(f"[WebRTC Track] {self.client_id[:8]} recibiendo silencio (sin datos)")
                 audio_data = np.zeros((config.BLOCKSIZE, 2), dtype=np.float32)
             
             # Asegurar que tengamos estéreo
@@ -78,6 +79,8 @@ class AudioStreamTrack(MediaStreamTrack):
             
         except asyncio.TimeoutError:
             # Timeout - enviar silencio
+            if config.VERBOSE:
+                print(f"[WebRTC Track] {self.client_id[:8]} timeout en recv()")
             silence = np.zeros((config.BLOCKSIZE, 2), dtype=np.float32)
             frame = AudioFrame.from_ndarray(
                 silence.T,
@@ -92,16 +95,24 @@ class AudioStreamTrack(MediaStreamTrack):
             return frame
     
     def put_audio(self, audio_data):
-        """Pone datos de audio en la cola (llamado desde el thread de captura)"""
+        """Pone datos de audio en la cola - VERSIÓN MEJORADA"""
         try:
-            # Usar put_nowait en lugar de put para evitar bloqueos
-            if not self._queue.full():
-                asyncio.run_coroutine_threadsafe(
-                    self._queue.put(audio_data),
-                    asyncio.get_event_loop()
-                )
+            # Usar put_nowait para evitar bloqueos
+            self._queue.put_nowait(audio_data)
+            if config.VERBOSE and self._queue.qsize() % 50 == 0:
+                print(f"[WebRTC Track] {self.client_id[:8]} queue size: {self._queue.qsize()}")
+        except asyncio.QueueFull:
+            # Descartar el buffer más viejo
+            try:
+                self._queue.get_nowait()
+                if config.VERBOSE:
+                    print(f"[WebRTC Track] {self.client_id[:8]} queue llena, descartando viejo")
+                self._queue.put_nowait(audio_data)
+            except asyncio.QueueEmpty:
+                pass
         except Exception as e:
-            logger.warning(f"Error poniendo audio en cola: {e}")
+            if config.VERBOSE:
+                print(f"[WebRTC Track] Error en put_audio: {e}")
     
     async def stop(self):
         """Detiene el track"""
@@ -111,7 +122,7 @@ class AudioStreamTrack(MediaStreamTrack):
 
 class WebRTCServer:
     """
-    Servidor WebRTC CORREGIDO - Ahora envía el MediaStreamTrack
+    Servidor WebRTC MEJORADO - Combina estabilidad vieja + mejoras nuevas
     """
     
     def __init__(self, audio_capture, channel_manager):
@@ -131,6 +142,7 @@ class WebRTCServer:
         # Estado
         self.running = False
         self.audio_thread = None
+        self.loop = None  # ← AÑADIDO: Para manejo de loops
         
         # Estadísticas
         self.stats = {
@@ -141,7 +153,7 @@ class WebRTCServer:
             'errors': 0
         }
         
-        logger.info("WebRTC Server (MediaStreamTrack) inicializado")
+        logger.info("WebRTC Server MEJORADO inicializado")
     
     def start(self):
         """Inicia el servidor WebRTC"""
@@ -149,6 +161,14 @@ class WebRTCServer:
             return
         
         self.running = True
+        
+        # Obtener loop para operaciones asíncronas
+        try:
+            self.loop = asyncio.get_event_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+        
         self.audio_thread = threading.Thread(
             target=self._run_audio_distribution,
             daemon=True,
@@ -156,27 +176,49 @@ class WebRTCServer:
         )
         self.audio_thread.start()
         
-        logger.info("WebRTC Server iniciado (modo MediaStreamTrack)")
+        logger.info("WebRTC Server iniciado")
     
     def stop(self):
-        """Detiene el servidor WebRTC"""
+        """Detiene el servidor WebRTC - MEJORADO"""
         self.running = False
         
-        # Cerrar todas las conexiones
-        for client_id in list(self.pcs.keys()):
-            asyncio.run(self.close_connection(client_id))
+        # Cerrar todas las conexiones usando el loop si está disponible
+        if self.loop and self.loop.is_running():
+            try:
+                for client_id in list(self.pcs.keys()):
+                    asyncio.run_coroutine_threadsafe(
+                        self.close_connection(client_id),
+                        self.loop
+                    )
+            except Exception as e:
+                logger.error(f"Error cerrando conexiones: {e}")
+        else:
+            # Método de respaldo
+            for client_id in list(self.pcs.keys()):
+                try:
+                    asyncio.run(self.close_connection(client_id))
+                except Exception as e:
+                    logger.error(f"Error cerrando conexión {client_id[:8]}: {e}")
         
+        # Esperar thread de audio
         if self.audio_thread:
             self.audio_thread.join(timeout=2)
         
         logger.info("WebRTC Server detenido")
     
+    # ============================================
+    # MÉTODO _run_audio_distribution MODIFICADO CON LOGS
+    # ============================================
     def _run_audio_distribution(self):
-        """Distribuye audio a todos los tracks WebRTC"""
-        logger.info("Audio distribution (MediaStreamTrack) iniciado")
+        """Distribuye audio a todos los tracks WebRTC - CON LOGS MEJORADOS"""
+        print("[WebRTC] 🔄 Audio distribution iniciado")
         
         frame_duration = config.BLOCKSIZE / config.SAMPLE_RATE
         next_frame_time = time.time()
+        
+        # Variables para logs
+        frame_counter = 0
+        status_interval = 100  # Cada ~2 segundos
         
         while self.running:
             try:
@@ -194,19 +236,48 @@ class WebRTCServer:
                 if audio_data is None:
                     continue
                 
+                frame_counter += 1
+                
+                # ✅ LOGS DE ESTADO PERIÓDICOS
+                if frame_counter % status_interval == 0:
+                    print(f"\n[WebRTC Dist] 📊 Frame {frame_counter}")
+                    print(f"  Audio shape: {audio_data.shape}")
+                    print(f"  Tracks activos: {len(self.audio_tracks)}")
+                    print(f"  PC connections: {len(self.pcs)}")
+                    print(f"  Subscripciones totales: {len(self.channel_manager.subscriptions)}")
+                    
+                    # Mostrar estado de cada cliente
+                    for client_id in list(self.audio_tracks.keys()):
+                        sub = self.channel_manager.subscriptions.get(client_id)
+                        if sub:
+                            channels = sub.get('channels', [])
+                            print(f"    {client_id[:8]}: {len(channels)} canales")
+                        else:
+                            print(f"    {client_id[:8]}: ❌ SIN SUB")
+                
                 # Distribuir a cada track activo
                 for client_id, track in list(self.audio_tracks.items()):
+                    
+                    # ✅ VERIFICAR SI EL CLIENTE TIENE SUSCRIPCIÓN
                     if client_id not in self.channel_manager.subscriptions:
+                        # ⚠️ DEBUG importante
+                        if frame_counter % 50 == 0:  # Cada ~1 segundo
+                            print(f"[WebRTC Dist] ⚠️ {client_id[:8]} sin suscripción")
+                            print(f"    Subscripciones disponibles: {list(self.channel_manager.subscriptions.keys())}")
                         continue
                     
                     subscription = self.channel_manager.subscriptions.get(client_id)
                     if not subscription:
+                        if frame_counter % 50 == 0:
+                            print(f"[WebRTC Dist] ❌ Subscription vacía para {client_id[:8]}")
                         continue
                     
                     channels = subscription.get('channels', [])
                     gains = subscription.get('gains', {})
                     
                     if not channels:
+                        if frame_counter % status_interval == 0:
+                            print(f"[WebRTC Dist] ⚠️ {client_id[:8]} sin canales activos")
                         continue
                     
                     try:
@@ -219,6 +290,10 @@ class WebRTCServer:
                         
                         # Enviar al track
                         track.put_audio(mixed_audio)
+                        
+                        # ✅ LOG DE ÉXITO (solo periódicamente)
+                        if frame_counter % status_interval == 0:
+                            print(f"[WebRTC Dist] ✅ {client_id[:8]}: {len(channels)} canales, {mixed_audio.nbytes} bytes")
                         
                         # Actualizar estadísticas
                         self.stats['total_packets_sent'] += 1
@@ -240,7 +315,7 @@ class WebRTCServer:
                 self.stats['errors'] += 1
                 time.sleep(0.1)
         
-        logger.info("Audio distribution (MediaStreamTrack) detenido")
+        print("[WebRTC] Audio distribution detenido")
     
     def _mix_channels(self, audio_data, channels, gains):
         """Mezcla múltiples canales en estéreo"""
@@ -283,14 +358,13 @@ class WebRTCServer:
     async def handle_offer(self, client_id: str, offer_sdp: str) -> str:
         """
         Procesa una oferta SDP del cliente y devuelve respuesta
-        CORREGIDO: Ahora agrega el MediaStreamTrack
         """
         try:
             # Crear PeerConnection
             pc = RTCPeerConnection(configuration=self.rtc_config)
             self.pcs[client_id] = pc
             
-            # ✅ CREAR Y AGREGAR AUDIO TRACK (ESTO FALTABA)
+            # Crear y agregar audio track
             audio_track = AudioStreamTrack(
                 self.audio_capture,
                 self.channel_manager,
@@ -298,15 +372,15 @@ class WebRTCServer:
             )
             self.audio_tracks[client_id] = audio_track
             
-            # ✅ AGREGAR TRACK A LA PEER CONNECTION
+            # Agregar track a la PeerConnection
             pc.addTrack(audio_track)
-            logger.info(f"✅ Audio track agregado para {client_id[:8]}...")
+            print(f"[WebRTC] ✅ Audio track agregado para {client_id[:8]}...")
             
             # Configurar event handlers
             @pc.on("connectionstatechange")
             async def on_connectionstatechange():
                 state = pc.connectionState
-                logger.info(f"Connection state {client_id[:8]}: {state}")
+                print(f"[WebRTC] Connection state {client_id[:8]}: {state}")
                 
                 if state in ["failed", "closed", "disconnected"]:
                     await self.close_connection(client_id)
@@ -314,7 +388,31 @@ class WebRTCServer:
             @pc.on("iceconnectionstatechange")
             async def on_iceconnectionstatechange():
                 state = pc.iceConnectionState
-                logger.info(f"ICE state {client_id[:8]}: {state}")
+                print(f"[WebRTC] ICE state {client_id[:8]}: {state}")
+            
+            # OPCIONAL: Configurar DataChannel para mensajes de control
+            try:
+                channel = pc.createDataChannel("audio-control")
+                
+                @channel.on("message")
+                def on_message(message):
+                    try:
+                        data = json.loads(message)
+                        print(f"[WebRTC DataChannel] {client_id[:8]}: {data.get('type')}")
+                        
+                        if data.get('type') == 'subscribe':
+                            channels = data.get('channels', [])
+                            gains = data.get('gains', {})
+                            
+                            # Registrar suscripción
+                            self.channel_manager.subscribe_client(client_id, channels, gains)
+                            print(f"[WebRTC DataChannel] ✅ Suscripción recibida via DataChannel")
+                            
+                    except Exception as e:
+                        print(f"[WebRTC DataChannel] Error: {e}")
+                
+            except Exception as e:
+                print(f"[WebRTC] DataChannel no creado: {e}")
             
             # Establecer oferta remota
             await pc.setRemoteDescription(
@@ -324,12 +422,9 @@ class WebRTCServer:
             # Crear respuesta
             answer = await pc.createAnswer()
             
-            # Optimizar SDP (opcional, el cliente ya lo hace)
-            # answer.sdp = self._optimize_sdp(answer.sdp)
-            
             await pc.setLocalDescription(answer)
             
-            logger.info(f"✅ Oferta WebRTC aceptada y track agregado para {client_id[:8]}...")
+            print(f"[WebRTC] ✅ Oferta WebRTC aceptada para {client_id[:8]}...")
             
             # Actualizar estadísticas
             self.stats['connections'] = len(self.pcs)
@@ -337,18 +432,33 @@ class WebRTCServer:
             return answer.sdp
             
         except Exception as e:
-            logger.error(f"Error procesando oferta para {client_id[:8]}: {e}")
+            print(f"[WebRTC] ❌ Error procesando oferta para {client_id[:8]}: {e}")
             await self.close_connection(client_id)
             raise
     
     async def add_ice_candidate(self, client_id: str, candidate_dict: dict):
-        """Agrega un candidato ICE a la conexión"""
-        if client_id in self.pcs:
-            pc = self.pcs[client_id]
-            try:
-                await pc.addIceCandidate(candidate_dict)
-            except Exception as e:
-                logger.error(f"Error agregando ICE candidate para {client_id[:8]}: {e}")
+        """Agrega un candidato ICE a la conexión - VERSIÓN QUE FUNCIONA"""
+        if client_id not in self.pcs:
+            print(f"[WebRTC] ⚠️ Cliente {client_id[:8]} no tiene PeerConnection activa")
+            return
+        
+        pc = self.pcs[client_id]
+        
+        try:
+            if config.VERBOSE:
+                print(f"[WebRTC Server] Procesando ICE candidate para {client_id[:8]}")
+            
+            # Versión SIMPLE que SÍ funciona
+            # Pasar el diccionario directamente como lo hacía la versión vieja
+            await pc.addIceCandidate(candidate_dict)
+            
+            if config.VERBOSE:
+                print(f"[WebRTC Server] ✅ ICE candidate agregado para {client_id[:8]}")
+                
+        except Exception as e:
+            logger.error(f"Error agregando ICE candidate para {client_id[:8]}: {e}")
+            if config.VERBOSE:
+                print(f"[WebRTC Server] ❌ Error: {type(e).__name__}: {e}")
     
     async def close_connection(self, client_id: str):
         """Cierra una conexión WebRTC limpiamente"""
@@ -358,12 +468,14 @@ class WebRTCServer:
                 track = self.audio_tracks[client_id]
                 await track.stop()
                 del self.audio_tracks[client_id]
+                print(f"[WebRTC] Track detenido para {client_id[:8]}")
             
             # Cerrar PeerConnection
             if client_id in self.pcs:
                 pc = self.pcs[client_id]
                 await pc.close()
                 del self.pcs[client_id]
+                print(f"[WebRTC] PeerConnection cerrada para {client_id[:8]}")
             
             # Desuscribir del channel manager
             self.channel_manager.unsubscribe_client(client_id)
@@ -371,7 +483,7 @@ class WebRTCServer:
             # Actualizar estadísticas
             self.stats['connections'] = len(self.pcs)
             
-            logger.info(f"Conexión WebRTC cerrada para {client_id[:8]}...")
+            print(f"[WebRTC] ✅ Conexión WebRTC cerrada para {client_id[:8]}...")
             
         except Exception as e:
             logger.error(f"Error cerrando conexión WebRTC para {client_id[:8]}: {e}")

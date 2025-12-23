@@ -1009,48 +1009,73 @@
                 document.getElementById('channel-count').textContent = `CHANNELS: ${numChannels}`;
             }
             
+
             async toggleChannel(channel, button) {
-                // Iniciar audio según protocolo
-                if (this.protocol === 'websocket' && !this.audioContext) {
-                    const success = await this.initAudioContext();
-                    if (!success) return;
-                    document.getElementById('init-overlay').classList.add('hidden');
-                } else if (this.protocol === 'webrtc' && !this.webrtcConnected) {
-                    await this.initWebRTC();
-                    // Esperar un momento para que WebRTC se conecte
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(`[App] toggleChannel(${channel}) INICIADO`);
+    console.log(`[App] Protocolo actual: ${this.protocol}`);
+    console.log(`[App] Audio initialized: ${this.audioInitialized}`);
+    
+    const strip = button.closest('.channel-strip');
+    
+    if (this.activeChannels.has(channel)) {
+        // Desactivar
+        console.log(`[App] Desactivando canal ${channel}`);
+        this.activeChannels.delete(channel);
+        button.classList.remove('active');
+        strip.classList.remove('active');
+        
+        if (this.channelProcessors[channel]) {
+            if (this.protocol === 'websocket') {
+                this.channelProcessors[channel].panNode.disconnect();
+                this.channelProcessors[channel].gainNode.disconnect();
+                if (this.channelProcessors[channel].workletNode) {
+                    this.channelProcessors[channel].workletNode.disconnect();
                 }
-                
-                const strip = button.closest('.channel-strip');
-                
-                if (this.activeChannels.has(channel)) {
-                    this.activeChannels.delete(channel);
-                    button.classList.remove('active');
-                    strip.classList.remove('active');
-                    
-                    if (this.channelProcessors[channel]) {
-                        this.channelProcessors[channel].panNode.disconnect();
-                        this.channelProcessors[channel].gainNode.disconnect();
-                        if (this.channelProcessors[channel].workletNode) {
-                            this.channelProcessors[channel].workletNode.disconnect();
-                        }
-                        delete this.channelProcessors[channel];
-                    }
-                } else {
-                    this.activeChannels.add(channel);
-                    button.classList.add('active');
-                    strip.classList.add('active');
-                    
-                    if (this.protocol === 'websocket') {
-                        this.createChannelProcessor(channel);
-                    }
-                }
-                
-                this.updateSubscription();
-                document.getElementById('audio-status').textContent = 
-                    `AUDIO: ${this.activeChannels.size} ACTIVE (${this.metrics.protocol})`;
             }
-            
+            delete this.channelProcessors[channel];
+        }
+    } else {
+        // Activar
+        console.log(`[App] Activando canal ${channel}`);
+        this.activeChannels.add(channel);
+        button.classList.add('active');
+        strip.classList.add('active');
+        
+        // Iniciar audio según protocolo
+        if (this.protocol === 'websocket' && !this.audioContext) {
+            console.log('[App] Iniciando WebSocket audio...');
+            const success = await this.initAudioContext();
+            if (!success) {
+                console.error('[App] Error iniciando WebSocket audio');
+                return;
+            }
+            document.getElementById('init-overlay').classList.add('hidden');
+        } else if (this.protocol === 'webrtc' && !this.webrtcConnected) {
+            console.log('[App] Esperando conexión WebRTC...');
+            await this.initWebRTC();
+            // Esperar un momento para que WebRTC se conecte
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (this.protocol === 'websocket') {
+            this.createChannelProcessor(channel);
+        }
+        // ✅ AGREGAR ESTO PARA WEBRTC
+        else if (this.protocol === 'webrtc') {
+            console.log(`[App] Usando WebRTC para canal ${channel}`);
+        }
+    }
+    
+    console.log(`[App] Canales activos después del toggle: ${this.activeChannels.size}`);
+    console.log(`[App] Llamando a updateSubscription()...`);
+    
+    // ✅ CRÍTICO: Llamar a updateSubscription
+    this.updateSubscription();
+    
+    document.getElementById('audio-status').textContent = 
+        `AUDIO: ${this.activeChannels.size} ACTIVE (${this.metrics.protocol})`;
+}
+         
             createChannelProcessor(channel) {
                 try {
                     if (!this.audioWorkletReady) {

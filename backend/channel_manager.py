@@ -22,7 +22,8 @@ class ChannelManager:
             'gains': gains
         }
         
-        import config_webrtc as config
+        import config
+
         if config.VERBOSE:
             print(f"[+] Cliente {client_id[:8]}... suscrito a {len(channels)} canales")
     
@@ -31,7 +32,7 @@ class ChannelManager:
         if client_id in self.subscriptions:
             del self.subscriptions[client_id]
             
-            import config_webrtc as config
+            import config
             if config.VERBOSE:
                 print(f"[-] Cliente {client_id[:8]}... desuscrito")
     

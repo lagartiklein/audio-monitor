@@ -16,7 +16,6 @@ from backend.audio_capture import AudioCapture
 from backend.channel_manager import ChannelManager
 from backend.websocket_server import app, socketio, init_server, stop_audio_thread, set_webrtc_server
 import config
-
 def get_local_ip():
     """Obtiene la IP local para acceso desde red"""
     try:
