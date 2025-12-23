@@ -1,949 +1,972 @@
-// Audio Monitor - Cliente Web CORREGIDO
-
-// Optimizado para latencia <25ms
-
-
+// Audio Monitor - Cliente Web con soporte WebRTC/WebSocket dual
 
 class AudioMonitor {
-
     constructor() {
-
         this.socket = null;
-
+        this.webrtcClient = null;
         this.audioContext = null;
-
-        this.channels = {};
-
         this.deviceInfo = null;
-
         this.activeChannels = new Set();
-
-        this.audioWorkletReady = false;
-
+        this.channelProcessors = {};
         
-
-        // MÃ©tricas
-
+        // Configuración de protocolo
+        this.useWebRTC = this.detectWebRTCSupport();
+        this.protocol = 'auto'; // 'auto', 'webrtc', 'websocket'
+        this.preferredProtocol = localStorage.getItem('audioMonitor_preferredProtocol') || 'webrtc';
+        this.autoSwitchProtocol = true;
+        
+        // Métricas combinadas
         this.metrics = {
-
             networkLatency: 0,
-
-            bufferHealth: 0,
-
+            bufferHealth: 100,
             estimatedLatency: 0,
-
-            lastPingTime: 0
-
+            protocol: '',
+            audioLatency: 0,
+            packetLoss: 0,
+            connectionQuality: 'unknown',
+            bytesReceived: 0,
+            jitter: 0
         };
-
         
-
-        // Auto-init flag
-
-        this.autoInitAttempted = false;
-
+        // Estado
+        this.connected = false;
+        this.audioInitialized = false;
+        this.connectionStartTime = 0;
+        this.protocolSwitchCount = 0;
         
-
+        // UI elements cache
+        this.uiElements = {};
+        
         this.init();
-
     }
-
-
 
     async init() {
-
         console.log('[AudioMonitor] Inicializando...');
-
+        this.connectionStartTime = Date.now();
         
-
-        // Conectar WebSocket
-
-        this.socket = io({
-
-            transports: ['websocket'],
-
-            upgrade: false,
-
-            reconnection: true,
-
-            reconnectionDelay: 1000,
-
-            reconnectionAttempts: 5
-
-        });
-
+        // Cache UI elements
+        this.cacheUIElements();
         
-
-        this.socket.on('connect', () => {
-
-            this.updateStatus('Conectado', 'connected');
-
-            console.log('[Socket] Conectado');
-
-            
-
-            // Re-suscribir canales activos si hay reconexiÃ³n
-
-            if (this.activeChannels.size > 0) {
-
-                this.updateSubscription();
-
-            }
-
-        });
-
+        // Actualizar UI inicial
+        this.updateStatus('Inicializando...', 'connecting');
+        this.updateProtocolDisplay('Detectando...');
         
-
-        this.socket.on('disconnect', (reason) => {
-
-            this.updateStatus('Desconectado', 'disconnected');
-
-            console.log('[Socket] Desconectado:', reason);
-
-        });
-
+        // Conectar WebSocket (siempre necesario para señalización)
+        await this.connectWebSocket();
         
-
-        this.socket.on('device_info', (info) => {
-
-            this.deviceInfo = info;
-
-            this.displayDeviceInfo(info);
-
-            this.createChannelGrid(info.channels);
-
-            this.calculateEstimatedLatency();
-
-            console.log('[Device] Info recibida:', info);
-
-            
-
-            // Mostrar botÃ³n de inicio si aÃºn no hay AudioContext
-
-            if (!this.audioContext && !this.autoInitAttempted) {
-
-                this.showInitButton();
-
-            }
-
-        });
-
+        // Configurar event listeners
+        this.setupEventListeners();
         
-
-        this.socket.on('audio', (data) => {
-
-            this.handleAudioData(data);
-
-        });
-
-        
-
-        this.socket.on('pong', (data) => {
-
-            // CORREGIDO: Ambos timestamps en milisegundos
-
-            const latency = Date.now() - data.client_timestamp;
-
-            this.updateNetworkLatency(latency);
-
-        });
-
-        
-
-        // Ping cada 2 segundos para medir latencia de red
-
-        setInterval(() => {
-
-            if (this.socket && this.socket.connected) {
-
-                this.socket.emit('ping', { timestamp: Date.now() });
-
-            }
-
-        }, 2000);
-
-        
-
-        // Actualizar mÃ©tricas cada 100ms
-
-        setInterval(() => {
-
-            this.updateMetricsDisplay();
-
-        }, 100);
-
+        // Iniciar monitorización de métricas
+        this.startMetricsMonitoring();
     }
-
-
-
-    showInitButton() {
-
-        const initBtn = document.getElementById('audio-init-btn');
-
-        if (initBtn) {
-
-            initBtn.style.display = 'block';
-
-            initBtn.onclick = () => this.initAudioContext();
-
-        }
-
+    
+    cacheUIElements() {
+        this.uiElements = {
+            status: document.getElementById('status'),
+            deviceInfo: document.getElementById('device-info'),
+            latency: document.getElementById('latency'),
+            bufferHealth: document.getElementById('buffer-health'),
+            networkLatency: document.getElementById('network-latency'),
+            protocolValue: document.getElementById('protocol-value'),
+            channelsGrid: document.getElementById('channels-grid'),
+            helpMessage: document.getElementById('help-message'),
+            audioInitBtn: document.getElementById('audio-init-btn'),
+            protocolInfo: document.getElementById('protocol-info') || this.createProtocolInfoElement()
+        };
     }
-
-
-
-    async initAudioContext() {
-
-        if (this.audioContext) return true;
-
+    
+    createProtocolInfoElement() {
+        const metricsPanel = document.querySelector('.metrics-panel');
+        if (!metricsPanel) return null;
         
-
-        if (!this.deviceInfo) {
-
-            console.warn('[Audio] Esperando device_info...');
-
-            return false;
-
-        }
-
-        
-
-        try {
-
-            this.autoInitAttempted = true;
-
-            
-
-            // Crear AudioContext con configuraciÃ³n Ã³ptima
-
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-
-                latencyHint: 'interactive',
-
-                sampleRate: this.deviceInfo.sample_rate
-
-            });
-
-            
-
-            console.log(`[Audio] Context creado:`);
-
-            console.log(`  Sample Rate: ${this.audioContext.sampleRate} Hz`);
-
-            console.log(`  Base Latency: ${(this.audioContext.baseLatency * 1000).toFixed(1)}ms`);
-
-            console.log(`  Output Latency: ${(this.audioContext.outputLatency * 1000).toFixed(1)}ms`);
-
-            
-
-            // Cargar AudioWorklet
-
-            await this.loadAudioWorklet();
-
-            
-
-            // Ocultar botÃ³n de inicio
-
-            const initBtn = document.getElementById('audio-init-btn');
-
-            if (initBtn) initBtn.style.display = 'none';
-
-            
-
-            // Actualizar latencia estimada con valores reales
-
-            this.calculateEstimatedLatency();
-
-            
-
-            return true;
-
-            
-
-        } catch (error) {
-
-            console.error('[Audio] Error al inicializar:', error);
-
-            alert('Error al inicializar audio. Intenta recargar la pÃ¡gina.');
-
-            return false;
-
-        }
-
-    }
-
-
-
-    async loadAudioWorklet() {
-
-        try {
-
-            await this.audioContext.audioWorklet.addModule('/audio-processor.js');
-
-            this.audioWorkletReady = true;
-
-            console.log('[AudioWorklet] Cargado correctamente');
-
-        } catch (error) {
-
-            console.error('[AudioWorklet] Error al cargar:', error);
-
-            this.audioWorkletReady = false;
-
-        }
-
-    }
-
-
-
-    displayDeviceInfo(info) {
-
-        document.getElementById('device-info').innerHTML = `
-
-            <strong>${info.name}</strong> | 
-
-            ${info.channels} canales | 
-
-            ${info.sample_rate} Hz | 
-
-            Buffer: ${info.blocksize} samples (${(info.blocksize/info.sample_rate*1000).toFixed(1)}ms)
-
+        const protocolDiv = document.createElement('div');
+        protocolDiv.className = 'metric';
+        protocolDiv.id = 'protocol-info';
+        protocolDiv.innerHTML = `
+            <span class="metric-label">Protocolo</span>
+            <span id="protocol-value" class="metric-value">--</span>
+            <span class="metric-unit">-</span>
         `;
-
+        metricsPanel.appendChild(protocolDiv);
+        
+        return protocolDiv;
     }
-
-
-
-    calculateEstimatedLatency() {
-
-        if (!this.deviceInfo) return;
-
+    
+    detectWebRTCSupport() {
+        const supported = !!(window.RTCPeerConnection && window.RTCSessionDescription);
+        console.log(`[AudioMonitor] WebRTC soportado: ${supported}`);
         
-
-        const captureLatency = (this.deviceInfo.blocksize / this.deviceInfo.sample_rate * 1000);
-
-        const jitterBuffer = this.deviceInfo.jitter_buffer_ms;
-
-        const processingLatency = 2;
-
-        const networkLatency = this.metrics.networkLatency || 10;
-
-        
-
-        // AÃ±adir latencias del AudioContext si estÃ¡ disponible
-
-        let contextLatency = 0;
-
-        if (this.audioContext) {
-
-            contextLatency = (this.audioContext.baseLatency + this.audioContext.outputLatency) * 1000;
-
+        if (!supported) {
+            console.warn('[AudioMonitor] WebRTC no está disponible en este navegador');
+            this.showWarning('WebRTC no está disponible. Usando WebSocket.');
         }
-
         
-
-        this.metrics.estimatedLatency = 
-
-            captureLatency + 
-
-            jitterBuffer + 
-
-            processingLatency + 
-
-            networkLatency +
-
-            contextLatency;
-
+        return supported;
     }
-
-
-
-    createChannelGrid(numChannels) {
-
-        const grid = document.getElementById('channels-grid');
-
-        grid.innerHTML = '';
-
-        
-
-        const helpMsg = document.getElementById('help-message');
-
-        if (helpMsg) helpMsg.style.display = 'none';
-
-        
-
-        for (let i = 0; i < numChannels; i++) {
-
-            const channelDiv = document.createElement('div');
-
-            channelDiv.className = 'channel';
-
-            channelDiv.innerHTML = `
-
-                <div class="channel-header">
-
-                    <button class="channel-toggle" data-channel="${i}">
-
-                        Canal ${i + 1}
-
-                    </button>
-
-                </div>
-
-                <div class="channel-controls">
-
-                    <label>Volumen</label>
-
-                    <input type="range" class="volume-slider" 
-
-                           data-channel="${i}"
-
-                           min="-60" max="12" value="0" step="1">
-
-                    <span class="volume-value">0 dB</span>
-
-                </div>
-
+    
+    showWarning(message) {
+        // Crear o actualizar elemento de advertencia
+        let warningEl = document.getElementById('webrtc-warning');
+        if (!warningEl) {
+            warningEl = document.createElement('div');
+            warningEl.id = 'webrtc-warning';
+            warningEl.className = 'warning-message';
+            warningEl.style.cssText = `
+                background: #ff9800;
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 10px 0;
+                text-align: center;
             `;
-
-            
-
-            grid.appendChild(channelDiv);
-
+            document.querySelector('.container').insertBefore(warningEl, document.querySelector('main'));
         }
-
         
-
-        // Event listeners
-
-        document.querySelectorAll('.channel-toggle').forEach(btn => {
-
-            btn.addEventListener('click', (e) => {
-
-                const channel = parseInt(e.target.dataset.channel);
-
-                this.toggleChannel(channel, e.target);
-
-            });
-
-        });
-
+        warningEl.textContent = `⚠️ ${message}`;
+        warningEl.style.display = 'block';
         
-
-        document.querySelectorAll('.volume-slider').forEach(slider => {
-
-            slider.addEventListener('input', (e) => {
-
-                const channel = parseInt(e.target.dataset.channel);
-
-                const db = parseFloat(e.target.value);
-
-                const gain = this.dbToGain(db);
-
-                
-
-                e.target.nextElementSibling.textContent = `${db > 0 ? '+' : ''}${db} dB`;
-
-                this.updateChannelGain(channel, gain);
-
-            });
-
-        });
-
+        // Ocultar después de 5 segundos
+        setTimeout(() => {
+            warningEl.style.display = 'none';
+        }, 5000);
     }
-
-
-
-    async toggleChannel(channel, button) {
-
-        // Iniciar AudioContext en primera interacciÃ³n
-
-        if (!this.audioContext) {
-
-            const success = await this.initAudioContext();
-
-            if (!success) return;
-
-        }
-
+    
+    async connectWebSocket() {
+        console.log('[AudioMonitor] Conectando WebSocket...');
         
-
-        const channelDiv = button.closest('.channel');
-
+        this.socket = io({
+            transports: ['websocket'],
+            upgrade: false,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 10,
+            timeout: 10000
+        });
         
-
-        if (this.activeChannels.has(channel)) {
-
-            // Desactivar
-
-            this.activeChannels.delete(channel);
-
-            button.classList.remove('active');
-
-            channelDiv.classList.remove('active');
-
+        this.socket.on('connect', () => {
+            console.log('[Socket] Conectado para señalización');
+            this.updateStatus('Conectado (señalización)', 'connected');
             
-
-            if (this.channels[channel]) {
-
-                this.channels[channel].gainNode.disconnect();
-
-                if (this.channels[channel].workletNode) {
-
-                    this.channels[channel].workletNode.disconnect();
-
-                }
-
-                delete this.channels[channel];
-
+            // Re-suscribir canales activos si hay reconexión
+            if (this.activeChannels.size > 0) {
+                setTimeout(() => this.updateSubscription(), 500);
             }
-
+        });
+        
+        this.socket.on('disconnect', (reason) => {
+            console.log('[Socket] Desconectado:', reason);
+            this.updateStatus('Desconectado', 'disconnected');
+            this.connected = false;
+            
+            // Cerrar WebRTC si existe
+            if (this.webrtcClient) {
+                this.webrtcClient.close();
+                this.webrtcClient = null;
+            }
+        });
+        
+        this.socket.on('device_info', (info) => {
+            this.handleDeviceInfo(info);
+        });
+        
+        // WebSocket audio (solo si estamos usando WebSocket)
+        this.socket.on('audio', (data) => {
+            if (this.protocol === 'websocket') {
+                this.handleAudioData(data);
+            }
+        });
+        
+        this.socket.on('pong', (data) => {
+            if (this.protocol === 'websocket') {
+                const latency = Date.now() - data.client_timestamp;
+                this.updateNetworkLatency(latency);
+            }
+        });
+        
+        // WebRTC events
+        this.socket.on('webrtc_answer', (data) => {
+            if (this.webrtcClient) {
+                this.webrtcClient.handleAnswer(data);
+            }
+        });
+        
+        this.socket.on('webrtc_ice_candidate', (data) => {
+            if (this.webrtcClient) {
+                this.webrtcClient.handleRemoteIceCandidate(data);
+            }
+        });
+        
+        this.socket.on('webrtc_error', (data) => {
+            console.error('[WebRTC] Error del servidor:', data.error);
+            this.handleWebRTCError(data.error);
+        });
+        
+        this.socket.on('webrtc_subscribed', (data) => {
+            console.log('[WebRTC] Suscripción confirmada:', data.channels);
+        });
+        
+        // Ping para WebSocket
+        setInterval(() => {
+            if (this.socket && this.socket.connected && this.protocol === 'websocket') {
+                this.socket.emit('ping', { timestamp: Date.now() });
+            }
+        }, 2000);
+    }
+    
+    handleDeviceInfo(info) {
+        this.deviceInfo = info;
+        this.displayDeviceInfo(info);
+        this.createChannelGrid(info.channels);
+        
+        console.log('[Device] Info recibida, WebRTC soportado:', info.supports_webrtc);
+        
+        // Determinar protocolo a usar
+        this.determineProtocol(info);
+        
+        if (this.protocol === 'webrtc' && info.supports_webrtc) {
+            // Intentar WebRTC automáticamente
+            this.initWebRTC();
         } else {
-
-            // Activar
-
-            this.activeChannels.add(channel);
-
-            button.classList.add('active');
-
-            channelDiv.classList.add('active');
-
-            
-
-            this.createChannelProcessor(channel);
-
+            // Usar WebSocket
+            this.showWebSocketInitButton();
         }
-
-        
-
-        // Actualizar suscripciÃ³n
-
-        this.updateSubscription();
-
     }
-
-
-
-    createChannelProcessor(channel) {
-
+    
+    determineProtocol(info) {
+        // Prioridades: 1. Preferencia del usuario, 2. Capacidades, 3. Fallback a WebSocket
+        
+        const canUseWebRTC = this.useWebRTC && info.supports_webrtc && info.webrtc_enabled !== false;
+        
+        if (this.preferredProtocol === 'webrtc' && canUseWebRTC) {
+            this.protocol = 'webrtc';
+            console.log('[AudioMonitor] Usando WebRTC (preferido)');
+        } else if (this.preferredProtocol === 'websocket') {
+            this.protocol = 'websocket';
+            console.log('[AudioMonitor] Usando WebSocket (preferido)');
+        } else if (canUseWebRTC) {
+            this.protocol = 'webrtc';
+            console.log('[AudioMonitor] Usando WebRTC (auto)');
+        } else {
+            this.protocol = 'websocket';
+            console.log('[AudioMonitor] Usando WebSocket (fallback)');
+        }
+        
+        this.metrics.protocol = this.protocol === 'webrtc' ? 'WebRTC' : 'WebSocket';
+        this.updateProtocolDisplay(this.metrics.protocol);
+    }
+    
+    async initWebRTC() {
         try {
-
-            if (!this.audioWorkletReady) {
-
-                console.warn('[Audio] AudioWorklet no disponible, usando fallback');
-
-                this.createChannelProcessorFallback(channel);
-
-                return;
-
+            console.log('[AudioMonitor] Iniciando WebRTC...');
+            this.updateStatus('Conectando WebRTC...', 'connecting');
+            
+            this.webrtcClient = new WebRTCClient(this.socket, this.socket.id);
+            
+            // Configurar callbacks
+            this.webrtcClient.onAudioConnected = () => {
+                console.log('[WebRTC] Audio conectado');
+                this.handleWebRTCConnected();
+            };
+            
+            this.webrtcClient.onConnected = () => {
+                this.connected = true;
+                console.log('[WebRTC] Conexión establecida');
+                
+                // Re-suscribir canales si es reconexión
+                if (this.activeChannels.size > 0) {
+                    const channels = Array.from(this.activeChannels);
+                    const gains = {};
+                    channels.forEach(ch => {
+                        gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
+                    });
+                    
+                    this.webrtcClient.subscribe(channels, gains);
+                }
+            };
+            
+            this.webrtcClient.onDisconnected = () => {
+                console.log('[WebRTC] Desconectado');
+                this.connected = false;
+                
+                if (this.autoSwitchProtocol && this.protocolSwitchCount < 2) {
+                    this.switchToWebSocket('WebRTC desconectado');
+                }
+            };
+            
+            this.webrtcClient.onError = (error) => {
+                console.error('[WebRTC] Error:', error);
+                this.handleWebRTCError(error.message || 'Error desconocido');
+            };
+            
+            // Conectar WebRTC
+            const success = await this.webrtcClient.connect();
+            if (!success) {
+                throw new Error('No se pudo conectar WebRTC');
             }
-
             
-
-            // Calcular buffer size en tÃ©rminos de bloques
-
-            const bufferSize = Math.max(3, Math.ceil(
-
-                (this.deviceInfo.jitter_buffer_ms / 1000) * 
-
-                this.deviceInfo.sample_rate / 
-
-                this.deviceInfo.blocksize
-
-            ));
-
+            // Ocultar botón de inicio
+            this.hideInitButton();
             
-
-            // Crear AudioWorkletNode
-
-            const workletNode = new AudioWorkletNode(this.audioContext, 'audio-processor', {
-
-                processorOptions: {
-
-                    bufferSize: bufferSize
-
-                }
-
-            });
-
-            
-
-            // GainNode para control de volumen
-
-            const gainNode = this.audioContext.createGain();
-
-            gainNode.gain.value = 1.0;
-
-            
-
-            workletNode.connect(gainNode);
-
-            gainNode.connect(this.audioContext.destination);
-
-            
-
-            // Escuchar mensajes del worklet
-
-            workletNode.port.onmessage = (event) => {
-
-                if (event.data.type === 'bufferHealth') {
-
-                    this.metrics.bufferHealth = event.data.value;
-
-                } else if (event.data.type === 'status') {
-
-                    console.log(`[Canal ${channel}] ${event.data.status}`);
-
-                }
-
-            };
-
-            
-
-            this.channels[channel] = {
-
-                workletNode: workletNode,
-
-                gainNode: gainNode,
-
-                gain: 1.0
-
-            };
-
-            
-
-            console.log(`[Canal ${channel}] AudioWorklet creado (buffer: ${bufferSize} bloques)`);
-
-            
-
         } catch (error) {
-
-            console.error(`[Canal ${channel}] Error creando worklet:`, error);
-
-            this.createChannelProcessorFallback(channel);
-
+            console.error('[AudioMonitor] Error iniciando WebRTC:', error);
+            this.fallbackToWebSocket(`Error WebRTC: ${error.message}`);
         }
-
     }
-
-
-
-    createChannelProcessorFallback(channel) {
-
-        console.log(`[Canal ${channel}] Usando ScriptProcessor (fallback)`);
-
+    
+    handleWebRTCConnected() {
+        this.audioInitialized = true;
+        this.protocol = 'webrtc';
+        this.metrics.protocol = 'WebRTC';
         
-
-        // Usar buffer mÃ¡s pequeÃ±o para reducir latencia
-
-        const bufferSize = 2048;
-
-        const processor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
-
-        const gainNode = this.audioContext.createGain();
-
-        gainNode.gain.value = 1.0;
-
+        // Actualizar UI
+        this.updateStatus('Conectado (WebRTC)', 'connected');
+        this.updateProtocolDisplay('WebRTC');
+        this.hideInitButton();
         
-
-        const jitterBuffer = [];
-
-        const targetSize = Math.max(2, Math.ceil(
-
-            (this.deviceInfo.jitter_buffer_ms / 1000) * 
-
-            this.deviceInfo.sample_rate / 
-
-            this.deviceInfo.blocksize
-
-        ));
-
-        
-
-        processor.onaudioprocess = (e) => {
-
-            const output = e.outputBuffer.getChannelData(0);
-
-            let outputIndex = 0;
-
-            
-
-            // Buffering inicial
-
-            if (jitterBuffer.length < targetSize) {
-
-                output.fill(0);
-
-                return;
-
-            }
-
-            
-
-            // Llenar output desde buffer
-
-            while (outputIndex < output.length && jitterBuffer.length > 0) {
-
-                const chunk = jitterBuffer.shift();
-
-                const copyLength = Math.min(chunk.length, output.length - outputIndex);
-
-                output.set(chunk.subarray(0, copyLength), outputIndex);
-
-                outputIndex += copyLength;
-
-            }
-
-            
-
-            // Llenar resto con silencio
-
-            if (outputIndex < output.length) {
-
-                output.fill(0, outputIndex);
-
-            }
-
-            
-
-            this.metrics.bufferHealth = (jitterBuffer.length / targetSize) * 100;
-
-        };
-
-        
-
-        processor.connect(gainNode);
-
-        gainNode.connect(this.audioContext.destination);
-
-        
-
-        this.channels[channel] = {
-
-            processor: processor,
-
-            gainNode: gainNode,
-
-            jitterBuffer: jitterBuffer,
-
-            targetSize: targetSize,
-
-            gain: 1.0
-
-        };
-
-    }
-
-
-
-    updateSubscription() {
-
-        const channels = Array.from(this.activeChannels);
-
-        const gains = {};
-
-        
-
-        channels.forEach(ch => {
-
-            gains[ch] = this.channels[ch]?.gain || 1.0;
-
-        });
-
-        
-
-        this.socket.emit('subscribe', { channels, gains });
-
-        console.log('[Subscription] Canales:', channels);
-
-    }
-
-
-
-    updateChannelGain(channel, gain) {
-
-        if (this.channels[channel]) {
-
-            this.channels[channel].gain = gain;
-
-            this.channels[channel].gainNode.gain.value = gain;
-
-        }
-
-    }
-
-
-
-    handleAudioData(data) {
-
-        // CORREGIDO: data es ArrayBuffer: [channel_id (uint32)][float32 samples]
-
-        const view = new DataView(data);
-
-        const channel = view.getUint32(0, true); // little-endian
-
-        
-
-        if (!this.activeChannels.has(channel)) return;
-
-        
-
-        // Extraer Float32Array (offset de 4 bytes por uint32)
-
-        const numSamples = (data.byteLength - 4) / 4;
-
-        const audioData = new Float32Array(data, 4, numSamples);
-
-        
-
-        // Validar datos
-
-        if (audioData.length === 0) {
-
-            console.warn(`[Canal ${channel}] Datos vacÃ­os recibidos`);
-
-            return;
-
-        }
-
-        
-
-        const channelData = this.channels[channel];
-
-        if (!channelData) return;
-
-        
-
-        if (channelData.workletNode) {
-
-            // AudioWorklet
-
-            channelData.workletNode.port.postMessage({
-
-                type: 'audio',
-
-                data: audioData
-
-            });
-
-        } else if (channelData.jitterBuffer) {
-
-            // Fallback
-
-            channelData.jitterBuffer.push(audioData);
-
-            
-
-            // Limitar tamaÃ±o del buffer
-
-            if (channelData.jitterBuffer.length > channelData.targetSize * 5) {
-
-                channelData.jitterBuffer.shift();
-
-            }
-
-        }
-
-    }
-
-
-
-    updateNetworkLatency(latency) {
-
-        // Suavizar latencia con promedio mÃ³vil
-
-        this.metrics.networkLatency = this.metrics.networkLatency * 0.8 + latency * 0.2;
-
+        // Calcular latencia estimada
         this.calculateEstimatedLatency();
-
+        
+        console.log('[AudioMonitor] WebRTC completamente conectado');
+        
+        // Guardar preferencia
+        localStorage.setItem('audioMonitor_preferredProtocol', 'webrtc');
     }
-
-
-
+    
+    handleWebRTCError(errorMessage) {
+        console.error('[WebRTC] Error crítico:', errorMessage);
+        
+        if (this.autoSwitchProtocol && this.protocolSwitchCount < 2) {
+            this.switchToWebSocket(`WebRTC error: ${errorMessage}`);
+        } else {
+            this.showError(`Error WebRTC: ${errorMessage}`);
+        }
+    }
+    
+    fallbackToWebSocket(reason) {
+        console.log(`[AudioMonitor] Fallback a WebSocket: ${reason}`);
+        this.protocolSwitchCount++;
+        
+        this.protocol = 'websocket';
+        this.metrics.protocol = 'WebSocket';
+        
+        // Cerrar WebRTC si existe
+        if (this.webrtcClient) {
+            this.webrtcClient.close();
+            this.webrtcClient = null;
+        }
+        
+        // Actualizar UI
+        this.updateProtocolDisplay('WebSocket');
+        this.showWebSocketInitButton();
+        
+        console.log('[AudioMonitor] Cambiado a WebSocket');
+    }
+    
+    switchToWebSocket(reason) {
+        this.showWarning(`Cambiando a WebSocket: ${reason}`);
+        this.fallbackToWebSocket(reason);
+    }
+    
+    showWebSocketInitButton() {
+        const btn = this.uiElements.audioInitBtn;
+        if (btn) {
+            btn.style.display = 'block';
+            btn.textContent = '🔊 Iniciar Audio (WebSocket)';
+            btn.onclick = () => this.initWebSocketAudio();
+        }
+    }
+    
+    hideInitButton() {
+        const btn = this.uiElements.audioInitBtn;
+        if (btn) {
+            btn.style.display = 'none';
+        }
+    }
+    
+    async initWebSocketAudio() {
+        if (this.audioContext) return true;
+        
+        if (!this.deviceInfo) {
+            console.warn('[Audio] Esperando device_info...');
+            return false;
+        }
+        
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                latencyHint: 'interactive',
+                sampleRate: this.deviceInfo.sample_rate
+            });
+            
+            console.log(`[Audio] Context WebSocket creado: ${this.audioContext.sampleRate}Hz`);
+            
+            // Cargar AudioWorklet
+            await this.loadAudioWorklet();
+            
+            // Ocultar botón
+            this.hideInitButton();
+            
+            this.audioInitialized = true;
+            this.protocol = 'websocket';
+            this.metrics.protocol = 'WebSocket';
+            
+            this.calculateEstimatedLatency();
+            this.updateStatus('Conectado (WebSocket)', 'connected');
+            
+            // Guardar preferencia
+            localStorage.setItem('audioMonitor_preferredProtocol', 'websocket');
+            
+            return true;
+            
+        } catch (error) {
+            console.error('[Audio] Error al inicializar WebSocket:', error);
+            this.showError(`Error audio: ${error.message}`);
+            return false;
+        }
+    }
+    
+    async loadAudioWorklet() {
+        try {
+            await this.audioContext.audioWorklet.addModule('/audio-processor.js');
+            console.log('[AudioWorklet] Cargado correctamente');
+            return true;
+        } catch (error) {
+            console.error('[AudioWorklet] Error al cargar:', error);
+            return false;
+        }
+    }
+    
+    displayDeviceInfo(info) {
+        const el = this.uiElements.deviceInfo;
+        if (el) {
+            const protocolBadge = info.supports_webrtc ? 
+                '<span style="color:#4CAF50; font-weight:bold;"> ⚡ WebRTC</span>' : 
+                '<span style="color:#FF9800;"> WebSocket</span>';
+            
+            el.innerHTML = `
+                <strong>${info.name}</strong> | 
+                ${info.channels} canales | 
+                ${info.sample_rate} Hz | 
+                Buffer: ${info.blocksize} samples
+                ${protocolBadge}
+            `;
+        }
+    }
+    
+    createChannelGrid(numChannels) {
+        const grid = this.uiElements.channelsGrid;
+        const helpMsg = this.uiElements.helpMessage;
+        
+        if (!grid) return;
+        
+        grid.innerHTML = '';
+        
+        if (helpMsg) {
+            helpMsg.style.display = 'none';
+        }
+        
+        for (let i = 0; i < numChannels; i++) {
+            const channelDiv = document.createElement('div');
+            channelDiv.className = 'channel';
+            channelDiv.innerHTML = `
+                <div class="channel-header">
+                    <button class="channel-toggle" data-channel="${i}">
+                        Canal ${i + 1}
+                    </button>
+                </div>
+                <div class="channel-controls">
+                    <label>Volumen</label>
+                    <input type="range" class="volume-slider" 
+                           data-channel="${i}"
+                           min="-60" max="12" value="0" step="1">
+                    <span class="volume-value">0 dB</span>
+                </div>
+            `;
+            
+            grid.appendChild(channelDiv);
+        }
+        
+        // Event listeners
+        grid.querySelectorAll('.channel-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const channel = parseInt(e.target.dataset.channel);
+                this.toggleChannel(channel, e.target);
+            });
+        });
+        
+        grid.querySelectorAll('.volume-slider').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const channel = parseInt(e.target.dataset.channel);
+                const db = parseFloat(e.target.value);
+                const gain = this.dbToGain(db);
+                
+                e.target.nextElementSibling.textContent = `${db > 0 ? '+' : ''}${db} dB`;
+                this.updateChannelGain(channel, gain);
+            });
+        });
+        
+        // Agregar botones de protocolo
+        this.addProtocolButtons();
+    }
+    
+    addProtocolButtons() {
+        const grid = this.uiElements.channelsGrid;
+        if (!grid) return;
+        
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'channel';
+        controlsDiv.style.gridColumn = '1 / -1';
+        controlsDiv.style.textAlign = 'center';
+        controlsDiv.style.padding = '20px';
+        controlsDiv.style.backgroundColor = '#2a2a2a';
+        
+        controlsDiv.innerHTML = `
+            <h3 style="margin-bottom: 15px; color: #e0e0e0;">Configuración de Protocolo</h3>
+            <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                <button id="btn-webrtc" class="protocol-btn" 
+                        style="background: ${this.protocol === 'webrtc' ? '#4CAF50' : '#444'}; 
+                               color: white; padding: 10px 20px; border: none; border-radius: 8px; 
+                               cursor: pointer; font-weight: bold;">
+                    ⚡ WebRTC (3-15ms)
+                </button>
+                <button id="btn-websocket" class="protocol-btn"
+                        style="background: ${this.protocol === 'websocket' ? '#2196F3' : '#444'}; 
+                               color: white; padding: 10px 20px; border: none; border-radius: 8px; 
+                               cursor: pointer; font-weight: bold;">
+                    🌐 WebSocket (20-40ms)
+                </button>
+                <button id="btn-auto" class="protocol-btn"
+                        style="background: ${this.protocol === 'auto' ? '#FF9800' : '#444'}; 
+                               color: white; padding: 10px 20px; border: none; border-radius: 8px; 
+                               cursor: pointer; font-weight: bold;">
+                    🤖 Auto-detect
+                </button>
+            </div>
+            <p style="margin-top: 15px; color: #888; font-size: 0.9em;">
+                Latencia actual: <span id="current-latency-display">--</span>ms | 
+                Protocolo: <span id="current-protocol-display">${this.metrics.protocol}</span>
+            </p>
+        `;
+        
+        grid.appendChild(controlsDiv);
+        
+        // Event listeners para botones de protocolo
+        document.getElementById('btn-webrtc').addEventListener('click', () => {
+            this.switchProtocol('webrtc');
+        });
+        
+        document.getElementById('btn-websocket').addEventListener('click', () => {
+            this.switchProtocol('websocket');
+        });
+        
+        document.getElementById('btn-auto').addEventListener('click', () => {
+            this.switchProtocol('auto');
+        });
+    }
+    
+    switchProtocol(newProtocol) {
+        if (newProtocol === this.protocol) return;
+        
+        console.log(`[AudioMonitor] Cambiando protocolo: ${this.protocol} -> ${newProtocol}`);
+        
+        // Guardar canales activos
+        const activeChannels = Array.from(this.activeChannels);
+        const gains = {};
+        activeChannels.forEach(ch => {
+            gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
+        });
+        
+        // Cerrar conexión actual
+        if (this.protocol === 'webrtc' && this.webrtcClient) {
+            this.webrtcClient.close();
+            this.webrtcClient = null;
+        }
+        
+        if (this.protocol === 'websocket' && this.audioContext) {
+            this.audioContext.close();
+            this.audioContext = null;
+            this.channelProcessors = {};
+        }
+        
+        // Actualizar protocolo
+        this.protocol = newProtocol;
+        this.preferredProtocol = newProtocol === 'auto' ? 'webrtc' : newProtocol;
+        
+        // Guardar preferencia
+        localStorage.setItem('audioMonitor_preferredProtocol', this.preferredProtocol);
+        
+        // Reiniciar conexión
+        if (this.protocol === 'webrtc') {
+            this.initWebRTC();
+        } else if (this.protocol === 'websocket') {
+            this.showWebSocketInitButton();
+            this.updateStatus('Listo para WebSocket', 'connecting');
+        } else {
+            // Auto: recargar info del dispositivo
+            this.socket.emit('get_device_info');
+        }
+        
+        this.protocolSwitchCount++;
+        
+        // Actualizar UI
+        this.updateProtocolButtons();
+    }
+    
+    updateProtocolButtons() {
+        document.querySelectorAll('.protocol-btn').forEach(btn => {
+            const isWebRTC = btn.id === 'btn-webrtc';
+            const isWebSocket = btn.id === 'btn-websocket';
+            const isAuto = btn.id === 'btn-auto';
+            
+            if (isWebRTC) {
+                btn.style.background = this.protocol === 'webrtc' ? '#4CAF50' : '#444';
+            } else if (isWebSocket) {
+                btn.style.background = this.protocol === 'websocket' ? '#2196F3' : '#444';
+            } else if (isAuto) {
+                btn.style.background = this.protocol === 'auto' ? '#FF9800' : '#444';
+            }
+        });
+        
+        const protocolDisplay = document.getElementById('current-protocol-display');
+        if (protocolDisplay) {
+            protocolDisplay.textContent = this.metrics.protocol;
+        }
+    }
+    
+    async toggleChannel(channel, button) {
+        // Iniciar audio según protocolo
+        if (this.protocol === 'websocket' && !this.audioContext) {
+            const success = await this.initWebSocketAudio();
+            if (!success) return;
+        } else if (this.protocol === 'webrtc' && !this.webrtcClient?.isConnected()) {
+            await this.initWebRTC();
+            // Esperar un momento para que WebRTC se conecte
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        const channelDiv = button.closest('.channel');
+        
+        if (this.activeChannels.has(channel)) {
+            // Desactivar
+            this.activeChannels.delete(channel);
+            button.classList.remove('active');
+            channelDiv.classList.remove('active');
+            
+            if (this.channelProcessors[channel]) {
+                if (this.protocol === 'websocket') {
+                    this.channelProcessors[channel].gainNode.disconnect();
+                    if (this.channelProcessors[channel].workletNode) {
+                        this.channelProcessors[channel].workletNode.disconnect();
+                    }
+                }
+                delete this.channelProcessors[channel];
+            }
+        } else {
+            // Activar
+            this.activeChannels.add(channel);
+            button.classList.add('active');
+            channelDiv.classList.add('active');
+            
+            if (this.protocol === 'websocket') {
+                this.createChannelProcessor(channel);
+            }
+        }
+        
+        // Actualizar suscripción
+        this.updateSubscription();
+    }
+    
+    createChannelProcessor(channel) {
+        // Solo para WebSocket
+        if (this.protocol !== 'websocket' || !this.audioContext) return;
+        
+        try {
+            // Calcular buffer size
+            const bufferSize = Math.max(3, Math.ceil(
+                (this.deviceInfo.jitter_buffer_ms / 1000) * 
+                this.deviceInfo.sample_rate / 
+                this.deviceInfo.blocksize
+            ));
+            
+            // Crear AudioWorkletNode
+            const workletNode = new AudioWorkletNode(this.audioContext, 'audio-processor', {
+                processorOptions: { bufferSize }
+            });
+            
+            // GainNode para control de volumen
+            const gainNode = this.audioContext.createGain();
+            gainNode.gain.value = 1.0;
+            
+            workletNode.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Escuchar métricas del worklet
+            workletNode.port.onmessage = (event) => {
+                if (event.data.type === 'bufferHealth') {
+                    this.metrics.bufferHealth = event.data.value;
+                }
+            };
+            
+            this.channelProcessors[channel] = {
+                workletNode: workletNode,
+                gainNode: gainNode,
+                gain: 1.0
+            };
+            
+            console.log(`[Canal ${channel}] Processor creado`);
+            
+        } catch (error) {
+            console.error(`[Canal ${channel}] Error:`, error);
+        }
+    }
+    
+    updateSubscription() {
+        const channels = Array.from(this.activeChannels);
+        const gains = {};
+        
+        channels.forEach(ch => {
+            gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
+        });
+        
+        if (this.protocol === 'websocket' && this.socket?.connected) {
+            this.socket.emit('subscribe', { channels, gains });
+            console.log('[WebSocket] Suscripción actualizada:', channels);
+        } else if (this.protocol === 'webrtc' && this.webrtcClient?.isConnected()) {
+            this.webrtcClient.subscribe(channels, gains);
+        }
+    }
+    
+    updateChannelGain(channel, gain) {
+        if (this.channelProcessors[channel]) {
+            this.channelProcessors[channel].gain = gain;
+            this.channelProcessors[channel].gainNode.gain.value = gain;
+        }
+        
+        // Enviar al servidor
+        if (this.protocol === 'websocket' && this.socket?.connected) {
+            this.socket.emit('update_gain', { channel, gain });
+        } else if (this.protocol === 'webrtc' && this.webrtcClient?.isConnected()) {
+            this.webrtcClient.updateGain(channel, gain);
+        }
+    }
+    
+    handleAudioData(data) {
+        if (this.protocol !== 'websocket') return;
+        
+        const view = new DataView(data);
+        const channel = view.getUint32(0, true);
+        
+        if (!this.activeChannels.has(channel)) return;
+        
+        const numSamples = (data.byteLength - 4) / 4;
+        const audioData = new Float32Array(data, 4, numSamples);
+        
+        if (audioData.length === 0) return;
+        
+        const channelData = this.channelProcessors[channel];
+        if (!channelData) return;
+        
+        if (channelData.workletNode) {
+            channelData.workletNode.port.postMessage({
+                type: 'audio',
+                data: audioData
+            });
+        }
+    }
+    
+    calculateEstimatedLatency() {
+        if (!this.deviceInfo) return;
+        
+        const captureLatency = (this.deviceInfo.blocksize / this.deviceInfo.sample_rate * 1000);
+        const jitterBuffer = this.deviceInfo.jitter_buffer_ms;
+        
+        let networkLatency = 10; // default
+        
+        if (this.protocol === 'websocket') {
+            networkLatency = this.metrics.networkLatency || 15;
+        } else if (this.protocol === 'webrtc' && this.webrtcClient) {
+            networkLatency = this.webrtcClient.getLatency() || 8;
+        }
+        
+        let contextLatency = 0;
+        if (this.audioContext) {
+            contextLatency = (this.audioContext.baseLatency + this.audioContext.outputLatency) * 1000;
+        }
+        
+        this.metrics.estimatedLatency = 
+            captureLatency + 
+            jitterBuffer + 
+            networkLatency +
+            contextLatency + 5;
+    }
+    
+    updateNetworkLatency(latency) {
+        this.metrics.networkLatency = this.metrics.networkLatency * 0.8 + latency * 0.2;
+        this.calculateEstimatedLatency();
+    }
+    
+    startMetricsMonitoring() {
+        setInterval(() => {
+            this.updateMetricsDisplay();
+        }, 100);
+    }
+    
     updateMetricsDisplay() {
-
-        // Latencia total
-
-        const latencyEl = document.getElementById('latency');
-
-        if (latencyEl) {
-
-            const latency = Math.round(this.metrics.estimatedLatency);
-
-            latencyEl.textContent = latency;
-
-            latencyEl.className = 'metric-value ' + 
-
-                (latency <= 30 ? 'good' : latency <= 50 ? 'warning' : 'bad');
-
+        // Obtener métricas según protocolo
+        if (this.protocol === 'webrtc' && this.webrtcClient) {
+            const webrtcMetrics = this.webrtcClient.getMetrics();
+            this.metrics.audioLatency = webrtcMetrics.audioLatency || webrtcMetrics.connectionLatency || 0;
+            this.metrics.packetLoss = webrtcMetrics.packetLoss || 0;
+            this.metrics.jitter = webrtcMetrics.jitter || 0;
+            this.metrics.bytesReceived = webrtcMetrics.bytesReceived || 0;
+            this.metrics.connectionQuality = webrtcMetrics.quality || 'unknown';
+            
+            // Usar latencia de WebRTC para cálculo estimado
+            this.metrics.estimatedLatency = this.metrics.audioLatency || this.metrics.estimatedLatency;
+            
+        } else if (this.protocol === 'websocket') {
+            this.metrics.protocol = 'WebSocket';
+            this.calculateEstimatedLatency();
         }
-
         
-
-        // Buffer health
-
-        const bufferEl = document.getElementById('buffer-health');
-
-        if (bufferEl) {
-
-            const buffer = Math.round(this.metrics.bufferHealth);
-
-            bufferEl.textContent = buffer;
-
-            bufferEl.className = 'metric-value ' + 
-
-                (buffer >= 50 && buffer <= 150 ? 'good' : buffer > 150 ? 'warning' : 'bad');
-
-        }
-
+        // Actualizar elementos UI
+        this.updateMetricElement('latency', Math.round(this.metrics.estimatedLatency), [15, 30], 'ms');
         
-
-        // Latencia de red
-
-        const networkEl = document.getElementById('network-latency');
-
-        if (networkEl) {
-
-            const network = Math.round(this.metrics.networkLatency);
-
-            networkEl.textContent = network;
-
-            networkEl.className = 'metric-value ' + 
-
-                (network <= 10 ? 'good' : network <= 25 ? 'warning' : 'bad');
-
+        this.updateMetricElement('buffer-health', Math.round(this.metrics.bufferHealth), [50, 150], '%', true);
+        
+        const networkValue = this.protocol === 'webrtc' ? 
+            this.metrics.audioLatency : this.metrics.networkLatency;
+        this.updateMetricElement('network-latency', Math.round(networkValue), [10, 25], 'ms');
+        
+        // Actualizar protocolo display
+        this.updateProtocolDisplay(this.metrics.protocol);
+        
+        // Actualizar display de latencia actual
+        const latencyDisplay = document.getElementById('current-latency-display');
+        if (latencyDisplay) {
+            latencyDisplay.textContent = Math.round(this.metrics.estimatedLatency);
+            latencyDisplay.style.color = this.getLatencyColor(this.metrics.estimatedLatency);
         }
-
+        
+        // Actualizar calidad de conexión
+        this.updateConnectionQuality();
     }
-
-
-
-    dbToGain(db) {
-
-        return Math.pow(10, db / 20);
-
+    
+    updateMetricElement(id, value, thresholds, unit, invert = false) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        
+        element.textContent = value;
+        
+        let className = 'bad';
+        if (!invert) {
+            if (value <= thresholds[0]) className = 'good';
+            else if (value <= thresholds[1]) className = 'warning';
+        } else {
+            if (value >= thresholds[0] && value <= thresholds[1]) className = 'good';
+            else if (value > thresholds[1]) className = 'warning';
+        }
+        
+        element.className = `metric-value ${className}`;
     }
-
-
-
+    
+    getLatencyColor(latency) {
+        if (latency <= 15) return '#4CAF50';
+        if (latency <= 30) return '#FF9800';
+        return '#f44336';
+    }
+    
+    updateProtocolDisplay(protocol) {
+        const el = this.uiElements.protocolValue;
+        if (el) {
+            el.textContent = protocol;
+            el.className = 'metric-value ' + 
+                (protocol === 'WebRTC' ? 'good' : 'warning');
+        }
+    }
+    
+    updateConnectionQuality() {
+        // Podrías agregar un indicador visual de calidad aquí
+        const quality = this.metrics.connectionQuality;
+        const statusEl = this.uiElements.status;
+        
+        if (statusEl && quality !== 'unknown') {
+            const qualityColors = {
+                'excellent': '#4CAF50',
+                'good': '#8BC34A',
+                'fair': '#FF9800',
+                'poor': '#FF5722',
+                'bad': '#f44336'
+            };
+            
+            statusEl.style.borderLeft = `4px solid ${qualityColors[quality] || '#666'}`;
+        }
+    }
+    
     updateStatus(message, type) {
-
-        const statusDiv = document.getElementById('status');
-
-        if (statusDiv) {
-
-            statusDiv.textContent = message;
-
-            statusDiv.className = `status-${type}`;
-
+        const statusEl = this.uiElements.status;
+        if (statusEl) {
+            statusEl.textContent = message;
+            statusEl.className = `status-${type}`;
         }
-
     }
-
+    
+    showError(message) {
+        this.updateStatus(`Error: ${message}`, 'disconnected');
+        console.error('[AudioMonitor]', message);
+        
+        // Mostrar notificación temporal
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            z-index: 1000;
+            max-width: 300px;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.remove(), 5000);
+    }
+    
+    dbToGain(db) {
+        return Math.pow(10, db / 20);
+    }
+    
+    setupEventListeners() {
+        // Botón de inicio de audio
+        const initBtn = this.uiElements.audioInitBtn;
+        if (initBtn) {
+            initBtn.onclick = () => {
+                if (this.protocol === 'websocket') {
+                    this.initWebSocketAudio();
+                } else if (this.protocol === 'webrtc') {
+                    this.initWebRTC();
+                }
+            };
+        }
+        
+        // Detectar cambios de visibilidad de página
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('[AudioMonitor] Página en segundo plano');
+            } else {
+                console.log('[AudioMonitor] Página en primer plano');
+                // Reanudar audio si es necesario
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+            }
+        });
+    }
 }
 
-
-
-// Iniciar aplicaciÃ³n
-
-const monitor = new AudioMonitor();
+// Iniciar aplicación cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    window.audioMonitor = new AudioMonitor();
+});

@@ -1,771 +1,386 @@
 * {
-
     margin: 0;
-
     padding: 0;
-
     box-sizing: border-box;
-
 }
-
-
 
 body {
-
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-
     background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-
     color: #e0e0e0;
-
     min-height: 100vh;
-
     overflow-x: hidden;
-
 }
-
-
 
 .container {
-
     max-width: 1400px;
-
     margin: 0 auto;
-
     padding: 20px;
-
 }
-
-
 
 /* === HEADER === */
-
 header {
-
     text-align: center;
-
     padding: 20px 0 30px 0;
-
     border-bottom: 2px solid #333;
-
     margin-bottom: 30px;
-
 }
-
-
 
 h1 {
-
     font-size: 2.5em;
-
     margin-bottom: 15px;
-
     background: linear-gradient(135deg, #4CAF50, #2196F3);
-
     -webkit-background-clip: text;
-
     -webkit-text-fill-color: transparent;
-
     background-clip: text;
-
 }
-
-
 
 .info-text {
-
     color: #888;
-
     margin: 10px 0;
-
     font-size: 0.95em;
-
 }
 
-
-
-/* === MÃ‰TRICAS === */
-
+/* === MÉTRICAS === */
 .metrics-panel {
-
     display: flex;
-
     justify-content: center;
-
     gap: 30px;
-
     margin-top: 20px;
-
     flex-wrap: wrap;
-
 }
-
-
 
 .metric {
-
     display: flex;
-
     align-items: center;
-
     gap: 8px;
-
     background: #2a2a2a;
-
     padding: 10px 20px;
-
     border-radius: 8px;
-
     border: 1px solid #333;
-
     transition: all 0.3s ease;
-
 }
-
-
 
 .metric:hover {
-
     border-color: #444;
-
     transform: translateY(-2px);
-
 }
-
-
 
 .metric-label {
-
     font-size: 0.85em;
-
     color: #888;
-
     text-transform: uppercase;
-
     letter-spacing: 0.5px;
-
 }
-
-
 
 .metric-value {
-
     font-size: 1.4em;
-
     font-weight: bold;
-
     color: #4CAF50;
-
     min-width: 40px;
-
     text-align: right;
-
     transition: color 0.3s ease;
-
 }
-
-
 
 .metric-unit {
-
     font-size: 0.9em;
-
     color: #666;
-
 }
 
-
-
-/* Colores segÃºn estado */
-
+/* Colores según estado */
 .metric-value.good { color: #4CAF50; }
-
 .metric-value.warning { color: #FF9800; }
-
 .metric-value.bad { color: #f44336; }
 
-
-
 /* === MAIN === */
-
 main {
-
     padding: 20px 0;
-
     min-height: 400px;
-
 }
-
-
 
 #channels-grid {
-
     display: grid;
-
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-
     gap: 20px;
-
 }
-
-
 
 /* === CANALES === */
-
 .channel {
-
     background: #2a2a2a;
-
     border-radius: 12px;
-
     padding: 18px;
-
     border: 2px solid #333;
-
     transition: all 0.3s ease;
-
 }
-
-
 
 .channel:hover {
-
     border-color: #444;
-
     transform: translateY(-2px);
-
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-
 }
-
-
 
 .channel.active {
-
     border-color: #4CAF50;
-
     background: linear-gradient(135deg, #2a2a2a 0%, #2f3f2f 100%);
-
     box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
-
 }
-
-
 
 .channel-header {
-
     margin-bottom: 15px;
-
 }
-
-
 
 .channel-toggle {
-
     width: 100%;
-
     padding: 14px;
-
     background: #444;
-
     color: #e0e0e0;
-
     border: none;
-
     border-radius: 8px;
-
     cursor: pointer;
-
     font-size: 1.05em;
-
     font-weight: 600;
-
     transition: all 0.2s;
-
     position: relative;
-
     overflow: hidden;
-
 }
-
-
 
 .channel-toggle::before {
-
     content: '';
-
     position: absolute;
-
     top: 50%;
-
     left: 50%;
-
     width: 0;
-
     height: 0;
-
     border-radius: 50%;
-
     background: rgba(76, 175, 80, 0.3);
-
     transform: translate(-50%, -50%);
-
     transition: width 0.6s, height 0.6s;
-
 }
-
-
 
 .channel-toggle:hover {
-
     background: #555;
-
     transform: scale(1.02);
-
 }
-
-
 
 .channel-toggle:active {
-
     transform: scale(0.98);
-
 }
-
-
 
 .channel-toggle.active {
-
     background: linear-gradient(135deg, #4CAF50, #45a049);
-
     color: white;
-
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-
 }
-
-
 
 .channel-toggle.active::before {
-
     width: 300px;
-
     height: 300px;
-
 }
-
-
 
 /* === CONTROLES === */
-
 .channel-controls {
-
     display: flex;
-
     flex-direction: column;
-
     gap: 10px;
-
     opacity: 0.5;
-
     transition: opacity 0.3s;
-
 }
-
-
 
 .channel.active .channel-controls {
-
     opacity: 1;
-
 }
-
-
 
 .channel-controls label {
-
     font-size: 0.85em;
-
     color: #888;
-
     text-transform: uppercase;
-
     letter-spacing: 0.5px;
-
 }
-
-
 
 .volume-slider {
-
     width: 100%;
-
     height: 8px;
-
     background: linear-gradient(to right, #333 0%, #444 100%);
-
     border-radius: 4px;
-
     outline: none;
-
     -webkit-appearance: none;
-
     cursor: pointer;
-
 }
-
-
 
 .volume-slider::-webkit-slider-thumb {
-
     -webkit-appearance: none;
-
     appearance: none;
-
     width: 20px;
-
     height: 20px;
-
     background: linear-gradient(135deg, #4CAF50, #45a049);
-
     cursor: pointer;
-
     border-radius: 50%;
-
     box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-
     transition: transform 0.2s;
-
 }
-
-
 
 .volume-slider::-webkit-slider-thumb:hover {
-
     transform: scale(1.2);
-
 }
-
-
 
 .volume-slider::-webkit-slider-thumb:active {
-
     transform: scale(1.1);
-
 }
-
-
 
 .volume-slider::-moz-range-thumb {
-
     width: 20px;
-
     height: 20px;
-
     background: linear-gradient(135deg, #4CAF50, #45a049);
-
     cursor: pointer;
-
     border-radius: 50%;
-
     border: none;
-
     box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-
 }
-
-
 
 .volume-value {
-
     font-size: 0.9em;
-
     color: #4CAF50;
-
     text-align: center;
-
     font-weight: 600;
-
 }
-
-
 
 /* === FOOTER === */
-
 footer {
-
     text-align: center;
-
     padding: 30px 0 20px 0;
-
     border-top: 2px solid #333;
-
     margin-top: 40px;
-
 }
-
-
 
 #status {
-
     padding: 12px 24px;
-
     border-radius: 24px;
-
     display: inline-block;
-
     font-size: 0.95em;
-
     font-weight: 600;
-
     transition: all 0.3s;
-
     margin-bottom: 10px;
-
 }
-
-
 
 .status-connected {
-
     background: linear-gradient(135deg, #4CAF50, #45a049);
-
     color: white;
-
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-
 }
-
-
 
 .status-disconnected {
-
     background: #f44336;
-
     color: white;
-
 }
-
-
 
 .status-connecting {
-
     background: #FF9800;
-
     color: white;
-
     animation: pulse 2s infinite;
-
 }
-
-
 
 @keyframes pulse {
-
     0%, 100% { opacity: 1; }
-
     50% { opacity: 0.7; }
-
 }
-
-
 
 .init-button {
-
     margin-top: 15px;
-
     padding: 14px 35px;
-
     background: linear-gradient(135deg, #2196F3, #1976D2);
-
     color: white;
-
     border: none;
-
     border-radius: 24px;
-
     font-size: 1.1em;
-
     font-weight: 600;
-
     cursor: pointer;
-
     transition: all 0.3s;
-
     box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
-
 }
-
-
 
 .init-button:hover {
-
     transform: scale(1.05);
-
     box-shadow: 0 6px 16px rgba(33, 150, 243, 0.6);
-
 }
-
-
 
 .init-button:active {
-
     transform: scale(1.02);
-
 }
-
-
 
 .footer-info {
-
     margin-top: 15px;
-
     color: #666;
-
 }
-
-
 
 /* === AYUDA === */
-
 .help-message {
-
     text-align: center;
-
     padding: 60px 20px;
-
     color: #666;
-
     font-size: 1.1em;
-
     line-height: 1.8;
-
 }
-
-
 
 .help-message p {
-
     margin: 10px 0;
-
 }
-
-
 
 /* === RESPONSIVE === */
-
 @media (max-width: 768px) {
-
     h1 {
-
         font-size: 2em;
-
     }
-
     
-
     #channels-grid {
-
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-
         gap: 15px;
-
     }
-
     
-
     .channel {
-
         padding: 12px;
-
     }
-
     
-
     .channel-toggle {
-
         padding: 12px;
-
         font-size: 0.95em;
-
     }
-
     
-
     .metrics-panel {
-
         gap: 15px;
-
     }
-
     
-
     .metric {
-
         padding: 8px 15px;
-
     }
-
     
-
     .metric-value {
-
         font-size: 1.2em;
-
     }
-
 }
 
-
-
 @media (max-width: 480px) {
-
     .container {
-
         padding: 15px;
-
     }
-
     
-
     h1 {
-
         font-size: 1.7em;
-
     }
-
     
-
     #channels-grid {
-
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-
         gap: 10px;
-
     }
-
     
-
     .metrics-panel {
-
         flex-direction: column;
-
         align-items: center;
-
         gap: 10px;
-
     }
-
     
-
     .metric {
-
         width: 100%;
-
         max-width: 300px;
-
         justify-content: center;
-
     }
-
 }

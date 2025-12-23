@@ -1,0 +1,52 @@
+"""
+Configuración WebRTC para ultra baja latencia
+"""
+
+# === CONFIGURACIÓN WEBRTC ===
+WEBRTC_ENABLED = True
+WEBRTC_AUDIO_CODEC = 'opus'
+OPUS_BITRATE = 96000
+OPUS_COMPLEXITY = 10
+OPUS_FRAME_DURATION = 20
+OPUS_PACKET_LOSS_PERC = 10
+
+# ICE Servers
+STUN_SERVERS = [
+    'stun:stun.l.google.com:19302',
+    'stun:stun1.l.google.com:19302',
+    'stun:stun2.l.google.com:19302'
+]
+
+# Buffer y Latencia
+TARGET_LATENCY_MS = 15
+MAX_LATENCY_MS = 30
+INITIAL_PLAYOUT_DELAY = 0.020
+MAX_PLAYOUT_DELAY = 0.100
+JITTER_BUFFER_FACTOR = 2.0
+
+# WebRTC Specific
+DATA_CHANNEL_PROTOCOL = 'audio-monitor-v1'
+MAX_PACKET_SIZE = 1200
+USE_DTX = False
+USE_FEC = True
+
+# === CONFIGURACIÓN BÁSICA ===
+SAMPLE_RATE = 44100
+BLOCKSIZE = 256
+DTYPE = 'float32'
+CHANNELS_MAX = 32
+QUEUE_SIZE = 10
+MAX_CLIENTS = 8
+JITTER_BUFFER_MS = 30
+
+# Red
+HOST = '0.0.0.0'
+PORT = 5100
+
+# WebSocket
+PING_INTERVAL = 5
+PING_TIMEOUT = 10
+
+# Debug
+VERBOSE = True
+SHOW_METRICS = True

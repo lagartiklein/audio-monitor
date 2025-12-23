@@ -2,61 +2,999 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a1a">
-    <meta name="description" content="Sistema de monitoreo de audio multi-canal de ultra-baja latencia">
-    <title>Audio Monitor - Ultra Low Latency</title>
-    <link rel="stylesheet" href="/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Monitor - Consola Digital</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="/webrtc-client.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 20px;
+            background: #111;
+            border-bottom: 2px solid #00ff00;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.5em;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+        }
+
+        .device-info {
+            font-size: 0.8em;
+            color: #0a0;
+            margin: 5px 0;
+        }
+
+        /* Métricas */
+        .metrics {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .metric {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 8px 16px;
+            font-size: 0.85em;
+        }
+
+        .metric-label {
+            color: #0a0;
+            margin-right: 5px;
+        }
+
+        .metric-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .metric-value.warning { color: #ff0; }
+        .metric-value.bad { color: #f00; }
+
+        /* Mixer Console */
+        .mixer-console {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 20px 10px;
+            background: #0d0d0d;
+            border: 2px solid #00ff00;
+            margin: 20px 0;
+        }
+
+        .channel-strip {
+            min-width: 120px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 15px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            transition: border-color 0.3s;
+        }
+
+        .channel-strip.active {
+            border-color: #00ff00;
+            background: #1f1f1f;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .channel-number {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #0a0;
+        }
+
+        .channel-strip.active .channel-number {
+            color: #00ff00;
+        }
+
+        /* VU Meter */
+        .vu-meter {
+            width: 40px;
+            height: 200px;
+            background: #000;
+            border: 1px solid #333;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vu-meter-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #00ff00 0%, #ff0 70%, #f00 90%);
+            transition: height 0.05s ease-out;
+        }
+
+        .vu-meter-scale {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px 2px;
+            pointer-events: none;
+        }
+
+        .vu-tick {
+            height: 1px;
+            background: #333;
+            font-size: 0.6em;
+            color: #555;
+            text-align: right;
+        }
+
+        /* Fader (Volumen) */
+        .fader-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .fader-label {
+            font-size: 0.7em;
+            color: #0a0;
+            text-transform: uppercase;
+        }
+
+        .fader {
+            width: 8px;
+            height: 150px;
+            background: #222;
+            border: 1px solid #333;
+            appearance: none;
+            outline: none;
+            cursor: pointer;
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+        }
+
+        .fader::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;
+            height: 12px;
+            background: #00ff00;
+            cursor: pointer;
+            border: 1px solid #0a0;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        .fader::-moz-range-thumb {
+            width: 30px;
+            height: 12px;
+            background: #00ff00;
+            cursor: pointer;
+            border: 1px solid #0a0;
+            border-radius: 0;
+        }
+
+        .fader-value {
+            font-size: 0.75em;
+            color: #00ff00;
+            min-width: 45px;
+            text-align: center;
+        }
+
+        /* Pan Control (Panorama) */
+        .pan-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .pan-label {
+            font-size: 0.7em;
+            color: #0a0;
+            text-transform: uppercase;
+        }
+
+        .pan-control {
+            width: 80px;
+            height: 8px;
+            background: #222;
+            border: 1px solid #333;
+            appearance: none;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .pan-control::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 20px;
+            background: #00ff00;
+            cursor: pointer;
+            border: 1px solid #0a0;
+        }
+
+        .pan-control::-moz-range-thumb {
+            width: 12px;
+            height: 20px;
+            background: #00ff00;
+            cursor: pointer;
+            border: 1px solid #0a0;
+            border-radius: 0;
+        }
+
+        .pan-value {
+            font-size: 0.7em;
+            color: #00ff00;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* Power Button */
+        .power-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #222;
+            border: 2px solid #333;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.8em;
+        }
+
+        .power-btn:hover {
+            border-color: #00ff00;
+        }
+
+        .power-btn.active {
+            background: #00ff00;
+            color: #000;
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.8);
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #111;
+            border-top: 2px solid #00ff00;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-led {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #333;
+            border: 1px solid #555;
+        }
+
+        .status-led.active {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .init-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 1000;
+        }
+
+        .init-overlay.hidden {
+            display: none;
+        }
+
+        .init-btn {
+            padding: 20px 40px;
+            background: #000;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            font-size: 1.2em;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .init-btn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+        }
+
+        .help-text {
+            color: #0a0;
+            font-size: 0.9em;
+            max-width: 400px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .mixer-console {
+                padding: 15px 5px;
+            }
+
+            .channel-strip {
+                min-width: 100px;
+                padding: 10px 5px;
+            }
+
+            .vu-meter {
+                height: 150px;
+                width: 30px;
+            }
+
+            .fader {
+                height: 120px;
+            }
+
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+                padding: 15px;
+            }
+        }
+
+        /* Orientation-specific adjustments */
+        @media (orientation: portrait) {
+            .container {
+                padding: 10px;
+            }
+
+            .mixer-console {
+                flex-direction: column;
+                overflow-x: hidden;
+                overflow-y: auto;
+                max-height: 60vh;
+                gap: 15px;
+            }
+
+            .channel-strip {
+                min-width: unset;
+                width: 100%;
+                flex-direction: row;
+                justify-content: space-around;
+                padding: 15px;
+                gap: 10px;
+            }
+
+            .vu-meter {
+                height: 120px;
+                width: 25px;
+            }
+
+            .fader {
+                height: 100px;
+                width: 6px;
+            }
+
+            .fader::-webkit-slider-thumb {
+                width: 25px;
+                height: 10px;
+            }
+
+            .fader::-moz-range-thumb {
+                width: 25px;
+                height: 10px;
+            }
+
+            .pan-control {
+                width: 60px;
+                height: 6px;
+            }
+
+            .pan-control::-webkit-slider-thumb {
+                width: 10px;
+                height: 18px;
+            }
+
+            .pan-control::-moz-range-thumb {
+                width: 10px;
+                height: 18px;
+            }
+
+            .power-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 0.7em;
+            }
+
+            .metrics {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .metric {
+                padding: 5px 10px;
+                font-size: 0.8em;
+            }
+
+            header {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 1.2em;
+            }
+        }
+
+        @media (orientation: landscape) {
+            .mixer-console {
+                overflow-x: auto;
+                overflow-y: hidden;
+            }
+
+            .channel-strip {
+                min-width: 120px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎚️ Audio Monitor</h1>
-            <div id="device-info" class="info-text">Conectando al servidor...</div>
+            <h1>▐▌ AUDIO MONITOR ▐▌</h1>
+            <div id="device-info" class="device-info">INITIALIZING SYSTEM...</div>
             
-            <!-- Métricas de latencia -->
-            <div class="metrics-panel">
+            <div class="metrics">
                 <div class="metric">
-                    <span class="metric-label">Latencia</span>
+                    <span class="metric-label">LAT:</span>
                     <span id="latency" class="metric-value">--</span>
-                    <span class="metric-unit">ms</span>
+                    <span>ms</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Buffer</span>
-                    <span id="buffer-health" class="metric-value">--</span>
-                    <span class="metric-unit">%</span>
+                    <span class="metric-label">BUF:</span>
+                    <span id="buffer" class="metric-value">--</span>
+                    <span>%</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Red</span>
-                    <span id="network-latency" class="metric-value">--</span>
-                    <span class="metric-unit">ms</span>
+                    <span class="metric-label">NET:</span>
+                    <span id="network" class="metric-value">--</span>
+                    <span>ms</span>
                 </div>
             </div>
         </header>
 
-        <main>
-            <div id="channels-grid"></div>
-            
-            <!-- Mensaje de ayuda inicial -->
-            <div id="help-message" class="help-message">
-                <p>🔌 Conectando al servidor...</p>
-                <p>Por favor espera un momento</p>
-            </div>
-        </main>
-
-        <footer>
-            <div id="status" class="status-connecting">Conectando...</div>
-            <button id="audio-init-btn" class="init-button" style="display:none;">
-                🔊 Iniciar Audio (Click aquí)
-            </button>
-            <div class="footer-info">
-                <small>💡 Usa audífonos para mejor experiencia</small>
-            </div>
-        </footer>
+        <div id="mixer-console" class="mixer-console">
+            <!-- Canales se generan dinámicamente -->
+        </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="/app.js"></script>
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div id="status-led" class="status-led"></div>
+            <span id="status-text">DISCONNECTED</span>
+        </div>
+        <div id="channel-count">CHANNELS: 0</div>
+        <div id="audio-status">AUDIO: STOPPED</div>
+    </div>
+
+    <div id="init-overlay" class="init-overlay">
+        <div class="help-text">
+            ► Sistema de Monitoreo Multi-canal<br>
+            ► Ultra Baja Latencia<br>
+            ► Control Individual de Volumen y Panorama
+        </div>
+        <button id="init-btn" class="init-btn">► INICIAR AUDIO ◄</button>
+        <div class="help-text" style="font-size: 0.75em; color: #555;">
+            Click para inicializar el sistema de audio
+        </div>
+    </div>
+
+    <script>
+        class AudioMonitor {
+            constructor() {
+                this.socket = null;
+                this.audioContext = null;
+                this.deviceInfo = null;
+                this.activeChannels = new Set();
+                this.channelProcessors = {};
+                this.audioWorkletReady = false;
+                
+                this.metrics = {
+                    networkLatency: 0,
+                    bufferHealth: 100,
+                    estimatedLatency: 0
+                };
+                
+                this.connected = false;
+                this.audioInitialized = false;
+                
+                this.init();
+            }
+
+            async init() {
+                console.log('[AudioMonitor] Inicializando...');
+                
+                this.socket = io({
+                    transports: ['websocket'],
+                    upgrade: false,
+                    reconnection: true
+                });
+                
+                this.socket.on('connect', () => {
+                    this.updateStatus('CONNECTED', true);
+                    this.connected = true;
+                    
+                    if (this.activeChannels.size > 0) {
+                        this.updateSubscription();
+                    }
+                });
+                
+                this.socket.on('disconnect', () => {
+                    this.updateStatus('DISCONNECTED', false);
+                    this.connected = false;
+                });
+                
+                this.socket.on('device_info', (info) => {
+                    this.deviceInfo = info;
+                    this.displayDeviceInfo(info);
+                    this.createMixerConsole(info.channels);
+                    this.calculateEstimatedLatency();
+                });
+                
+                this.socket.on('audio', (data) => {
+                    this.handleAudioData(data);
+                });
+                
+                this.socket.on('pong', (data) => {
+                    const latency = Date.now() - data.client_timestamp;
+                    this.updateNetworkLatency(latency);
+                });
+                
+                setInterval(() => {
+                    if (this.socket && this.socket.connected) {
+                        this.socket.emit('ping', { timestamp: Date.now() });
+                    }
+                }, 2000);
+                
+                setInterval(() => this.updateMetricsDisplay(), 100);
+                
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('init-btn').onclick = () => {
+                    this.initAudioContext();
+                    document.getElementById('init-overlay').classList.add('hidden');
+                };
+            }
+            
+            async initAudioContext() {
+                if (this.audioContext) return true;
+                
+                if (!this.deviceInfo) {
+                    console.warn('[Audio] Esperando device_info...');
+                    return false;
+                }
+                
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                        latencyHint: 'interactive',
+                        sampleRate: this.deviceInfo.sample_rate
+                    });
+                    
+                    await this.loadAudioWorklet();
+                    this.calculateEstimatedLatency();
+                    this.audioInitialized = true;
+                    
+                    document.getElementById('audio-status').textContent = 'AUDIO: READY';
+                    
+                    return true;
+                } catch (error) {
+                    console.error('[Audio] Error:', error);
+                    return false;
+                }
+            }
+            
+            async loadAudioWorklet() {
+                try {
+                    await this.audioContext.audioWorklet.addModule('/audio-processor.js');
+                    this.audioWorkletReady = true;
+                } catch (error) {
+                    console.error('[AudioWorklet] Error:', error);
+                    this.audioWorkletReady = false;
+                }
+            }
+            
+            displayDeviceInfo(info) {
+                document.getElementById('device-info').textContent = 
+                    `${info.name} | ${info.channels} CH | ${info.sample_rate} Hz | ${info.blocksize} samples`;
+            }
+            
+            calculateEstimatedLatency() {
+                if (!this.deviceInfo) return;
+                
+                const captureLatency = (this.deviceInfo.blocksize / this.deviceInfo.sample_rate * 1000);
+                const jitterBuffer = this.deviceInfo.jitter_buffer_ms;
+                const processingLatency = 2;
+                const networkLatency = this.metrics.networkLatency || 10;
+                
+                let contextLatency = 0;
+                if (this.audioContext) {
+                    contextLatency = (this.audioContext.baseLatency + this.audioContext.outputLatency) * 1000;
+                }
+                
+                this.metrics.estimatedLatency = 
+                    captureLatency + jitterBuffer + processingLatency + networkLatency + contextLatency;
+            }
+            
+            createMixerConsole(numChannels) {
+                const mixer = document.getElementById('mixer-console');
+                mixer.innerHTML = '';
+                
+                for (let i = 0; i < numChannels; i++) {
+                    const strip = document.createElement('div');
+                    strip.className = 'channel-strip';
+                    strip.innerHTML = `
+                        <div class="channel-number">CH ${i + 1}</div>
+                        
+                        <button class="power-btn" data-channel="${i}">PWR</button>
+                        
+                        <div class="vu-meter">
+                            <div class="vu-meter-fill" data-channel="${i}"></div>
+                        </div>
+                        
+                        <div class="fader-container">
+                            <label class="fader-label">VOL</label>
+                            <input type="range" class="fader" data-channel="${i}"
+                                   min="-60" max="12" value="0" step="1" orient="vertical">
+                            <span class="fader-value">0dB</span>
+                        </div>
+                        
+                        <div class="pan-container">
+                            <label class="pan-label">PAN</label>
+                            <input type="range" class="pan-control" data-channel="${i}"
+                                   min="-100" max="100" value="0" step="1">
+                            <span class="pan-value">C</span>
+                        </div>
+                    `;
+                    
+                    mixer.appendChild(strip);
+                }
+                
+                document.querySelectorAll('.power-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const channel = parseInt(e.target.dataset.channel);
+                        this.toggleChannel(channel, e.target);
+                    });
+                });
+                
+                document.querySelectorAll('.fader').forEach(fader => {
+                    fader.addEventListener('input', (e) => {
+                        const channel = parseInt(e.target.dataset.channel);
+                        const db = parseFloat(e.target.value);
+                        const gain = this.dbToGain(db);
+                        
+                        e.target.nextElementSibling.textContent = `${db > 0 ? '+' : ''}${db}dB`;
+                        this.updateChannelGain(channel, gain);
+                    });
+                });
+                
+                document.querySelectorAll('.pan-control').forEach(pan => {
+                    pan.addEventListener('input', (e) => {
+                        const channel = parseInt(e.target.dataset.channel);
+                        const panValue = parseFloat(e.target.value);
+                        
+                        let panText = panValue === 0 ? 'C' : 
+                                     panValue < 0 ? `L${Math.abs(panValue)}` : 
+                                     `R${panValue}`;
+                        e.target.nextElementSibling.textContent = panText;
+                        
+                        this.updateChannelPan(channel, panValue);
+                    });
+                });
+                
+                document.getElementById('channel-count').textContent = `CHANNELS: ${numChannels}`;
+            }
+            
+            async toggleChannel(channel, button) {
+                if (!this.audioContext) {
+                    const success = await this.initAudioContext();
+                    if (!success) return;
+                    document.getElementById('init-overlay').classList.add('hidden');
+                }
+                
+                const strip = button.closest('.channel-strip');
+                
+                if (this.activeChannels.has(channel)) {
+                    this.activeChannels.delete(channel);
+                    button.classList.remove('active');
+                    strip.classList.remove('active');
+                    
+                    if (this.channelProcessors[channel]) {
+                        this.channelProcessors[channel].panNode.disconnect();
+                        this.channelProcessors[channel].gainNode.disconnect();
+                        if (this.channelProcessors[channel].workletNode) {
+                            this.channelProcessors[channel].workletNode.disconnect();
+                        }
+                        delete this.channelProcessors[channel];
+                    }
+                } else {
+                    this.activeChannels.add(channel);
+                    button.classList.add('active');
+                    strip.classList.add('active');
+                    
+                    this.createChannelProcessor(channel);
+                }
+                
+                this.updateSubscription();
+                document.getElementById('audio-status').textContent = 
+                    `AUDIO: ${this.activeChannels.size} ACTIVE`;
+            }
+            
+            createChannelProcessor(channel) {
+                try {
+                    if (!this.audioWorkletReady) {
+                        this.createChannelProcessorFallback(channel);
+                        return;
+                    }
+                    
+                    const bufferSize = Math.max(3, Math.ceil(
+                        (this.deviceInfo.jitter_buffer_ms / 1000) * 
+                        this.deviceInfo.sample_rate / 
+                        this.deviceInfo.blocksize
+                    ));
+                    
+                    const workletNode = new AudioWorkletNode(this.audioContext, 'audio-processor', {
+                        processorOptions: { bufferSize }
+                    });
+                    
+                    const gainNode = this.audioContext.createGain();
+                    gainNode.gain.value = 1.0;
+                    
+                    const panNode = this.audioContext.createStereoPanner();
+                    panNode.pan.value = 0;
+                    
+                    workletNode.connect(gainNode);
+                    gainNode.connect(panNode);
+                    panNode.connect(this.audioContext.destination);
+                    
+                    workletNode.port.onmessage = (event) => {
+                        if (event.data.type === 'bufferHealth') {
+                            this.metrics.bufferHealth = event.data.value;
+                        }
+                    };
+                    
+                    this.channelProcessors[channel] = {
+                        workletNode,
+                        gainNode,
+                        panNode,
+                        gain: 1.0,
+                        pan: 0
+                    };
+                    
+                } catch (error) {
+                    console.error(`[Canal ${channel}] Error:`, error);
+                    this.createChannelProcessorFallback(channel);
+                }
+            }
+            
+            createChannelProcessorFallback(channel) {
+                const bufferSize = 2048;
+                const processor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+                const gainNode = this.audioContext.createGain();
+                gainNode.gain.value = 1.0;
+                
+                const panNode = this.audioContext.createStereoPanner();
+                panNode.pan.value = 0;
+                
+                const jitterBuffer = [];
+                const targetSize = Math.max(2, Math.ceil(
+                    (this.deviceInfo.jitter_buffer_ms / 1000) * 
+                    this.deviceInfo.sample_rate / 
+                    this.deviceInfo.blocksize
+                ));
+                
+                processor.onaudioprocess = (e) => {
+                    const output = e.outputBuffer.getChannelData(0);
+                    let outputIndex = 0;
+                    
+                    if (jitterBuffer.length < targetSize) {
+                        output.fill(0);
+                        return;
+                    }
+                    
+                    while (outputIndex < output.length && jitterBuffer.length > 0) {
+                        const chunk = jitterBuffer.shift();
+                        const copyLength = Math.min(chunk.length, output.length - outputIndex);
+                        output.set(chunk.subarray(0, copyLength), outputIndex);
+                        outputIndex += copyLength;
+                    }
+                    
+                    if (outputIndex < output.length) {
+                        output.fill(0, outputIndex);
+                    }
+                    
+                    this.metrics.bufferHealth = (jitterBuffer.length / targetSize) * 100;
+                };
+                
+                processor.connect(gainNode);
+                gainNode.connect(panNode);
+                panNode.connect(this.audioContext.destination);
+                
+                this.channelProcessors[channel] = {
+                    processor,
+                    gainNode,
+                    panNode,
+                    jitterBuffer,
+                    targetSize,
+                    gain: 1.0,
+                    pan: 0
+                };
+            }
+            
+            updateSubscription() {
+                const channels = Array.from(this.activeChannels);
+                const gains = {};
+                
+                channels.forEach(ch => {
+                    gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
+                });
+                
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('subscribe', { channels, gains });
+                }
+            }
+            
+            updateChannelGain(channel, gain) {
+                if (this.channelProcessors[channel]) {
+                    this.channelProcessors[channel].gain = gain;
+                    this.channelProcessors[channel].gainNode.gain.value = gain;
+                    
+                    if (this.socket && this.socket.connected) {
+                        this.socket.emit('update_gain', { channel, gain });
+                    }
+                }
+            }
+            
+            updateChannelPan(channel, panValue) {
+                if (this.channelProcessors[channel]) {
+                    const normalizedPan = panValue / 100;
+                    this.channelProcessors[channel].pan = normalizedPan;
+                    this.channelProcessors[channel].panNode.pan.value = normalizedPan;
+                }
+            }
+            
+            handleAudioData(data) {
+                const view = new DataView(data);
+                const channel = view.getUint32(0, true);
+                
+                if (!this.activeChannels.has(channel)) return;
+                
+                const numSamples = (data.byteLength - 4) / 4;
+                const audioData = new Float32Array(data, 4, numSamples);
+                
+                if (audioData.length === 0) return;
+                
+                // Actualizar VU meter
+                const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
+                const db = 20 * Math.log10(Math.max(rms, 0.00001));
+                const percentage = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+                
+                const vuMeter = document.querySelector(`.vu-meter-fill[data-channel="${channel}"]`);
+                if (vuMeter) {
+                    vuMeter.style.height = `${percentage}%`;
+                }
+                
+                const channelData = this.channelProcessors[channel];
+                if (!channelData) return;
+                
+                if (channelData.workletNode) {
+                    channelData.workletNode.port.postMessage({ type: 'audio', data: audioData });
+                } else if (channelData.jitterBuffer) {
+                    channelData.jitterBuffer.push(audioData);
+                    if (channelData.jitterBuffer.length > channelData.targetSize * 5) {
+                        channelData.jitterBuffer.shift();
+                    }
+                }
+            }
+            
+            updateNetworkLatency(latency) {
+                this.metrics.networkLatency = this.metrics.networkLatency * 0.8 + latency * 0.2;
+                this.calculateEstimatedLatency();
+            }
+            
+            updateMetricsDisplay() {
+                const latencyEl = document.getElementById('latency');
+                if (latencyEl) {
+                    const latency = Math.round(this.metrics.estimatedLatency);
+                    latencyEl.textContent = latency;
+                    latencyEl.className = 'metric-value ' + 
+                        (latency <= 30 ? '' : latency <= 50 ? 'warning' : 'bad');
+                }
+                
+                const bufferEl = document.getElementById('buffer');
+                if (bufferEl) {
+                    const buffer = Math.round(this.metrics.bufferHealth);
+                    bufferEl.textContent = buffer;
+                    bufferEl.className = 'metric-value ' + 
+                        (buffer >= 50 && buffer <= 150 ? '' : buffer > 150 ? 'warning' : 'bad');
+                }
+                
+                const networkEl = document.getElementById('network');
+                if (networkEl) {
+                    const network = Math.round(this.metrics.networkLatency);
+                    networkEl.textContent = network;
+                    networkEl.className = 'metric-value ' + 
+                        (network <= 10 ? '' : network <= 25 ? 'warning' : 'bad');
+                }
+            }
+            
+            dbToGain(db) {
+                return Math.pow(10, db / 20);
+            }
+            
+            updateStatus(message, connected) {
+                document.getElementById('status-text').textContent = message;
+                const led = document.getElementById('status-led');
+                
+                if (connected) {
+                    led.classList.add('active');
+                } else {
+                    led.classList.remove('active');
+                }
+            }
+        }
+
+        const monitor = new AudioMonitor();
+    </script>
 </body>
 </html>
