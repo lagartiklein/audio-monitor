@@ -527,7 +527,7 @@
                 </div>
                 <div class="metric">
                     <span class="metric-label">PROT:</span>
-                    <span id="protocol" class="metric-value">WebRTC</span>
+                    <span id="protocol" class="metric-value">WebSocket</span>
                 </div>
             </div>
         </header>
@@ -546,17 +546,7 @@
         <div id="audio-status">AUDIO: INITIALIZING</div>
     </div>
 
-    <div id="init-overlay" class="init-overlay">
-        <div class="help-text">
-            ► Sistema de Monitoreo Multi-canal<br>
-            ► Ultra Baja Latencia (WebRTC)<br>
-            ► Control Individual de Volumen y Panorama
-        </div>
-        <button id="init-btn" class="init-btn">► INICIAR AUDIO (WebSocket) ◄</button>
-        <div class="help-text" style="font-size: 0.75em; color: #555;">
-            WebRTC no disponible. Click para usar WebSocket
-        </div>
-    </div>
+    <!-- Overlay eliminado, acceso directo al mixer -->
 
     <div id="warning-message" class="warning-message"></div>
 
@@ -564,76 +554,42 @@
         class AudioMonitor {
             constructor() {
                 this.socket = null;
-                this.webrtcClient = null;
                 this.audioContext = null;
                 this.deviceInfo = null;
                 this.activeChannels = new Set();
                 this.channelProcessors = {};
                 this.audioWorkletReady = false;
-                
-                // Configuración de protocolo
-                this.useWebRTC = this.detectWebRTCSupport();
-                this.protocol = 'webrtc'; // Por defecto WebRTC
-                this.preferredProtocol = localStorage.getItem('audioMonitor_preferredProtocol') || 'webrtc';
-                this.webrtcConnected = false;
-                
+                this.protocol = 'websocket';
                 this.metrics = {
                     networkLatency: 0,
                     bufferHealth: 100,
                     estimatedLatency: 0,
-                    protocol: 'WebRTC',
+                    protocol: 'WebSocket',
                     audioLatency: 0,
                     packetLoss: 0,
                     jitter: 0,
                     quality: 'unknown'
                 };
-                
                 this.connected = false;
                 this.audioInitialized = false;
                 this.connectionStartTime = Date.now();
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 3;
-                
                 this.init();
             }
 
             async init() {
-                console.log('[AudioMonitor] Inicializando... WebRTC disponible:', this.useWebRTC);
+                console.log('[AudioMonitor] Inicializando solo WebSocket...');
                 this.connectionStartTime = Date.now();
-                
-                // Actualizar UI inicial
                 this.updateStatus('CONNECTING...', false);
                 this.updateProtocolDisplay();
-                
-                // Conectar WebSocket (siempre necesario para señalización)
                 await this.connectWebSocket();
-                
-                // Iniciar monitorización
                 this.startMetricsMonitoring();
                 this.setupEventListeners();
-                
-                // Ocultar overlay si WebRTC está disponible
-                if (this.useWebRTC) {
-                    document.getElementById('init-overlay').classList.add('hidden');
-                }
-            }
-            
-            detectWebRTCSupport() {
-                const supported = !!(window.RTCPeerConnection && window.RTCSessionDescription);
-                console.log('[AudioMonitor] WebRTC soportado:', supported);
-                
-                if (!supported) {
-                    this.showWarning('WebRTC no está disponible en este navegador. Usando WebSocket.');
-                    this.protocol = 'websocket';
-                    this.metrics.protocol = 'WebSocket';
-                }
-                
-                return supported;
             }
             
             async connectWebSocket() {
-                console.log('[AudioMonitor] Conectando WebSocket para señalización...');
-                
+                console.log('[AudioMonitor] Conectando WebSocket...');
                 this.socket = io({
                     transports: ['websocket'],
                     upgrade: false,
@@ -641,40 +597,19 @@
                     reconnectionDelay: 1000,
                     reconnectionAttempts: 5
                 });
-                
                 this.socket.on('connect', () => {
-                    console.log('[Socket] Conectado para señalización');
-                    this.updateStatus('CONNECTED (Signal)', true);
+                    console.log('[Socket] Conectado');
+                    this.updateStatus('CONNECTED', true);
                     this.connected = true;
-                    
-                    // Si WebRTC está disponible, intentar conectar
-                    if (this.useWebRTC && this.preferredProtocol === 'webrtc') {
-                        this.initWebRTC();
-                    } else {
-                        // Mostrar botón de inicio para WebSocket
-                        document.getElementById('init-overlay').classList.remove('hidden');
-                        document.getElementById('audio-status').textContent = 'AUDIO: READY (WebSocket)';
-                    }
-                    
-                    // Re-suscribir canales activos si hay reconexión
+                    document.getElementById('audio-status').textContent = 'AUDIO: READY (WebSocket)';
                     if (this.activeChannels.size > 0) {
                         setTimeout(() => this.updateSubscription(), 500);
                     }
                 });
-                
                 this.socket.on('disconnect', (reason) => {
                     console.log('[Socket] Desconectado:', reason);
                     this.updateStatus('DISCONNECTED', false);
                     this.connected = false;
-                    
-                    // Cerrar WebRTC también
-                    if (this.webrtcClient) {
-                        this.webrtcClient.close();
-                        this.webrtcClient = null;
-                        this.webrtcConnected = false;
-                    }
-                    
-                    // Intentar reconexión
                     if (this.reconnectAttempts < this.maxReconnectAttempts) {
                         this.reconnectAttempts++;
                         setTimeout(() => {
@@ -683,50 +618,18 @@
                         }, 1000 * this.reconnectAttempts);
                     }
                 });
-                
                 this.socket.on('device_info', (info) => {
                     this.handleDeviceInfo(info);
                 });
-                
-                // WebSocket audio (solo si estamos usando WebSocket como fallback)
                 this.socket.on('audio', (data) => {
-                    if (this.protocol === 'websocket') {
-                        this.handleAudioData(data);
-                    }
+                    this.handleAudioData(data);
                 });
-                
                 this.socket.on('pong', (data) => {
-                    if (this.protocol === 'websocket') {
-                        const latency = Date.now() - data.client_timestamp;
-                        this.updateNetworkLatency(latency);
-                    }
+                    const latency = Date.now() - data.client_timestamp;
+                    this.updateNetworkLatency(latency);
                 });
-                
-                // WebRTC events
-                this.socket.on('webrtc_answer', (data) => {
-                    if (this.webrtcClient) {
-                        this.webrtcClient.handleAnswer(data);
-                    }
-                });
-                
-                this.socket.on('webrtc_ice_candidate', (data) => {
-                    if (this.webrtcClient) {
-                        this.webrtcClient.handleRemoteIceCandidate(data);
-                    }
-                });
-                
-                this.socket.on('webrtc_error', (data) => {
-                    console.error('[WebRTC] Error del servidor:', data.error);
-                    this.fallbackToWebSocket(`Error WebRTC: ${data.error}`);
-                });
-                
-                this.socket.on('webrtc_subscribed', (data) => {
-                    console.log('[WebRTC] Suscripción confirmada:', data.channels);
-                });
-                
-                // Ping para WebSocket (solo cuando se usa WebSocket)
                 setInterval(() => {
-                    if (this.socket && this.socket.connected && this.protocol === 'websocket') {
+                    if (this.socket && this.socket.connected) {
                         this.socket.emit('ping', { timestamp: Date.now() });
                     }
                 }, 2000);
@@ -737,11 +640,6 @@
                 this.displayDeviceInfo(info);
                 this.createMixerConsole(info.channels);
                 this.calculateEstimatedLatency();
-                
-                // Mostrar soporte WebRTC en info del dispositivo
-                if (info.supports_webrtc) {
-                    console.log('[Device] Servidor soporta WebRTC');
-                }
             }
             
             async initWebRTC() {
@@ -826,47 +724,25 @@
             fallbackToWebSocket(reason) {
                 console.log(`[AudioMonitor] Fallback a WebSocket: ${reason}`);
                 this.showWarning(reason);
-                
                 this.protocol = 'websocket';
                 this.metrics.protocol = 'WebSocket';
                 this.updateProtocolDisplay();
-                
                 // Cerrar WebRTC si existe
                 if (this.webrtcClient) {
                     this.webrtcClient.close();
                     this.webrtcClient = null;
                     this.webrtcConnected = false;
                 }
-                
-                // Mostrar botón de inicio para WebSocket
-                document.getElementById('init-overlay').classList.remove('hidden');
-                document.getElementById('init-btn').textContent = '► INICIAR AUDIO (WebSocket) ◄';
                 document.getElementById('audio-status').textContent = 'AUDIO: READY (WebSocket)';
-                
+                // No overlay ni botón de inicio
                 console.log('[AudioMonitor] Cambiado a WebSocket');
             }
             
             setupEventListeners() {
-                document.getElementById('init-btn').onclick = async () => {
-                    if (this.protocol === 'websocket') {
-                        const success = await this.initAudioContext();
-                        if (success) {
-                            document.getElementById('init-overlay').classList.add('hidden');
-                            document.getElementById('audio-status').textContent = 'AUDIO: ACTIVE (WebSocket)';
-                        }
-                    }
-                };
-                
-                // Detectar cambios de visibilidad de página
+                // Solo visibilidad, sin overlay ni botón de inicio
                 document.addEventListener('visibilitychange', () => {
-                    if (document.hidden) {
-                        console.log('[AudioMonitor] Página en segundo plano');
-                    } else {
-                        console.log('[AudioMonitor] Página en primer plano');
-                        // Reanudar audio si es necesario
-                        if (this.audioContext && this.audioContext.state === 'suspended') {
-                            this.audioContext.resume();
-                        }
+                    if (!document.hidden && this.audioContext && this.audioContext.state === 'suspended') {
+                        this.audioContext.resume();
                     }
                 });
             }
@@ -1049,20 +925,9 @@
                 console.error('[App] Error iniciando WebSocket audio');
                 return;
             }
-            document.getElementById('init-overlay').classList.add('hidden');
-        } else if (this.protocol === 'webrtc' && !this.webrtcConnected) {
-            console.log('[App] Esperando conexión WebRTC...');
-            await this.initWebRTC();
-            // Esperar un momento para que WebRTC se conecte
-            await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        
         if (this.protocol === 'websocket') {
             this.createChannelProcessor(channel);
-        }
-        // ✅ AGREGAR ESTO PARA WEBRTC
-        else if (this.protocol === 'webrtc') {
-            console.log(`[App] Usando WebRTC para canal ${channel}`);
         }
     }
     
@@ -1369,12 +1234,5 @@
         });
     </script>
 
-    <script src="/webrtc-client.js"></script>
-<script>
-    // Iniciar aplicación cuando el DOM esté listo
-    document.addEventListener('DOMContentLoaded', () => {
-        window.audioMonitor = new AudioMonitor();
-    });
-</script>
 </body>
 </html>

@@ -1,10 +1,14 @@
 """
-Channel Manager - Gestión de suscripciones y procesamiento de canales
-Versión completa
+Channel Manager - Gestión de suscripciones para servidor dual
 """
 
 import numpy as np
 import struct
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+import config
 
 class ChannelManager:
     def __init__(self, num_channels):
@@ -22,8 +26,6 @@ class ChannelManager:
             'gains': gains
         }
         
-        import config
-
         if config.VERBOSE:
             print(f"[+] Cliente {client_id[:8]}... suscrito a {len(channels)} canales")
     
@@ -32,7 +34,6 @@ class ChannelManager:
         if client_id in self.subscriptions:
             del self.subscriptions[client_id]
             
-            import config
             if config.VERBOSE:
                 print(f"[-] Cliente {client_id[:8]}... desuscrito")
     
@@ -92,3 +93,15 @@ class ChannelManager:
         for sub in self.subscriptions.values():
             total += len(sub['channels'])
         return total
+    
+    def get_subscribed_channels(self, client_id):
+        """Obtiene canales suscritos por cliente"""
+        if client_id in self.subscriptions:
+            return self.subscriptions[client_id]['channels']
+        return []
+    
+    def get_channel_gains(self, client_id):
+        """Obtiene ganancias por canal para un cliente"""
+        if client_id in self.subscriptions:
+            return self.subscriptions[client_id]['gains']
+        return {}

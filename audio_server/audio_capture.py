@@ -1,6 +1,6 @@
 """
-Audio Capture - Captura multi-canal optimizada para baja latencia
-Versión completa y robusta
+Audio Capture - Captura multi-canal optimizada
+Versión para servidor dual
 """
 
 import sounddevice as sd
@@ -8,6 +8,11 @@ import numpy as np
 import queue
 import threading
 import time
+import sys
+import os
+
+# Agregar ruta para importar config unificada
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import config
 
 class AudioCapture:
@@ -17,16 +22,14 @@ class AudioCapture:
         self.audio_queue = queue.Queue(maxsize=config.QUEUE_SIZE)
         self.running = False
         self.actual_sample_rate = None
-        self.capture_thread = None
         
     def list_devices(self):
-        """Lista todas las interfaces de audio disponibles con >2 canales"""
+        """Lista interfaces de audio con >2 canales"""
         try:
             devices = sd.query_devices()
             audio_interfaces = []
             
             for i, device in enumerate(devices):
-                # Solo interfaces multi-canal (>2 canales)
                 if device['max_input_channels'] > 2:
                     sample_rate = device.get('default_samplerate', 44100)
                     if not sample_rate or sample_rate == 0:
@@ -43,7 +46,6 @@ class AudioCapture:
             
         except Exception as e:
             print(f"[!] Error listando dispositivos: {e}")
-            # Devolver dispositivo simulado como fallback
             return [{
                 'id': 0,
                 'name': 'Dispositivo Simulado (Fallback)',
@@ -52,12 +54,7 @@ class AudioCapture:
             }]
     
     def start_capture(self, device_id=None):
-        """
-        Inicia captura de audio en thread de alta prioridad
-        Retorna: número de canales disponibles
-        """
-        
-        # Si no se especifica device, usar el primero con >2 canales
+        """Inicia captura de audio"""
         if device_id is None:
             devices = self.list_devices()
             if not devices:
@@ -68,15 +65,7 @@ class AudioCapture:
         channels = min(self.device_info['max_input_channels'], config.CHANNELS_MAX)
         
         # Determinar sample rate
-        if hasattr(config, 'SAMPLE_RATE') and config.SAMPLE_RATE:
-            self.actual_sample_rate = config.SAMPLE_RATE
-        else:
-            self.actual_sample_rate = self.device_info.get('default_samplerate', 44100)
-            if not self.actual_sample_rate or self.actual_sample_rate == 0:
-                self.actual_sample_rate = 44100
-        
-        # Asegurar que es entero
-        self.actual_sample_rate = int(self.actual_sample_rate)
+        self.actual_sample_rate = config.SAMPLE_RATE
         
         if config.VERBOSE:
             print(f"[*] Iniciando captura de audio:")
@@ -85,10 +74,8 @@ class AudioCapture:
             print(f"    Sample rate: {self.actual_sample_rate} Hz")
             print(f"    Blocksize: {config.BLOCKSIZE} samples")
             
-            if self.actual_sample_rate and self.actual_sample_rate > 0:
-                latency_ms = (config.BLOCKSIZE / self.actual_sample_rate) * 1000
-                print(f"    Latencia por bloque: {latency_ms:.1f}ms")
-            
+            latency_ms = (config.BLOCKSIZE / self.actual_sample_rate) * 1000
+            print(f"    Latencia por bloque: {latency_ms:.1f}ms")
             print(f"    Formato: {config.DTYPE}")
         
         # Crear stream con parámetros optimizados
@@ -137,10 +124,7 @@ class AudioCapture:
         return channels
     
     def _audio_callback(self, indata, frames, time_info, status):
-        """
-        Callback ejecutado en thread de audio (alta prioridad)
-        CRÍTICO: Debe ser lo más rápido posible
-        """
+        """Callback ejecutado en thread de audio"""
         if status:
             if config.VERBOSE:
                 print(f"[!] Audio status: {status}")
@@ -152,14 +136,10 @@ class AudioCapture:
         except queue.Full:
             # Queue llena = cliente no consume rápido suficiente
             # Descartar buffer (mejor que bloquear el callback)
-            # Esto es normal cuando no hay clientes conectados
             pass
     
     def get_audio_data(self, timeout=1.0):
-        """
-        Obtiene datos de audio con timeout
-        Retorna: numpy array (frames, channels) en float32 o None si timeout
-        """
+        """Obtiene datos de audio con timeout"""
         try:
             return self.audio_queue.get(timeout=timeout)
         except queue.Empty:
