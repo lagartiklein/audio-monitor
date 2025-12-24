@@ -95,7 +95,7 @@ class NativeClient:
         self.metrics.connection_time = time.time()
         
         # Encoder
-        self.encoder = NativeAudioEncoder(sample_rate=config.SAMPLE_RATE)
+        self.encoder = NativeAudioEncoder()
         
         # Configuración del cliente
         self.sample_rate = config.SAMPLE_RATE
@@ -527,14 +527,7 @@ class NativeAudioServer:
             }
             client.send_control(stats_msg)
     
-    # ============================================================================
-# INSTRUCCIONES:
-# 1. Abre tu archivo: audio_server/native_server.py
-# 2. BUSCA el método: def _audio_distribution_loop(self):
-# 3. REEMPLAZA desde "def _audio_distribution_loop(self):" 
-#    hasta el final del método (antes del siguiente "def")
-# 4. HAZ LO MISMO con: def _monitor_loop(self):
-# ============================================================================
+
 
     def _audio_distribution_loop(self):
         """

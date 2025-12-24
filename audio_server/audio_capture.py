@@ -1,6 +1,6 @@
 """
-Audio Capture - Captura multi-canal optimizada
-Versión optimizada para baja latencia y buffer estable
+Audio Capture - ✅ ADAPTATIVO al hardware real
+Detecta sample rate y blocksize del hardware y ajusta configuración
 """
 
 import sounddevice as sd
@@ -11,7 +11,6 @@ import time
 import sys
 import os
 
-# Agregar ruta para importar config unificada
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import config
 
@@ -22,6 +21,7 @@ class AudioCapture:
         self.audio_queue = queue.Queue(maxsize=config.QUEUE_SIZE)
         self.running = False
         self.actual_sample_rate = None
+        self.actual_blocksize = None  # ✅ Guardar blocksize real
         
         # Estadísticas
         self.stats = {
@@ -55,15 +55,10 @@ class AudioCapture:
             
         except Exception as e:
             print(f"[!] Error listando dispositivos: {e}")
-            return [{
-                'id': 0,
-                'name': 'Dispositivo Simulado (Fallback)',
-                'channels': 8,
-                'sample_rate': 44100
-            }]
+            return []
     
     def start_capture(self, device_id=None):
-        """Inicia captura de audio optimizada"""
+        """✅ Inicia captura FORZANDO 256 samples"""
         if device_id is None:
             devices = self.list_devices()
             if not devices:
@@ -73,79 +68,116 @@ class AudioCapture:
         self.device_info = sd.query_devices(device_id)
         channels = min(self.device_info['max_input_channels'], config.CHANNELS_MAX)
         
-        # Determinar sample rate
-        self.actual_sample_rate = config.SAMPLE_RATE
+        # ✅ Obtener sample rate REAL del dispositivo
+        device_sample_rate = int(self.device_info.get('default_samplerate', 44100))
         
-        if config.VERBOSE:
-            print(f"[*] Iniciando captura de audio:")
-            print(f"    Dispositivo: {self.device_info['name']}")
-            print(f"    Canales: {channels}")
-            print(f"    Sample rate: {self.actual_sample_rate} Hz")
-            print(f"    Blocksize: {config.BLOCKSIZE} samples")
-            
-            latency_ms = (config.BLOCKSIZE / self.actual_sample_rate) * 1000
-            print(f"    Latencia por bloque: {latency_ms:.1f}ms")
-            print(f"    Formato: {config.DTYPE}")
-            print(f"    Queue size: {config.QUEUE_SIZE}")
+        print(f"[*] Iniciando captura con configuración ESTÁNDAR:")
+        print(f"    Dispositivo: {self.device_info['name']}")
+        print(f"    Canales: {channels}")
+        print(f"    Sample rate detectado: {device_sample_rate} Hz")
+        print(f"    Blocksize: {config.BLOCKSIZE} samples (FORZADO)")
         
-        # Crear stream con parámetros optimizados
+        # ✅ FORZAR blocksize a 256
+        forced_blocksize = config.BLOCKSIZE  # 256
+        
+        # Crear stream FORZANDO 256 samples
         try:
+            print(f"[*] Forzando blocksize estándar: {forced_blocksize} samples...")
+            
             self.stream = sd.InputStream(
                 device=device_id,
                 channels=channels,
-                samplerate=self.actual_sample_rate,
-                blocksize=config.BLOCKSIZE,
+                samplerate=device_sample_rate,
+                blocksize=forced_blocksize,
                 dtype=config.DTYPE,
                 callback=self._audio_callback,
                 latency='low'
             )
-        except Exception as e:
-            print(f"[!] Error creando stream: {e}")
             
-            # Intentar con parámetros más conservadores
-            print("[*] Intentando con parámetros más conservadores...")
+            # ✅ Guardar valores REALES
+            self.actual_sample_rate = device_sample_rate
+            self.actual_blocksize = forced_blocksize
+            
+            # ✅ ACTUALIZAR solo sample rate (blocksize ya es 256)
+            config.update_audio_config(device_sample_rate)
+            
+            print(f"[✅] Blocksize configurado: {forced_blocksize} samples")
+            
+        except Exception as e:
+            print(f"[!] Error con blocksize {forced_blocksize}: {e}")
+            print(f"[!] El hardware no soporta {forced_blocksize} samples")
+            print(f"[!] Esto puede causar problemas de sincronización")
+            
+            # Intentar con 512 como fallback
+            print(f"[*] Intentando con 512 samples como fallback...")
             try:
+                self.stream = sd.InputStream(
+                    device=device_id,
+                    channels=channels,
+                    samplerate=device_sample_rate,
+                    blocksize=512,
+                    dtype=config.DTYPE,
+                    callback=self._audio_callback,
+                    latency='low'
+                )
+                
+                self.actual_sample_rate = device_sample_rate
+                self.actual_blocksize = 512
+                
+                # Actualizar config con blocksize diferente
+                config.BLOCKSIZE = 512
+                config.NATIVE_CHUNK_SIZE = 512
+                config.update_audio_config(device_sample_rate)
+                
+                print(f"[⚠️] ADVERTENCIA: Usando 512 samples en lugar de 256")
+                print(f"[⚠️] Esto puede aumentar la latencia")
+                
+            except Exception as e2:
+                # Último recurso: configuración mínima
+                print("[!] Usando configuración mínima de fallback...")
                 self.stream = sd.InputStream(
                     device=device_id,
                     channels=min(2, channels),
                     samplerate=44100,
-                    blocksize=512,
+                    blocksize=256,
                     dtype=config.DTYPE,
                     callback=self._audio_callback
                 )
-                channels = 2
                 self.actual_sample_rate = 44100
-            except Exception as e2:
-                print(f"[!] Error crítico: {e2}")
-                raise
+                self.actual_blocksize = 256
+                channels = 2
+                
+                config.update_audio_config(44100)
         
         self.running = True
         self.stream.start()
         
-        if config.VERBOSE:
-            print(f"[✓] Captura iniciada correctamente")
-            
-            # Verificar latencia real
-            if hasattr(self.stream, 'latency'):
-                actual_latency = self.stream.latency
-                if actual_latency:
-                    print(f"    Latencia de captura: {actual_latency*1000:.1f}ms")
+        # ✅ Mostrar configuración FINAL
+        latency_ms = (self.actual_blocksize / self.actual_sample_rate) * 1000
+        
+        print(f"\n[✅] Captura iniciada con configuración FINAL:")
+        print(f"    • Sample Rate: {self.actual_sample_rate} Hz")
+        print(f"    • Blocksize: {self.actual_blocksize} samples")
+        print(f"    • Latencia por bloque: {latency_ms:.2f}ms")
+        print(f"    • Canales: {channels}")
+        print(f"    • Queue size: {config.QUEUE_SIZE}")
+        
+        # Verificar latencia real del stream
+        if hasattr(self.stream, 'latency'):
+            actual_latency = self.stream.latency
+            if actual_latency:
+                print(f"    • Latencia total de captura: {actual_latency*1000:.1f}ms")
         
         return channels
     
     def _audio_callback(self, indata, frames, time_info, status):
-        """Callback optimizado con monitoreo de buffer"""
+        """Callback optimizado"""
         self.stats['total_callbacks'] += 1
-        current_time = time.time()
         
         if status and config.VERBOSE:
             print(f"[!] Audio status: {status}")
         
-        # Monitorear tasa de callbacks
-        time_since_last = current_time - self.stats['last_callback_time']
-        self.stats['last_callback_time'] = current_time
-        
-        # Actualizar estadísticas de queue
+        # Actualizar estadísticas
         current_qsize = self.audio_queue.qsize()
         self.stats['queue_min'] = min(self.stats['queue_min'], current_qsize)
         self.stats['queue_max'] = max(self.stats['queue_max'], current_qsize)
@@ -154,41 +186,30 @@ class AudioCapture:
             # Poner en queue sin bloquear
             self.audio_queue.put_nowait(indata.copy())
             
-            # Solo mostrar warnings si buffer muy bajo (y VERBOSE)
-            if config.VERBOSE:
-                if current_qsize == 0:
-                    print(f"[⚠️] Audio queue vacía - posible underrun")
-                elif current_qsize < 3:
-                    fill_percent = (current_qsize / config.QUEUE_SIZE) * 100
-                    if fill_percent < 10:
-                        print(f"[⚠️] Buffer crítico bajo: {current_qsize}/{config.QUEUE_SIZE} ({fill_percent:.0f}%)")
-                    elif fill_percent < 30:
-                        print(f"[⚠️] Buffer bajo: {current_qsize}/{config.QUEUE_SIZE} ({fill_percent:.0f}%)")
+            # ⚠️ Warning solo si crítico
+            if config.VERBOSE and current_qsize < 10:
+                fill_percent = (current_qsize / config.QUEUE_SIZE) * 100
+                if fill_percent < 5:
+                    print(f"[⚠️] Buffer bajo: {current_qsize}/{config.QUEUE_SIZE}")
                         
         except queue.Full:
-            # Queue llena - incrementar contador de frames descartados
             self.stats['dropped_frames'] += 1
             
-            if config.VERBOSE:
-                # Mostrar cada 10 frames descartados para no saturar la consola
-                if self.stats['dropped_frames'] % 10 == 0:
-                    drop_rate = (self.stats['dropped_frames'] / self.stats['total_callbacks']) * 100
-                    print(f"[⚠️] Buffer lleno - frames descartados: {self.stats['dropped_frames']}")
-                    print(f"    Tasa de descarte: {drop_rate:.2f}%")
-                    print(f"    Posibles causas:")
-                    print(f"    - Cliente no consume suficientemente rápido")
-                    print(f"    - QUEUE_SIZE muy pequeño ({config.QUEUE_SIZE})")
-                    print(f"    - Procesamiento del servidor demasiado lento")
+            # Mostrar cada 20 frames descartados
+            if config.VERBOSE and self.stats['dropped_frames'] % 20 == 0:
+                drop_rate = (self.stats['dropped_frames'] / 
+                           self.stats['total_callbacks']) * 100
+                print(f"[⚠️] Frames descartados: {self.stats['dropped_frames']} ({drop_rate:.1f}%)")
     
-    def get_audio_data(self, timeout=1.0):
-        """Obtiene datos de audio con timeout"""
+    def get_audio_data(self, timeout=0.1):
+        """Obtiene datos de audio con timeout corto"""
         try:
             return self.audio_queue.get(timeout=timeout)
         except queue.Empty:
             return None
     
     def get_stats(self):
-        """Obtener estadísticas de captura"""
+        """Obtener estadísticas"""
         current_qsize = self.audio_queue.qsize()
         queue_fill_percent = (current_qsize / config.QUEUE_SIZE) * 100 if config.QUEUE_SIZE > 0 else 0
         
@@ -205,33 +226,33 @@ class AudioCapture:
             'total_callbacks': self.stats['total_callbacks'],
             'dropped_frames': self.stats['dropped_frames'],
             'drop_rate_percent': drop_rate,
-            'sample_rate': self.actual_sample_rate or config.SAMPLE_RATE,
+            'sample_rate': self.actual_sample_rate,
+            'blocksize': self.actual_blocksize,
             'running': self.running
         }
     
     def print_stats(self):
-        """Imprimir estadísticas detalladas"""
+        """Imprimir estadísticas"""
         stats = self.get_stats()
         
-        print(f"\n[📊] Estadísticas de Buffer:")
+        print(f"\n[📊] Estadísticas de Captura:")
+        print(f"    Sample Rate: {stats['sample_rate']} Hz")
+        print(f"    Blocksize: {stats['blocksize']} samples")
         print(f"    Queue: {stats['queue_fill']}/{stats['queue_capacity']} ({stats['queue_fill_percent']:.0f}%)")
         print(f"    Min/Max: {stats['queue_min']}/{stats['queue_max']}")
         print(f"    Callbacks: {stats['total_callbacks']}")
-        print(f"    Frames descartados: {stats['dropped_frames']} ({stats['drop_rate_percent']:.2f}%)")
+        print(f"    Descartados: {stats['dropped_frames']} ({stats['drop_rate_percent']:.2f}%)")
         
         if stats['queue_fill_percent'] < 10:
-            print(f"[⚠️] BUFFER CRÍTICO BAJO: {stats['queue_fill_percent']:.0f}%")
-            print(f"    → Incrementa QUEUE_SIZE o BLOCKSIZE en config.py")
+            print(f"[⚠️] Buffer bajo - considera aumentar QUEUE_SIZE")
         elif stats['queue_fill_percent'] > 90:
-            print(f"[⚠️] BUFFER CRÍTICO ALTO: {stats['queue_fill_percent']:.0f}%")
-            print(f"    → Cliente no consume rápido suficiente")
+            print(f"[⚠️] Buffer alto - clientes no consumen rápido")
         
         if stats['drop_rate_percent'] > 1.0:
-            print(f"[⚠️] ALTA TASA DE DESCARTE: {stats['drop_rate_percent']:.2f}%")
-            print(f"    → Considera aumentar QUEUE_SIZE en config.py")
+            print(f"[⚠️] Alta tasa de descarte")
     
     def stop_capture(self):
-        """Detiene la captura limpiamente"""
+        """Detiene la captura"""
         if self.stream:
             self.running = False
             try:
@@ -242,7 +263,6 @@ class AudioCapture:
             except Exception as e:
                 print(f"[!] Error deteniendo stream: {e}")
         
-        # Imprimir estadísticas finales
         self.print_stats()
         
         # Limpiar queue

@@ -1,11 +1,12 @@
-# config.py - CONFIGURACIÓN FINAL ESTABLE
+# config.py - CONFIGURACIÓN ADAPTATIVA AL HARDWARE REAL
 
 # === CONFIGURACIÓN AUDIO BÁSICA ===
-SAMPLE_RATE = 48000
-BLOCKSIZE = 512          # Estable para la mayoría de interfaces
+# ✅ ESTÁNDAR FORZADO: 256 samples para ultra-baja latencia
+SAMPLE_RATE = 44100      # Se ajusta dinámicamente según hardware
+BLOCKSIZE = 256          # ✅ FORZADO: 256 samples estándar
 DTYPE = 'float32'
 CHANNELS_MAX = 32
-QUEUE_SIZE = 300         # Buffer grande para evitar underrun
+QUEUE_SIZE = 5         # ✅ Reducido para baja latencia
 MAX_CLIENTS = 8
 
 # === CONFIGURACIÓN WEB ===
@@ -21,9 +22,9 @@ PING_TIMEOUT = 10
 NATIVE_ENABLED = True
 NATIVE_PORT = 5101
 NATIVE_HOST = '0.0.0.0'
-NATIVE_LATENCY_TARGET = 15
-NATIVE_CHUNK_SIZE = 512  # ¡DEBE SER IGUAL A BLOCKSIZE!
-NATIVE_BUFFER_PACKETS = 3
+NATIVE_LATENCY_TARGET = 10       # ✅ 10ms objetivo con 256 samples
+NATIVE_CHUNK_SIZE = 256          # ✅ FORZADO: 256 samples estándar
+NATIVE_BUFFER_PACKETS = 2        # ✅ Mínimo (2x256 = 512 total)
 NATIVE_MAGIC_NUMBER = 0xA1D10A7C
 NATIVE_PROTOCOL_VERSION = 2
 NATIVE_HEADER_SIZE = 20
@@ -36,18 +37,39 @@ LOG_NATIVE_PACKETS = False
 MEASURE_LATENCY = True
 
 # === CALIDAD DE AUDIO ===
-MASTER_VOLUME = 0.8
+MASTER_VOLUME = 1.0      # ✅ Sin atenuación
 USE_SOFT_CLIP = True
 SOFT_CLIP_THRESHOLD = 0.95
 
-# Cálculos automáticos
+# ✅ Función para actualizar solo sample rate (blocksize es fijo)
+def update_audio_config(detected_sample_rate):
+    """
+    Actualiza solo sample rate - blocksize siempre es 256
+    """
+    global SAMPLE_RATE, WEB_JITTER_BUFFER
+    
+    SAMPLE_RATE = detected_sample_rate
+    
+    # Ajustar jitter buffer según sample rate
+    block_time_ms = (BLOCKSIZE / SAMPLE_RATE) * 1000
+    WEB_JITTER_BUFFER = int(block_time_ms * 4)
+    
+    if VERBOSE:
+        print(f"[Config] ✅ Configuración adaptada:")
+        print(f"         • Sample Rate: {SAMPLE_RATE} Hz (del hardware)")
+        print(f"         • Blocksize: {BLOCKSIZE} samples (FORZADO)")
+        print(f"         • Block time: {block_time_ms:.2f}ms")
+        print(f"         • Native chunk: {NATIVE_CHUNK_SIZE}")
+        print(f"         • Queue size: {QUEUE_SIZE}")
+        print(f"         • Latencia objetivo: {NATIVE_LATENCY_TARGET}ms")
+
+# Cálculos iniciales
 if __name__ == "config":
     block_time_ms = (BLOCKSIZE / SAMPLE_RATE) * 1000
     WEB_JITTER_BUFFER = int(block_time_ms * 4)
     
     if VERBOSE:
-        print(f"[Config] ✅ Configuración cargada")
-        print(f"         • Blocksize: {BLOCKSIZE} samples")
-        print(f"         • Block time: {block_time_ms:.1f}ms")
-        print(f"         • Queue size: {QUEUE_SIZE}")
-        print(f"         • Native chunk: {NATIVE_CHUNK_SIZE}")
+        print(f"[Config] ⚙️ Configuración estándar:")
+        print(f"         • Sample Rate: {SAMPLE_RATE} Hz (se ajustará al hardware)")
+        print(f"         • Blocksize: {BLOCKSIZE} samples (FORZADO)")
+        print(f"         • Block time: {block_time_ms:.2f}ms")
