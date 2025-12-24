@@ -72,10 +72,12 @@ class ClientMetrics:
 class NativeClient:
     """Cliente optimizado V2.1 con protocolo length-prefix"""
     
-    def __init__(self, client_id: str, sock: socket.socket, address: Tuple[str, int]):
+    def __init__(self, client_id: str, sock: socket.socket, address: Tuple[str, int], num_channels: int):
+       
         self.id = client_id
         self.socket = sock
         self.address = address
+        self.num_channels = num_channels  # ✅ Guardar
         
         # Estado
         self.status = ClientStatus.CONNECTING
@@ -181,7 +183,7 @@ class NativeClient:
         config_dict = {
             'type': 'config',
             'sample_rate': self.sample_rate,
-            'channels': 32,
+        'channels': self.num_channels,  # ✅ Dinámico
             'buffer_size': self.buffer_size,
             'format': self.format,
             'latency_target': self.latency_target,
@@ -341,7 +343,7 @@ class NativeAudioServer:
                         client_socket, address = self.server_socket.accept()
                         
                         client_id = f"{address[0]}_{int(time.time() * 1000)}"
-                        client = NativeClient(client_id, client_socket, address)
+                        client = NativeClient(client_id, client_socket, address, self.channel_manager.num_channels)
                         
                         with self.client_lock:
                             self.clients[client_id] = client

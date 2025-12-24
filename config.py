@@ -1,34 +1,29 @@
-# config.py - Configuración OPTIMIZADA y compatible con ASIO
-
-# === MODOS DE OPERACIÓN ===
-OPERATION_MODE = "dual"
+# config.py - CONFIGURACIÓN FINAL ESTABLE
 
 # === CONFIGURACIÓN AUDIO BÁSICA ===
 SAMPLE_RATE = 48000
-BLOCKSIZE = 512
+BLOCKSIZE = 512          # Estable para la mayoría de interfaces
 DTYPE = 'float32'
 CHANNELS_MAX = 32
-QUEUE_SIZE = 100  # ✅ Ya lo ajustaste bien - 580ms buffer
+QUEUE_SIZE = 300         # Buffer grande para evitar underrun
 MAX_CLIENTS = 8
 
-# === CONFIGURACIÓN WEB (Browser) ===
+# === CONFIGURACIÓN WEB ===
 WEB_ENABLED = True
 WEB_PORT = 5100
 WEB_HOST = '0.0.0.0'
-WEB_LATENCY_TARGET = 30
-WEB_JITTER_BUFFER = 30
+WEB_LATENCY_TARGET = 40
+WEB_JITTER_BUFFER = 40
 PING_INTERVAL = 5
 PING_TIMEOUT = 10
 
-# === CONFIGURACIÓN NATIVE (APK) ===
+# === CONFIGURACIÓN NATIVE ===
 NATIVE_ENABLED = True
 NATIVE_PORT = 5101
 NATIVE_HOST = '0.0.0.0'
 NATIVE_LATENCY_TARGET = 15
-NATIVE_CHUNK_SIZE = 512
+NATIVE_CHUNK_SIZE = 512  # ¡DEBE SER IGUAL A BLOCKSIZE!
 NATIVE_BUFFER_PACKETS = 3
-NATIVE_PROTOCOL = 'TCP'
-NATIVE_PRIORITY = 'realtime'
 NATIVE_MAGIC_NUMBER = 0xA1D10A7C
 NATIVE_PROTOCOL_VERSION = 2
 NATIVE_HEADER_SIZE = 20
@@ -39,40 +34,20 @@ NATIVE_HEARTBEAT_INTERVAL = 2.0
 VERBOSE = True
 LOG_NATIVE_PACKETS = False
 MEASURE_LATENCY = True
-LOG_BUFFER_STATS = True
 
-# === CONFIGURACIÓN WEBRTC (opcional) ===
-WEBRTC_ENABLED = False
-WEBRTC_AUDIO_CODEC = 'opus'
-OPUS_BITRATE = 96000
-OPUS_COMPLEXITY = 10
-OPUS_FRAME_DURATION = 20
-OPUS_PACKET_LOSS_PERC = 10
+# === CALIDAD DE AUDIO ===
+MASTER_VOLUME = 0.8
+USE_SOFT_CLIP = True
+SOFT_CLIP_THRESHOLD = 0.95
 
-STUN_SERVERS = [
-    'stun:stun.l.google.com:19302',
-    'stun:stun1.l.google.com:19302',
-    'stun:stun2.l.google.com:19302'
-]
-
-DATA_CHANNEL_PROTOCOL = 'audio-monitor-v1'
-MAX_PACKET_SIZE = 1200
-USE_DTX = False
-USE_FEC = True
-
-# === CONFIGURACIÓN PARA ESTABILIDAD ===
-
-# Audio Capture
-AUDIO_LATENCY = 'low'
-
-# ✅ ASIO NO SOPORTA ESTAS FLAGS - Las dejamos como dict vacío
-AUDIO_EXTRA_SETTINGS = {}
-
-# Threading
-USE_REALTIME_PRIORITY = True
-AUDIO_THREAD_PRIORITY = 99
-
-# Buffer Management
-BUFFER_UNDERRUN_THRESHOLD = 0.2
-BUFFER_OVERRUN_THRESHOLD = 0.9
-BUFFER_STATS_INTERVAL = 5.0
+# Cálculos automáticos
+if __name__ == "config":
+    block_time_ms = (BLOCKSIZE / SAMPLE_RATE) * 1000
+    WEB_JITTER_BUFFER = int(block_time_ms * 4)
+    
+    if VERBOSE:
+        print(f"[Config] ✅ Configuración cargada")
+        print(f"         • Blocksize: {BLOCKSIZE} samples")
+        print(f"         • Block time: {block_time_ms:.1f}ms")
+        print(f"         • Queue size: {QUEUE_SIZE}")
+        print(f"         • Native chunk: {NATIVE_CHUNK_SIZE}")

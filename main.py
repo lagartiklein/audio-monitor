@@ -33,8 +33,8 @@ def run_web_mode():
     print("[*] Iniciando modo WEB...")
     
     # Importar módulos web
-    from backend.audio_capture import AudioCapture
-    from backend.channel_manager import ChannelManager
+    from audio_server.audio_capture import AudioCapture
+    from audio_server.channel_manager import ChannelManager
     from backend.websocket_server import app, socketio, init_server, stop_audio_thread
     
     import config
