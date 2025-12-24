@@ -1,0 +1,326 @@
+2025-12-24 00:10:28.919  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:29.023  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:29.068  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 2 cost 24.653204 refreshRate 11166771 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.129  4305-4305  callGcSupression        com.cepalabsfree.fichatech           D  java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[])' on a null object reference
+2025-12-24 00:10:29.130  4305-4305  callGcSupression        com.cepalabsfree.fichatech           D  java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[])' on a null object reference
+2025-12-24 00:10:29.131  4305-4305  ScrollOpti...neManager] com.cepalabsfree.fichatech           D  updateCurrentActivity: mCurrentActivityName=null, isOptEnable=true, isAnimAheadEnable=true, isFrameInsertEnable=true, InsertNum=1, isEnabledForScrollChanged=false
+2025-12-24 00:10:29.132  4305-4305  FirebaseSessions        com.cepalabsfree.fichatech           D  App backgrounded on com.cepalabsfree.fichatech
+2025-12-24 00:10:29.191  4305-4305  VRI[MainActivity]       com.cepalabsfree.fichatech           D  onFocusEvent false
+2025-12-24 00:10:29.192  4305-4305  callGcSupression        com.cepalabsfree.fichatech           D  java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[])' on a null object reference
+2025-12-24 00:10:29.199  4305-4305  ResourcesManagerExtImpl com.cepalabsfree.fichatech           D  applyConfigurationToAppResourcesLocked app.getDisplayId() return callback.displayId:-1
+2025-12-24 00:10:29.232  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:29.232  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:29.232  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:29.250  4305-4305  AutofillManager         com.cepalabsfree.fichatech           D  Fill dialog is enabled:false, hints=[password, passwordAuto, creditCardNumber, creditCardSecurityCode, creditCardExpirationDate]
+2025-12-24 00:10:29.251  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:29.251  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  notifyValueChanged(1073741824): ignoring on state UNKNOWN
+2025-12-24 00:10:29.252  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:29.252  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  notifyValueChanged(1073741824): ignoring on state UNKNOWN
+2025-12-24 00:10:29.253  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:29.253  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  notifyValueChanged(1073741824): ignoring on state UNKNOWN
+2025-12-24 00:10:29.283  4305-4305  AudioTrack              com.cepalabsfree.fichatech           I  set(): type=audio,case=1,attributes=1,content_type=2,usage=1,source=-1,flags=0x900
+2025-12-24 00:10:29.283  4305-4305  AudioTrackExtImpl       com.cepalabsfree.fichatech           D  AudioTrackExtImpl init
+2025-12-24 00:10:29.283  4305-4305  AudioTrack              com.cepalabsfree.fichatech           D  set(): streamType -1, sampleRate 48000, format 0x1, channelMask 0x3, frameCount 7688, flags #0, notificationFrames 0, sessionId 0, transferType 3, uid 10337, pid 4305
+2025-12-24 00:10:29.283  4305-4305  AudioTrack              com.cepalabsfree.fichatech           I  set(): 0xb40000796515ec00, Create AudioTrackThread, tid = 6872
+2025-12-24 00:10:29.283  4305-4305  ListServiceUtils        com.cepalabsfree.fichatech           D  checkInListByUid module:audio-boost-blacklist uid:10337 cost 101us return 0
+2025-12-24 00:10:29.283  4305-4305  AudioTrackExtImpl       com.cepalabsfree.fichatech           D  doSchedBoost, set audioapp task boost, pid=4305, tid=6872, enable=1, ret=0
+2025-12-24 00:10:29.292  4305-4305  AudioTrack              com.cepalabsfree.fichatech           I  createTrack_l(0): AUDIO_OUTPUT_FLAG_FAST successful; frameCount 7688 -> 7688
+2025-12-24 00:10:29.293  4305-4305  AudioTrack              com.cepalabsfree.fichatech           I  createTrack_l(2958) on outputId(13) : 0xb40000796515ec00, mCblk = 0x7aa3857000,  mLatency = 221, mAfLatency = 61, frameCount = 7688, mSampleRate = 48000, mFlags = 0x4, mReqFrameCount = 7688, mNotificationFramesAct = 192
+2025-12-24 00:10:29.293  4305-4305  ListServiceUtils        com.cepalabsfree.fichatech           D  checkInListByUid module:audio-boost-blacklist uid:10337 cost 85us return 0
+2025-12-24 00:10:29.293  4305-4305  AudioTrackExtImpl       com.cepalabsfree.fichatech           D  doSchedBoost, set audioapp task boost, pid=4305, tid=4305, enable=1, ret=0
+2025-12-24 00:10:29.293  4305-4305  ListServiceUtils        com.cepalabsfree.fichatech           D  checkInListByUid module:change-futex-timeout uid:10337 cost 81us return 0
+2025-12-24 00:10:29.296  4305-4305  AudioTrack              com.cepalabsfree.fichatech           D  start(2958): prior state:STATE_STOPPED output 13 stream 3 session 18281
+2025-12-24 00:10:29.304  4305-4305  ListServiceUtils        com.cepalabsfree.fichatech           D  checkInListByUid module:audio-boost-blacklist uid:10337 cost 108us return 0
+2025-12-24 00:10:29.304  4305-4305  AudioRenderer           com.cepalabsfree.fichatech           D  AudioTrack inicializado:
+2025-12-24 00:10:29.304  4305-4305  AudioRenderer           com.cepalabsfree.fichatech           D    • Sample Rate: 48000 Hz
+2025-12-24 00:10:29.304  4305-4305  AudioRenderer           com.cepalabsfree.fichatech           D    • Buffer: 30752 bytes (7688 samples)
+2025-12-24 00:10:29.304  4305-4305  AudioRenderer           com.cepalabsfree.fichatech           D    • Mix Buffer: 480 samples (10ms)
+2025-12-24 00:10:29.304  4305-4305  AudioRenderer           com.cepalabsfree.fichatech           D    • Performance: LOW_LATENCY
+2025-12-24 00:10:29.306  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:29.306  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  notifyValueChanged(1073741824): ignoring on state UNKNOWN
+2025-12-24 00:10:29.306  4305-4305  AudioMonitor            com.cepalabsfree.fichatech           D  ✅ Activity creada
+2025-12-24 00:10:29.308  4305-4386  AidlConversionCppNdk    com.cepalabsfree.fichatech           W  aidl2legacy_AudioChannelLayout_audio_channel_mask_t: no legacy output audio_channel_mask_t found for AudioChannelLayout{layoutMask: 16}
+2025-12-24 00:10:29.315  4305-4305  ScrollOpti...neManager] com.cepalabsfree.fichatech           D  updateCurrentActivity: mCurrentActivityName=com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity, isOptEnable=true, isAnimAheadEnable=true, isFrameInsertEnable=true, InsertNum=1, isEnabledForScrollChanged=false
+2025-12-24 00:10:29.315  4305-4305  ActivityThread          com.cepalabsfree.fichatech           D  ComponentInfo{com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity} checkFinished=false 2
+2025-12-24 00:10:29.315  4305-4305  ResourcesManagerExtImpl com.cepalabsfree.fichatech           D  applyConfigurationToAppResourcesLocked app.getDisplayId() return callback.displayId:-1
+2025-12-24 00:10:29.315  4305-4305  FirebaseSessions        com.cepalabsfree.fichatech           D  App foregrounded on com.cepalabsfree.fichatech
+2025-12-24 00:10:29.321  4305-4305  WindowManager           com.cepalabsfree.fichatech           D  Add to mViews: DecorView@3d62894[NativeAudioStreamActivity],pkg= com.cepalabsfree.fichatech
+2025-12-24 00:10:29.331  4305-4305  InputEventReceiver      com.cepalabsfree.fichatech           D  Input log is disabled in InputEventReceiver.
+2025-12-24 00:10:29.332  4305-4305  callGcSupression        com.cepalabsfree.fichatech           D  java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[])' on a null object reference
+2025-12-24 00:10:29.333  4305-4305  ResourcesManagerExtImpl com.cepalabsfree.fichatech           D  applyConfigurationToAppResourcesLocked app.getDisplayId() return callback.displayId:-1
+2025-12-24 00:10:29.333  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 1 cost 18.60375 refreshRate 11180255 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.336  4305-4305  OplusBracketLog         com.cepalabsfree.fichatech           E  [OplusViewMirrorManager] updateHostViewRootIfNeeded, not support android.view.ViewRootImpl@42fe239
+2025-12-24 00:10:29.349  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  wrapConfigInfoIntoFlags rotation=0, smallestScreenWidthDp=360, relayoutAsync=false, newFlags=23592960, title=com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity
+2025-12-24 00:10:29.362  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  relayoutWindow result, sizeChanged:true, surfaceControlChanged:true, transformHintChanged:true, mSurfaceSize:Point(1080, 2400), mLastSurfaceSize:Point(0, 0), mWidth:-1, mHeight:-1, requestedWidth:1080, requestedHeight:2400, transformHint:0, lastTransformHint:-2147483648, installOrientation:0, displayRotation:0, isSurfaceValid:true, attr.flag:-2122252032, useBlast:true, tmpFrames:ClientWindowFrames{frame=[0,0][1080,2400] display=[0,0][1080,2400] parentFrame=[0,0][0,0]}
+2025-12-24 00:10:29.363  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           W  updateBlastSurfaceIfNeeded, surfaceSize:Point(1080, 2400), lastSurfaceSize:Point(0, 0), format:-1, blastBufferQueue:null
+2025-12-24 00:10:29.363  4305-4305  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [](id:10d100000011,api:0,p:-1,c:4305) connect: controlledByApp=false
+2025-12-24 00:10:29.369  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#17(BLAST Consumer)17](id:10d100000011,api:1,p:4305,c:4305) connect: api=1 producerControlledByApp=true
+2025-12-24 00:10:29.369  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           E  Unable to match the desired swap behavior.
+2025-12-24 00:10:29.373  4305-4305  AutofillManager         com.cepalabsfree.fichatech           D  notifyViewEnteredForFillDialog:1073741824
+2025-12-24 00:10:29.377  4305-4305  SurfaceControl          com.cepalabsfree.fichatech           I   setExtendedRangeBrightness sc=Surface(name=com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity)/@0x84a652e,currentBufferRatio=1.0,desiredRatio=1.0
+2025-12-24 00:10:29.384  4305-4937  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#17](f:0,a:1) acquireNextBufferLocked size=1080x2400 mFrameNumber=1 applyTransaction=true mTimestamp=348157898098331(auto) mPendingTransactions.size=0 graphicBufferId=18489834209351 transform=0
+2025-12-24 00:10:29.385  4305-4937  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:29.385  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:29.385  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:29.386  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  setMaxDequeuedBufferCount: 2
+2025-12-24 00:10:29.399  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 4 cost 54.62308 refreshRate 11167208 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.419  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           W  handleResized, msg:5, frameChanged:false, configChanged:false, displayChanged:false, attachedFrameChanged:false, compatScaleChanged:false, pendingDragResizing=false
+2025-12-24 00:10:29.424  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           W  handleResized, msg:5, frameChanged:false, configChanged:false, displayChanged:false, attachedFrameChanged:false, compatScaleChanged:false, pendingDragResizing=false
+2025-12-24 00:10:29.425  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 2 cost 24.205576 refreshRate 11160757 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.464  4305-4937  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=3 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:29.477  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:29.477  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:29.479  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: true 3 cost 44.606625 refreshRate 11162181 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.506  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: true 1 cost 16.1624 refreshRate 11164441 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.537  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  onFocusEvent true
+2025-12-24 00:10:29.538  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 1 cost 14.355214 refreshRate 11168080 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.589  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: true 1 cost 21.412151 refreshRate 11168426 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:29.919  4305-4386  VRI[MainActivity]       com.cepalabsfree.fichatech           D  dispatchAppVisibility visible:false
+2025-12-24 00:10:29.935  4305-4305  OpenGLRenderer          com.cepalabsfree.fichatech           D  RenderProxy::destroy: this=0xb400007984586400, mContext=0xb40000795e3e7800
+2025-12-24 00:10:29.935  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  SkiaOpenGLPipeline::setSurface: this=0xb40000796a6cc700, surface=NULL
+2025-12-24 00:10:29.936  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[MainActivity]#16(BLAST Consumer)16](id:10d100000010,api:1,p:4305,c:4305) disconnect: api 1
+2025-12-24 00:10:29.936  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  endAllActiveAnimators on 0xb40000790e2d1400 (NavigationMenuItemView) with handle 0xb400007989bef3c0
+2025-12-24 00:10:29.936  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  wrapConfigInfoIntoFlags rotation=0, smallestScreenWidthDp=360, relayoutAsync=false, newFlags=23592960, title=com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.MainActivity
+2025-12-24 00:10:29.946  4305-4305  VRI[MainActivity]       com.cepalabsfree.fichatech           D  relayoutWindow result, sizeChanged:false, surfaceControlChanged:true, transformHintChanged:false, mSurfaceSize:Point(1080, 2400), mLastSurfaceSize:Point(1080, 2400), mWidth:1080, mHeight:2400, requestedWidth:1080, requestedHeight:2400, transformHint:0, lastTransformHint:0, installOrientation:0, displayRotation:0, isSurfaceValid:false, attr.flag:-2139029248, useBlast:true, tmpFrames:ClientWindowFrames{frame=[0,0][1080,2400] display=[0,0][1080,2400] parentFrame=[0,0][0,0]}
+2025-12-24 00:10:29.948  4305-4305  callGcSupression        com.cepalabsfree.fichatech           D  java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[])' on a null object reference
+2025-12-24 00:10:29.949  4305-4305  VRI[MainActivity]       com.cepalabsfree.fichatech           D  setWindowStopped stopped:true
+2025-12-24 00:10:29.959  4305-4305  WindowOnBackDispatcher  com.cepalabsfree.fichatech           W  OnBackInvokedCallback is not enabled for the application.
+                                                                                                    Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+2025-12-24 00:10:29.959  4305-4386  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[MainActivity]#16](f:0,a:1) destructor()
+2025-12-24 00:10:29.959  4305-4386  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [VRI[MainActivity]#16(BLAST Consumer)16](id:10d100000010,api:0,p:-1,c:4305) disconnect
+2025-12-24 00:10:29.971  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  wrapConfigInfoIntoFlags rotation=0, smallestScreenWidthDp=360, relayoutAsync=false, newFlags=23592960, title=com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.MainActivity
+2025-12-24 00:10:29.979  4305-4305  VRI[MainActivity]       com.cepalabsfree.fichatech           D  relayoutWindow result, sizeChanged:false, surfaceControlChanged:true, transformHintChanged:false, mSurfaceSize:Point(1080, 2400), mLastSurfaceSize:Point(1080, 2400), mWidth:1080, mHeight:2400, requestedWidth:1080, requestedHeight:2400, transformHint:0, lastTransformHint:0, installOrientation:0, displayRotation:0, isSurfaceValid:false, attr.flag:-2139029248, useBlast:true, tmpFrames:ClientWindowFrames{frame=[0,0][1080,2400] display=[0,0][1080,2400] parentFrame=[0,0][0,0]}
+2025-12-24 00:10:30.397  4305-5163  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.MainActivity,This DecorView@7c75cf4[] change focus to false
+2025-12-24 00:10:30.542  4305-5163  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,This DecorView@3d62894[NativeAudioStreamActivity] change focus to true
+2025-12-24 00:10:32.135  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:32.274  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:32.636  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:32.675  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:32.850  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:32.925  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:33.025  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:33.102  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:33.192  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:33.281  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:33.380  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:33.460  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:33.557  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:33.619  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:34.146  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:34.199  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:35.985  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:36.080  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:36.126  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 2 cost 33.454212 refreshRate 11179924 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:40.242  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:40.313  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  receiver results: flags=7 enabled=true, enabledForAugmentedOnly: false
+2025-12-24 00:10:40.316  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  startSessionLocked(): id=1073741824, bounds=null, value=[type=1, value=17_chars], flags=0, state=UNKNOWN, compatMode=false, augmentedOnly=false, enabledAugmentedOnly=false, enteredIds=null
+2025-12-24 00:10:40.348  4305-4305  ImeTracker              com.cepalabsfree.fichatech           I  com.cepalabsfree.fichatech:4363bf07: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+2025-12-24 00:10:40.349  4305-4305  InputMethodManager      com.cepalabsfree.fichatech           D  showSoftInput() view=androidx.appcompat.widget.AppCompatEditText{75024bb VFED..CL. .F.P..ID 60,133-900,301 #7f0a0174 app:id/ipEditText aid=1073741824 viewInfo = } flags=0 reason=SHOW_SOFT_INPUT
+2025-12-24 00:10:40.359  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:40.360  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 4 cost 55.098866 refreshRate 11111111 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:40.366  4305-4305  WindowManager           com.cepalabsfree.fichatech           D  Add to mViews: android.widget.PopupWindow$PopupDecorView{cf67416 V.E...... R.....I. 0,0-0,0 viewInfo = },pkg= com.cepalabsfree.fichatech
+2025-12-24 00:10:40.376  4305-4305  InputEventReceiver      com.cepalabsfree.fichatech           D  Input log is disabled in InputEventReceiver.
+2025-12-24 00:10:40.379  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraCursorWidth
+2025-12-24 00:10:40.379  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraLeftOffset
+2025-12-24 00:10:40.389  4305-4305  View                    com.cepalabsfree.fichatech           V  dispatchProvideAutofillStructure(): not laid out, ignoring 4 children of 1073741831
+2025-12-24 00:10:40.389  4305-4305  View                    com.cepalabsfree.fichatech           V  dispatchProvideAutofillStructure(): not laid out, ignoring 1 children of 1073741833
+2025-12-24 00:10:40.391  4305-4305  AssistStructure         com.cepalabsfree.fichatech           I  Flattened final assist data: 5100 bytes, containing 2 windows, 11 views
+2025-12-24 00:10:40.394  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 1 cost 21.87195 refreshRate 11162800 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:40.395  4305-4305  OplusBracketLog         com.cepalabsfree.fichatech           E  [OplusViewMirrorManager] updateHostViewRootIfNeeded, not support android.view.ViewRootImpl@d42636d
+2025-12-24 00:10:40.409  4305-4305  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [](id:10d100000012,api:0,p:-1,c:4305) connect: controlledByApp=false
+2025-12-24 00:10:40.414  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[PopupWindow:e29a531]#18(BLAST Consumer)18](id:10d100000012,api:1,p:4305,c:4305) connect: api=1 producerControlledByApp=true
+2025-12-24 00:10:40.414  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           E  Unable to match the desired swap behavior.
+2025-12-24 00:10:40.436  4305-4305  SurfaceControl          com.cepalabsfree.fichatech           I   setExtendedRangeBrightness sc=Surface(name=PopupWindow:e29a531)/@0x4317ff0,currentBufferRatio=1.0,desiredRatio=1.0
+2025-12-24 00:10:40.439  4305-4937  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[PopupWindow:e29a531]#18](f:0,a:1) acquireNextBufferLocked size=120x120 mFrameNumber=1 applyTransaction=true mTimestamp=348168952594733(auto) mPendingTransactions.size=0 graphicBufferId=18489834209355 transform=0
+2025-12-24 00:10:40.440  4305-4937  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:40.440  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:40.440  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:40.441  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  setMaxDequeuedBufferCount: 2
+2025-12-24 00:10:40.445  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 2 cost 28.637293 refreshRate 11111111 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:40.450  4305-4937  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=2 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:40.450  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:40.450  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:40.471  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           W  handleResized abandoned!
+2025-12-24 00:10:40.476  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           W  handleResized abandoned!
+2025-12-24 00:10:40.488  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           W  handleResized abandoned!
+2025-12-24 00:10:40.495  4305-4305  InsetsController        com.cepalabsfree.fichatech           D  show(ime(), fromIme=true)
+2025-12-24 00:10:40.515  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           W  handleResized abandoned!
+2025-12-24 00:10:40.524  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           W  handleResized abandoned!
+2025-12-24 00:10:40.527  4305-4305  VRI[PopupW...w:e29a531] com.cepalabsfree.fichatech           W  handleResized abandoned!
+2025-12-24 00:10:40.585  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  setTrackedViews(): sessionId=2089800843, trackedIds=null, saveOnAllViewsInvisible=false, saveOnFinish=true, fillableIds=null, saveTrigerId=null, mFillableIds=null, mEnabled=true, mSessionId=2089800843
+2025-12-24 00:10:40.716  4305-4305  ImeTracker              com.cepalabsfree.fichatech           I  com.cepalabsfree.fichatech:4363bf07: onShown
+2025-12-24 00:10:41.472  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  PopupWindow:e29a531,window dying
+2025-12-24 00:10:41.472  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  PopupWindow:e29a531,unregisterSystemUIBroadcastReceiver 
+2025-12-24 00:10:41.473  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  PopupWindow:e29a531, unregisterSystemUIBroadcastReceiver failed java.lang.IllegalArgumentException: Receiver not registered: android.view.OplusScrollToTopManager$2@cbd3ca1
+2025-12-24 00:10:41.473  4305-4305  WindowOnBackDispatcher  com.cepalabsfree.fichatech           W  sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda17@2ddbba2
+2025-12-24 00:10:41.474  4305-4305  OpenGLRenderer          com.cepalabsfree.fichatech           D  RenderProxy::destroy: this=0xb400007984c75080, mContext=0xb400007964d44540
+2025-12-24 00:10:41.475  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  SkiaOpenGLPipeline::setSurface: this=0xb40000796a6cc200, surface=NULL
+2025-12-24 00:10:41.475  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[PopupWindow:e29a531]#18(BLAST Consumer)18](id:10d100000012,api:1,p:4305,c:4305) disconnect: api 1
+2025-12-24 00:10:41.476  4305-4305  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[PopupWindow:e29a531]#18](f:0,a:1) destructor()
+2025-12-24 00:10:41.476  4305-4305  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [VRI[PopupWindow:e29a531]#18(BLAST Consumer)18](id:10d100000012,api:0,p:-1,c:4305) disconnect
+2025-12-24 00:10:41.487  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:41.488  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  updateSessionLocked(): id=1073741824, bounds=null, value=[type=1, value=16_chars], action=4, flags=128
+2025-12-24 00:10:41.494  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraCursorWidth
+2025-12-24 00:10:41.494  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraLeftOffset
+2025-12-24 00:10:41.636  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:41.636  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  updateSessionLocked(): id=1073741824, bounds=null, value=[type=1, value=15_chars], action=4, flags=128
+2025-12-24 00:10:41.649  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraCursorWidth
+2025-12-24 00:10:41.649  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraLeftOffset
+2025-12-24 00:10:41.823  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:41.824  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  updateSessionLocked(): id=1073741824, bounds=null, value=[type=1, value=14_chars], action=4, flags=128
+2025-12-24 00:10:41.831  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraCursorWidth
+2025-12-24 00:10:41.831  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraLeftOffset
+2025-12-24 00:10:41.989  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:41.989  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  updateSessionLocked(): id=1073741824, bounds=null, value=[type=1, value=13_chars], action=4, flags=128
+2025-12-24 00:10:41.997  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraCursorWidth
+2025-12-24 00:10:41.997  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraLeftOffset
+2025-12-24 00:10:42.196  4305-4305  TextView                com.cepalabsfree.fichatech           V  notifyAutoFillManagerAfterTextChanged
+2025-12-24 00:10:42.197  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  updateSessionLocked(): id=1073741824, bounds=null, value=[type=1, value=12_chars], action=4, flags=128
+2025-12-24 00:10:42.209  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraCursorWidth
+2025-12-24 00:10:42.210  4305-4305  OplusCursorFeedback     com.cepalabsfree.fichatech           D  getExtraLeftOffset
+2025-12-24 00:10:42.632  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:42.730  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:42.732  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 1 cost 13.762222 refreshRate 11170788 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:42.752  4305-4305  AudioMonitor            com.cepalabsfree.fichatech           D  🔌 Conectando a 192.168.1.10:5101...
+2025-12-24 00:10:42.758  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 1 cost 17.767311 refreshRate 11170788 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:42.758  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  ========================================
+2025-12-24 00:10:42.758  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  🚀 INICIANDO CONEXIÓN NATIVA
+2025-12-24 00:10:42.758  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  ========================================
+2025-12-24 00:10:42.759  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  📍 Servidor: 192.168.1.10:5101
+2025-12-24 00:10:42.759  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  🔐 Protocolo: V2
+2025-12-24 00:10:42.759  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  📦 Magic: -5e2ef584
+2025-12-24 00:10:42.759  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  📏 Header: 16 bytes
+2025-12-24 00:10:42.760  4305-4934  TrafficStats            com.cepalabsfree.fichatech           D  tagSocket(176) with statsTag=0xffffffff, statsUid=-1
+2025-12-24 00:10:42.760  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  ✅ Socket creado
+2025-12-24 00:10:42.761  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    • SO_TIMEOUT: 10000ms
+2025-12-24 00:10:42.761  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    • TCP_NODELAY: true
+2025-12-24 00:10:42.761  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    • KEEPALIVE: true
+2025-12-24 00:10:42.761  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    • SEND_BUFFER: 64KB
+2025-12-24 00:10:42.761  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    • RECV_BUFFER: 128KB
+2025-12-24 00:10:42.761  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  🔌 Conectando a 192.168.1.10:5101...
+2025-12-24 00:10:42.771  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  ✅ Socket conectado!
+2025-12-24 00:10:42.771  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  ✅ Streams obtenidos
+2025-12-24 00:10:42.771  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  🆔 Client ID: android_1766545842771
+2025-12-24 00:10:42.771  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  🤝 Enviando handshake...
+2025-12-24 00:10:42.771  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  📤 Construyendo mensaje handshake...
+2025-12-24 00:10:42.772  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  📦 Handshake JSON:
+2025-12-24 00:10:42.772  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    {"type":"handshake","client_type":"android_v2","protocol_version":2,"capabilities":["low_latency","multi_channel","auto_gain"],"timestamp":1766545842771,"session_id":"android_1766545842771"}
+2025-12-24 00:10:42.772  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D    Tamaño: 190 bytes
+2025-12-24 00:10:42.772  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           E  ❌ Error enviando handshake: null
+2025-12-24 00:10:42.772  4305-4934  System.err              com.cepalabsfree.fichatech           W  java.nio.BufferOverflowException
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at java.nio.Buffer.nextPutIndex(Buffer.java:695)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at java.nio.HeapByteBuffer.putShort(HeapByteBuffer.java:293)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at com.cepalabsfree.fichatech.audiostream.NativeAudioClient.sendHandshakeFixed(NativeAudioClient.kt:273)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at com.cepalabsfree.fichatech.audiostream.NativeAudioClient.access$sendHandshakeFixed(NativeAudioClient.kt:21)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at com.cepalabsfree.fichatech.audiostream.NativeAudioClient$connect$2.invokeSuspend(NativeAudioClient.kt:146)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+2025-12-24 00:10:42.773  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+2025-12-24 00:10:42.774  4305-4934  System.err              com.cepalabsfree.fichatech           W  	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-12-24 00:10:42.774  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           E  ❌ Handshake FALLÓ
+2025-12-24 00:10:42.774  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  🔌 Desconectando: Handshake fallido
+2025-12-24 00:10:42.775  4305-4934  NativeAudioClient       com.cepalabsfree.fichatech           D  ✅ Desconectado
+2025-12-24 00:10:42.801  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.802  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.802  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.809  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.809  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.809  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.833  4305-4305  WindowManager           com.cepalabsfree.fichatech           D  Add to mViews: DecorView@a806826[NativeAudioStreamActivity],pkg= com.cepalabsfree.fichatech
+2025-12-24 00:10:42.844  4305-4305  InputEventReceiver      com.cepalabsfree.fichatech           D  Input log is disabled in InputEventReceiver.
+2025-12-24 00:10:42.864  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.864  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.864  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.871  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.871  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.871  4305-4305  oplus.andr...actoryImpl com.cepalabsfree.fichatech           I  get feature:IOplusDynamicVsyncFeature
+2025-12-24 00:10:42.892  4305-4305  WindowManager           com.cepalabsfree.fichatech           D  Add to mViews: DecorView@ae09cb0[NativeAudioStreamActivity],pkg= com.cepalabsfree.fichatech
+2025-12-24 00:10:42.900  4305-4305  InputEventReceiver      com.cepalabsfree.fichatech           D  Input log is disabled in InputEventReceiver.
+2025-12-24 00:10:42.902  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 10 cost 117.38195 refreshRate 11169480 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:42.910  4305-4305  OplusBracketLog         com.cepalabsfree.fichatech           E  [OplusViewMirrorManager] updateHostViewRootIfNeeded, not support android.view.ViewRootImpl@cd4304f
+2025-12-24 00:10:42.931  4305-4305  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [](id:10d100000013,api:0,p:-1,c:4305) connect: controlledByApp=false
+2025-12-24 00:10:42.937  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#19(BLAST Consumer)19](id:10d100000013,api:1,p:4305,c:4305) connect: api=1 producerControlledByApp=true
+2025-12-24 00:10:42.937  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           E  Unable to match the desired swap behavior.
+2025-12-24 00:10:42.943  4305-4305  SurfaceControl          com.cepalabsfree.fichatech           I   setExtendedRangeBrightness sc=Surface(name=com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity)/@0x31753ba,currentBufferRatio=1.0,desiredRatio=1.0
+2025-12-24 00:10:42.949  4305-4937  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#19](f:0,a:1) acquireNextBufferLocked size=1098x639 mFrameNumber=1 applyTransaction=true mTimestamp=348171462445617(auto) mPendingTransactions.size=0 graphicBufferId=18489834209359 transform=0
+2025-12-24 00:10:42.949  4305-4937  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:42.950  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:42.950  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:42.950  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  setMaxDequeuedBufferCount: 2
+2025-12-24 00:10:42.951  4305-4305  OplusBracketLog         com.cepalabsfree.fichatech           E  [OplusViewMirrorManager] updateHostViewRootIfNeeded, not support android.view.ViewRootImpl@9d0f261
+2025-12-24 00:10:42.983  4305-4305  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [](id:10d100000014,api:0,p:-1,c:4305) connect: controlledByApp=false
+2025-12-24 00:10:42.987  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#20(BLAST Consumer)20](id:10d100000014,api:1,p:4305,c:4305) connect: api=1 producerControlledByApp=true
+2025-12-24 00:10:42.987  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           E  Unable to match the desired swap behavior.
+2025-12-24 00:10:42.995  4305-4305  SurfaceControl          com.cepalabsfree.fichatech           I   setExtendedRangeBrightness sc=Surface(name=com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity)/@0x31bc274,currentBufferRatio=1.0,desiredRatio=1.0
+2025-12-24 00:10:43.002  4305-4937  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#20](f:0,a:1) acquireNextBufferLocked size=1098x639 mFrameNumber=1 applyTransaction=true mTimestamp=348171515703169(auto) mPendingTransactions.size=0 graphicBufferId=18489834209363 transform=0
+2025-12-24 00:10:43.002  4305-4937  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:43.003  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:43.003  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:43.003  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  setMaxDequeuedBufferCount: 2
+2025-12-24 00:10:43.004  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  onFocusEvent false
+2025-12-24 00:10:43.009  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: false 9 cost 101.02955 refreshRate 11167144 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:43.030  4305-4937  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=3 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:43.030  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:43.030  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:43.039  4305-4937  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  Received frameCommittedCallback lastAttemptedDrawFrameNum=3 didProduceBuffer=true syncBuffer=false
+2025-12-24 00:10:43.040  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  draw finished.
+2025-12-24 00:10:43.040  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  reportDrawFinished
+2025-12-24 00:10:43.040  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  onFocusEvent true
+2025-12-24 00:10:44.031  4305-5163  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,This DecorView@3d62894[NativeAudioStreamActivity] change focus to false
+2025-12-24 00:10:44.053  4305-5163  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,This DecorView@ae09cb0[NativeAudioStreamActivity] change focus to true
+2025-12-24 00:10:46.767  4305-4814  TrafficStats            com.cepalabsfree.fichatech           D  tagSocket(91) with statsTag=0xffffffff, statsUid=-1
+2025-12-24 00:10:48.183  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:48.275  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:48.383  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,window dying
+2025-12-24 00:10:48.383  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,unregisterSystemUIBroadcastReceiver 
+2025-12-24 00:10:48.383  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity, unregisterSystemUIBroadcastReceiver failed java.lang.IllegalArgumentException: Receiver not registered: android.view.OplusScrollToTopManager$2@bcb5e0d
+2025-12-24 00:10:48.385  4305-4305  WindowOnBackDispatcher  com.cepalabsfree.fichatech           W  sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda17@fd6f186
+2025-12-24 00:10:48.388  4305-4305  OpenGLRenderer          com.cepalabsfree.fichatech           D  RenderProxy::destroy: this=0xb40000790e1aec80, mContext=0xb40000795e38c480
+2025-12-24 00:10:48.388  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  SkiaOpenGLPipeline::setSurface: this=0xb40000796a6cc840, surface=NULL
+2025-12-24 00:10:48.388  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#20(BLAST Consumer)20](id:10d100000014,api:1,p:4305,c:4305) disconnect: api 1
+2025-12-24 00:10:48.388  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  endAllActiveAnimators on 0xb400007989a0f400 (RippleDrawable) with handle 0xb4000079eea0dd80
+2025-12-24 00:10:48.403  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: true 1 cost 12.602433 refreshRate 11111111 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:48.410  4305-4386  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#20](f:0,a:1) destructor()
+2025-12-24 00:10:48.410  4305-4386  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#20(BLAST Consumer)20](id:10d100000014,api:0,p:-1,c:4305) disconnect
+2025-12-24 00:10:48.433  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  onFocusEvent true
+2025-12-24 00:10:49.441  4305-5163  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,This DecorView@a806826[NativeAudioStreamActivity] change focus to true
+2025-12-24 00:10:50.376  4305-4305  AutofillManager         com.cepalabsfree.fichatech           V  requestHideFillUi(null): anchor = null
+2025-12-24 00:10:50.392  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: true 1 cost 16.535276 refreshRate 11164542 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:50.432  4305-4305  ViewRootImplExtImpl     com.cepalabsfree.fichatech           D  the up motion event handled by client, just return
+2025-12-24 00:10:50.450  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,window dying
+2025-12-24 00:10:50.450  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,unregisterSystemUIBroadcastReceiver 
+2025-12-24 00:10:50.450  4305-4305  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity, unregisterSystemUIBroadcastReceiver failed java.lang.IllegalArgumentException: Receiver not registered: android.view.OplusScrollToTopManager$2@d5703c
+2025-12-24 00:10:50.453  4305-4305  WindowOnBackDispatcher  com.cepalabsfree.fichatech           W  sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda17@92ad3dc
+2025-12-24 00:10:50.458  4305-4305  OpenGLRenderer          com.cepalabsfree.fichatech           D  RenderProxy::destroy: this=0xb400007984b3ca80, mContext=0xb400007964d71fc0
+2025-12-24 00:10:50.458  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  SkiaOpenGLPipeline::setSurface: this=0xb40000795e230600, surface=NULL
+2025-12-24 00:10:50.462  4305-4937  BufferQueueProducer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#19(BLAST Consumer)19](id:10d100000013,api:1,p:4305,c:4305) disconnect: api 1
+2025-12-24 00:10:50.462  4305-4937  OpenGLRenderer          com.cepalabsfree.fichatech           D  endAllActiveAnimators on 0xb400007989a0e800 (RippleDrawable) with handle 0xb40000795e37b680
+2025-12-24 00:10:50.487  4305-4361  BLASTBufferQueue        com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#19](f:0,a:1) destructor()
+2025-12-24 00:10:50.488  4305-4361  BufferQueueConsumer     com.cepalabsfree.fichatech           D  [VRI[NativeAudioStreamActivity]#19(BLAST Consumer)19](id:10d100000013,api:0,p:-1,c:4305) disconnect
+2025-12-24 00:10:50.489  4305-4305  Quality                 com.cepalabsfree.fichatech           I  Skipped: true 3 cost 37.98666 refreshRate 11164542 bit true processName com.cepalabsfree.fichatech
+2025-12-24 00:10:50.519  4305-4305  VRI[Native...mActivity] com.cepalabsfree.fichatech           D  onFocusEvent true
+2025-12-24 00:10:50.521  4305-4305  WindowOnBackDispatcher  com.cepalabsfree.fichatech           W  sendCancelIfRunning: isInProgress=falsecallback=ImeCallback=ImeOnBackInvokedCallback@63630139 Callback=android.window.IOnBackInvokedCallback$Stub$Proxy@ee3371a
+2025-12-24 00:10:51.529  4305-5163  OplusScrollToTopManager com.cepalabsfree.fichatech           D  com.cepalabsfree.fichatech/com.cepalabsfree.fichatech.audiostream.NativeAudioStreamActivity,This DecorView@3d62894[NativeAudioStreamActivity] change focus to true
+2025-12-24 00:11:16.807  4305-4814  TrafficStats            com.cepalabsfree.fichatech           D  tagSocket(91) with statsTag=0xffffffff, statsUid=-1
+2025-12-24 00:11:23.012  4305-4305  Ads                     com.cepalabsfree.fichatech           I  Ad failed to load : 2
+2025-12-24 00:11:23.038  4305-6053  DynamiteModule          com.cepalabsfree.fichatech           I  Considering local module com.google.android.gms.ads.dynamite:0 and remote module com.google.android.gms.ads.dynamite:254380203
+2025-12-24 00:11:23.038  4305-6053  DynamiteModule          com.cepalabsfree.fichatech           I  Selected remote version of com.google.android.gms.ads.dynamite, version >= 254380203
+2025-12-24 00:11:23.038  4305-6053  DynamiteModule          com.cepalabsfree.fichatech           V  Dynamite loader version >= 2, using loadModule2NoCrashUtils
+2025-12-24 00:11:23.039  4305-4305  Ads                     com.cepalabsfree.fichatech           I  Ad failed to load : 2
+2025-12-24 00:11:23.056  4305-6053  Ads                     com.cepalabsfree.fichatech           I  Use RequestConfiguration.Builder().setTestDeviceIds(Arrays.asList("94234578EB8E6B469CE26B3DF5AD4357")) to get test ads on this device.
+2025-12-24 00:11:23.081  4305-7061  AudioManager            com.cepalabsfree.fichatech           D  isSpeakerphoneOn()=false, calling application:com.cepalabsfree.fichatech
+2025-12-24 00:11:23.086  4305-7061  AudioManagerExtImpl     com.cepalabsfree.fichatech           D  getStreamVolume packageName=com.cepalabsfree.fichatech, index=15, streamType=3
+2025-12-24 00:11:23.088  4305-7061  AudioManagerExtImpl     com.cepalabsfree.fichatech           D  getStreamVolume packageName=com.cepalabsfree.fichatech, index=0, streamType=2
+2025-12-24 00:11:23.091  4305-6053  ServiceBindIntentUtils  com.cepalabsfree.fichatech           W  Dynamic lookup for intent failed for action: com.google.android.gms.ads.service.CACHE
+2025-12-24 00:11:23.105  4305-6053  DynamiteModule          com.cepalabsfree.fichatech           I  Considering local module com.google.android.gms.ads.dynamite:0 and remote module com.google.android.gms.ads.dynamite:254380203
+2025-12-24 00:11:23.105  4305-6053  DynamiteModule          com.cepalabsfree.fichatech           I  Selected remote version of com.google.android.gms.ads.dynamite, version >= 254380203
+2025-12-24 00:11:23.105  4305-6053  DynamiteModule          com.cepalabsfree.fichatech           V  Dynamite loader version >= 2, using loadModule2NoCrashUtils
+2025-12-24 00:11:23.113  4305-6053  Ads                     com.cepalabsfree.fichatech           I  Use RequestConfiguration.Builder().setTestDeviceIds(Arrays.asList("94234578EB8E6B469CE26B3DF5AD4357")) to get test ads on this device.
+2025-12-24 00:11:23.131  4305-7058  AudioManager            com.cepalabsfree.fichatech           D  isSpeakerphoneOn()=false, calling application:com.cepalabsfree.fichatech
+2025-12-24 00:11:23.135  4305-7058  AudioManagerExtImpl     com.cepalabsfree.fichatech           D  getStreamVolume packageName=com.cepalabsfree.fichatech, index=15, streamType=3
+2025-12-24 00:11:23.136  4305-7058  AudioManagerExtImpl     com.cepalabsfree.fichatech           D  getStreamVolume packageName=com.cepalabsfree.fichatech, index=0, streamType=2
+2025-12-24 00:11:23.142  4305-7052  Ads                     com.cepalabsfree.fichatech           W  Not retrying to fetch app settings
