@@ -1,5 +1,6 @@
 """
-WebSocket Server - Servidor Flask + SocketIO completo
+WebSocket Server - Flask + SocketIO (Sin WebRTC, solo WebSocket optimizado)
+Compatible con servidor Nativo simultáneo
 """
 
 from flask import Flask, send_from_directory, request
@@ -24,19 +25,24 @@ channel_manager = None
 audio_thread = None
 running = False
 
+# ✅ Para modo broadcaster
+audio_broadcast_queue = None
+use_broadcaster = False
+
+# === WEBSOCKET SERVER ===
 def init_server(capture, manager):
     """Inicializar referencias globales"""
     global audio_capture, channel_manager
     audio_capture = capture
     channel_manager = manager
     
-    # Iniciar thread de envío de audio
+    # Iniciar thread de envío de audio para WebSocket
     start_audio_thread()
     
-    print("[*] WebSocket server inicializado")
+    print("[*] WebSocket server inicializado (optimizado)")
 
 def start_audio_thread():
-    """Inicia el thread que envía audio a los clientes"""
+    """Inicia el thread que envía audio a los clientes WebSocket"""
     global audio_thread, running
     
     if audio_thread and audio_thread.is_alive():
@@ -46,10 +52,10 @@ def start_audio_thread():
     audio_thread = threading.Thread(
         target=audio_sender_loop,
         daemon=True,
-        name="AudioSender"
+        name="AudioSenderWebSocket"
     )
     audio_thread.start()
-    print("[*] Thread de audio iniciado")
+    print("[*] Thread de audio WebSocket iniciado")
 
 def stop_audio_thread():
     """Detiene el thread de audio"""
@@ -57,19 +63,29 @@ def stop_audio_thread():
     running = False
     if audio_thread:
         audio_thread.join(timeout=2)
-    print("[*] Thread de audio detenido")
+    print("[*] Thread de audio WebSocket detenido")
 
 def audio_sender_loop():
-    """Loop principal que envía audio a clientes conectados"""
-    print("[*] Audio sender iniciado")
+    """
+    Loop principal que envía audio SOLO a clientes WebSocket
+    Usa broadcaster si está disponible, sino usa audio_capture directamente
+    """
+    print("[*] Audio sender WebSocket iniciado")
     
     consecutive_errors = 0
     max_consecutive_errors = 10
     
     while running:
         try:
-            # Obtener datos de audio
-            audio_data = audio_capture.get_audio_data(timeout=0.1)
+            # ✅ Obtener audio del broadcaster o directamente
+            if use_broadcaster and audio_broadcast_queue:
+                try:
+                    audio_data = audio_broadcast_queue.get(timeout=0.1)
+                except Exception:
+                    continue
+            else:
+                # Fallback: obtener directamente de audio_capture
+                audio_data = audio_capture.get_audio_data(timeout=0.05)
             
             if audio_data is None:
                 continue
@@ -77,32 +93,36 @@ def audio_sender_loop():
             # Reset error counter en éxito
             consecutive_errors = 0
             
-            # Enviar a cada cliente
+            # ✅ Enviar SOLO a clientes WebSocket
             for client_id in list(channel_manager.subscriptions.keys()):
                 try:
                     # Procesar audio para este cliente
                     audio_packets = channel_manager.get_audio_for_client(client_id, audio_data)
                     
-                    # Enviar cada paquete
+                    # Enviar cada paquete via WebSocket
                     for packet in audio_packets:
-                        socketio.emit('audio', packet, room=client_id)
+                        try:
+                            socketio.emit('audio', packet, room=client_id)
+                        except Exception as e:
+                            # Cliente desconectado, ignorar
+                            pass
                         
                 except Exception as e:
                     if config.VERBOSE:
-                        print(f"[!] Error enviando a {client_id[:8]}: {e}")
+                        logger.debug(f"Error enviando WebSocket a {client_id[:8]}: {e}")
     
         except Exception as e:
             consecutive_errors += 1
             if config.VERBOSE:
-                print(f"[!] Error en audio sender: {e}")
+                logger.error(f"Error en audio sender WebSocket: {e}")
             
             if consecutive_errors >= max_consecutive_errors:
-                print(f"[!] Demasiados errores consecutivos ({consecutive_errors})")
+                logger.error(f"Demasiados errores consecutivos ({consecutive_errors})")
                 break
             
             time.sleep(0.1)
     
-    print("[*] Audio sender detenido")
+    print("[*] Audio sender WebSocket detenido")
 
 # === CONFIGURACIÓN FLASK ===
 app = Flask(__name__, 
@@ -137,13 +157,16 @@ def static_files(path):
 # === EVENTOS SOCKETIO ===
 @socketio.on('connect')
 def handle_connect():
-    """Cliente se conecta"""
+    """Cliente WebSocket se conecta"""
     client_id = request.sid
     
-    # Verificar límite de clientes
-    if channel_manager.get_client_count() >= config.MAX_CLIENTS:
+    # Verificar límite de clientes WebSocket
+    current_websocket_clients = len([k for k in channel_manager.subscriptions.keys() 
+                                     if k.startswith('sid_') or '-' in k])
+    
+    if current_websocket_clients >= config.MAX_CLIENTS:
         if config.VERBOSE:
-            print(f"[!] Cliente rechazado (límite {config.MAX_CLIENTS} alcanzado)")
+            print(f"[!] Cliente WebSocket rechazado (límite {config.MAX_CLIENTS} alcanzado)")
         return False
     
     # Enviar info del dispositivo de audio
@@ -152,27 +175,28 @@ def handle_connect():
         'channels': channel_manager.num_channels,
         'sample_rate': config.SAMPLE_RATE,
         'blocksize': config.BLOCKSIZE,
-        'jitter_buffer_ms': config.WEB_JITTER_BUFFER
+        'jitter_buffer_ms': config.WEB_JITTER_BUFFER,
+        'supports_webrtc': False  # ✅ Deshabilitar WebRTC
     }
     emit('device_info', device_info)
     
     if config.VERBOSE:
-        print(f"[+] Cliente conectado: {client_id[:8]}...")
+        print(f"[+] Cliente WebSocket conectado: {client_id[:8]}...")
     
     return True
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Cliente se desconecta"""
+    """Cliente WebSocket se desconecta"""
     client_id = request.sid
     channel_manager.unsubscribe_client(client_id)
     
     if config.VERBOSE:
-        print(f"[-] Cliente desconectado: {client_id[:8]}...")
+        print(f"[-] Cliente WebSocket desconectado: {client_id[:8]}...")
 
 @socketio.on('subscribe')
 def handle_subscribe(data):
-    """Cliente se suscribe a canales específicos"""
+    """Cliente WebSocket se suscribe a canales"""
     client_id = request.sid
     channels = data.get('channels', [])
     gains = data.get('gains', {})
@@ -186,11 +210,11 @@ def handle_subscribe(data):
     emit('subscribed', {'channels': channels})
     
     if config.VERBOSE:
-        print(f"[+] {client_id[:8]} suscrito a {len(channels)} canales")
+        print(f"[+] WebSocket {client_id[:8]} suscrito a {len(channels)} canales")
 
 @socketio.on('update_gain')
 def handle_update_gain(data):
-    """Cliente actualiza ganancia de un canal"""
+    """Cliente WebSocket actualiza ganancia"""
     client_id = request.sid
     channel = int(data.get('channel'))
     gain = float(data.get('gain'))

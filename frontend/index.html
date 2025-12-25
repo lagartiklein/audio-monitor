@@ -4,504 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Monitor - Consola Digital</title>
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
-   
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Courier New', monospace;
-            background: #0a0a0a;
-            color: #00ff00;
-            overflow-x: hidden;
-        }
-
-        .container {
-            max-width: 100%;
-            padding: 20px;
-        }
-
-        /* Header */
-        header {
-            text-align: center;
-            padding: 20px;
-            background: #111;
-            border-bottom: 2px solid #00ff00;
-            margin-bottom: 20px;
-        }
-
-        h1 {
-            font-size: 1.5em;
-            letter-spacing: 3px;
-            margin-bottom: 10px;
-        }
-
-        .device-info {
-            font-size: 0.8em;
-            color: #0a0;
-            margin: 5px 0;
-        }
-
-        /* Métricas */
-        .metrics {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-
-        .metric {
-            background: #000;
-            border: 1px solid #00ff00;
-            padding: 8px 16px;
-            font-size: 0.85em;
-        }
-
-        .metric-label {
-            color: #0a0;
-            margin-right: 5px;
-        }
-
-        .metric-value {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .metric-value.warning { color: #ff0; }
-        .metric-value.bad { color: #f00; }
-
-        /* Mixer Console */
-        .mixer-console {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 20px 10px;
-            background: #0d0d0d;
-            border: 2px solid #00ff00;
-            margin: 20px 0;
-        }
-
-        .channel-strip {
-            min-width: 120px;
-            background: #1a1a1a;
-            border: 1px solid #333;
-            padding: 15px 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            transition: border-color 0.3s;
-        }
-
-        .channel-strip.active {
-            border-color: #00ff00;
-            background: #1f1f1f;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-        }
-
-        .channel-number {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #0a0;
-        }
-
-        .channel-strip.active .channel-number {
-            color: #00ff00;
-        }
-
-        /* VU Meter */
-        .vu-meter {
-            width: 40px;
-            height: 200px;
-            background: #000;
-            border: 1px solid #333;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .vu-meter-fill {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 0%;
-            background: linear-gradient(to top, #00ff00 0%, #ff0 70%, #f00 90%);
-            transition: height 0.05s ease-out;
-        }
-
-        .vu-meter-scale {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 5px 2px;
-            pointer-events: none;
-        }
-
-        .vu-tick {
-            height: 1px;
-            background: #333;
-            font-size: 0.6em;
-            color: #555;
-            text-align: right;
-        }
-
-        /* Fader (Volumen) */
-        .fader-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .fader-label {
-            font-size: 0.7em;
-            color: #0a0;
-            text-transform: uppercase;
-        }
-
-        .fader {
-            width: 8px;
-            height: 150px;
-            background: #222;
-            border: 1px solid #333;
-            appearance: none;
-            outline: none;
-            cursor: pointer;
-            writing-mode: bt-lr;
-            -webkit-appearance: slider-vertical;
-        }
-
-        .fader::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 30px;
-            height: 12px;
-            background: #00ff00;
-            cursor: pointer;
-            border: 1px solid #0a0;
-            box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
-        }
-
-        .fader::-moz-range-thumb {
-            width: 30px;
-            height: 12px;
-            background: #00ff00;
-            cursor: pointer;
-            border: 1px solid #0a0;
-            border-radius: 0;
-        }
-
-        .fader-value {
-            font-size: 0.75em;
-            color: #00ff00;
-            min-width: 45px;
-            text-align: center;
-        }
-
-        /* Pan Control (Panorama) */
-        .pan-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .pan-label {
-            font-size: 0.7em;
-            color: #0a0;
-            text-transform: uppercase;
-        }
-
-        .pan-control {
-            width: 80px;
-            height: 8px;
-            background: #222;
-            border: 1px solid #333;
-            appearance: none;
-            outline: none;
-            cursor: pointer;
-        }
-
-        .pan-control::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 12px;
-            height: 20px;
-            background: #00ff00;
-            cursor: pointer;
-            border: 1px solid #0a0;
-        }
-
-        .pan-control::-moz-range-thumb {
-            width: 12px;
-            height: 20px;
-            background: #00ff00;
-            cursor: pointer;
-            border: 1px solid #0a0;
-            border-radius: 0;
-        }
-
-        .pan-value {
-            font-size: 0.7em;
-            color: #00ff00;
-            min-width: 30px;
-            text-align: center;
-        }
-
-        /* Power Button */
-        .power-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: #222;
-            border: 2px solid #333;
-            color: #666;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.8em;
-        }
-
-        .power-btn:hover {
-            border-color: #00ff00;
-        }
-
-        .power-btn.active {
-            background: #00ff00;
-            color: #000;
-            border-color: #00ff00;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.8);
-        }
-
-        /* Status Bar */
-        .status-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #111;
-            border-top: 2px solid #00ff00;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85em;
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-led {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #333;
-            border: 1px solid #555;
-        }
-
-        .status-led.active {
-            background: #00ff00;
-            box-shadow: 0 0 10px #00ff00;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .init-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.95);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            z-index: 1000;
-        }
-
-        .init-overlay.hidden {
-            display: none;
-        }
-
-        .init-btn {
-            padding: 20px 40px;
-            background: #000;
-            border: 2px solid #00ff00;
-            color: #00ff00;
-            font-size: 1.2em;
-            font-family: 'Courier New', monospace;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .init-btn:hover {
-            background: #00ff00;
-            color: #000;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
-        }
-
-        .help-text {
-            color: #0a0;
-            font-size: 0.9em;
-            max-width: 400px;
-            text-align: center;
-            line-height: 1.6;
-        }
-
-        /* Warning Message */
-        .warning-message {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #ff9800;
-            color: black;
-            padding: 10px;
-            border: 1px solid #00ff00;
-            font-family: 'Courier New', monospace;
-            font-size: 0.8em;
-            z-index: 1000;
-            max-width: 300px;
-            display: none;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .mixer-console {
-                padding: 15px 5px;
-            }
-
-            .channel-strip {
-                min-width: 100px;
-                padding: 10px 5px;
-            }
-
-            .vu-meter {
-                height: 150px;
-                width: 30px;
-            }
-
-            .fader {
-                height: 120px;
-            }
-
-            .status-bar {
-                flex-direction: column;
-                gap: 10px;
-                padding: 15px;
-            }
-        }
-
-        /* Orientation-specific adjustments */
-        @media (orientation: portrait) {
-            .container {
-                padding: 10px;
-            }
-
-            .mixer-console {
-                flex-direction: column;
-                overflow-x: hidden;
-                overflow-y: auto;
-                max-height: 60vh;
-                gap: 15px;
-            }
-
-            .channel-strip {
-                min-width: unset;
-                width: 100%;
-                flex-direction: row;
-                justify-content: space-around;
-                padding: 15px;
-                gap: 10px;
-            }
-
-            .vu-meter {
-                height: 120px;
-                width: 25px;
-            }
-
-            .fader {
-                height: 100px;
-                width: 6px;
-            }
-
-            .fader::-webkit-slider-thumb {
-                width: 25px;
-                height: 10px;
-            }
-
-            .fader::-moz-range-thumb {
-                width: 25px;
-                height: 10px;
-            }
-
-            .pan-control {
-                width: 60px;
-                height: 6px;
-            }
-
-            .pan-control::-webkit-slider-thumb {
-                width: 10px;
-                height: 18px;
-            }
-
-            .pan-control::-moz-range-thumb {
-                width: 10px;
-                height: 18px;
-            }
-
-            .power-btn {
-                width: 40px;
-                height: 40px;
-                font-size: 0.7em;
-            }
-
-            .metrics {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .metric {
-                padding: 5px 10px;
-                font-size: 0.8em;
-            }
-
-            header {
-                padding: 15px;
-            }
-
-            h1 {
-                font-size: 1.2em;
-            }
-        }
-
-        @media (orientation: landscape) {
-            .mixer-console {
-                overflow-x: auto;
-                overflow-y: hidden;
-            }
-
-            .channel-strip {
-                min-width: 120px;
-            }
-        }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -545,8 +49,6 @@
         <div id="channel-count">CHANNELS: 0</div>
         <div id="audio-status">AUDIO: INITIALIZING</div>
     </div>
-
-    <!-- Overlay eliminado, acceso directo al mixer -->
 
     <div id="warning-message" class="warning-message"></div>
 
@@ -642,104 +144,7 @@
                 this.calculateEstimatedLatency();
             }
             
-            async initWebRTC() {
-                if (!this.useWebRTC || !this.socket?.connected) {
-                    console.log('[WebRTC] No disponible o no conectado');
-                    this.fallbackToWebSocket('WebRTC no disponible');
-                    return;
-                }
-                
-                try {
-                    console.log('[AudioMonitor] Iniciando WebRTC...');
-                    this.updateStatus('CONNECTING (WebRTC)...', true);
-                    
-                    this.webrtcClient = new WebRTCClient(this.socket, this.socket.id);
-                    
-                    // Configurar callbacks
-                    this.webrtcClient.onAudioConnected = () => {
-                        console.log('[WebRTC] Audio conectado');
-                        this.handleWebRTCConnected();
-                    };
-                    
-                    this.webrtcClient.onConnected = () => {
-                        console.log('[WebRTC] Conexión establecida');
-                        this.webrtcConnected = true;
-                        this.protocol = 'webrtc';
-                        this.metrics.protocol = 'WebRTC';
-                        this.updateProtocolDisplay();
-                        
-                        // Re-suscribir canales si es reconexión
-                        if (this.activeChannels.size > 0) {
-                            const channels = Array.from(this.activeChannels);
-                            const gains = {};
-                            channels.forEach(ch => {
-                                gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
-                            });
-                            
-                            this.webrtcClient.subscribe(channels, gains);
-                        }
-                        
-                        // Ocultar overlay
-                        document.getElementById('init-overlay').classList.add('hidden');
-                        document.getElementById('audio-status').textContent = 'AUDIO: READY (WebRTC)';
-                    };
-                    
-                    this.webrtcClient.onDisconnected = () => {
-                        console.log('[WebRTC] Desconectado');
-                        this.webrtcConnected = false;
-                        
-                        if (this.protocol === 'webrtc') {
-                            this.fallbackToWebSocket('WebRTC desconectado');
-                        }
-                    };
-                    
-                    this.webrtcClient.onError = (error) => {
-                        console.error('[WebRTC] Error:', error);
-                        this.fallbackToWebSocket(`Error WebRTC: ${error.message || 'Error desconocido'}`);
-                    };
-                    
-                    // Conectar WebRTC
-                    const success = await this.webrtcClient.connect();
-                    if (!success) {
-                        throw new Error('No se pudo conectar WebRTC');
-                    }
-                    
-                } catch (error) {
-                    console.error('[AudioMonitor] Error iniciando WebRTC:', error);
-                    this.fallbackToWebSocket(`Error WebRTC: ${error.message}`);
-                }
-            }
-            
-            handleWebRTCConnected() {
-                this.audioInitialized = true;
-                this.connected = true;
-                this.updateStatus('CONNECTED (WebRTC)', true);
-                
-                // Guardar preferencia
-                localStorage.setItem('audioMonitor_preferredProtocol', 'webrtc');
-                
-                console.log('[AudioMonitor] WebRTC completamente conectado');
-            }
-            
-            fallbackToWebSocket(reason) {
-                console.log(`[AudioMonitor] Fallback a WebSocket: ${reason}`);
-                this.showWarning(reason);
-                this.protocol = 'websocket';
-                this.metrics.protocol = 'WebSocket';
-                this.updateProtocolDisplay();
-                // Cerrar WebRTC si existe
-                if (this.webrtcClient) {
-                    this.webrtcClient.close();
-                    this.webrtcClient = null;
-                    this.webrtcConnected = false;
-                }
-                document.getElementById('audio-status').textContent = 'AUDIO: READY (WebSocket)';
-                // No overlay ni botón de inicio
-                console.log('[AudioMonitor] Cambiado a WebSocket');
-            }
-            
             setupEventListeners() {
-                // Solo visibilidad, sin overlay ni botón de inicio
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden && this.audioContext && this.audioContext.state === 'suspended') {
                         this.audioContext.resume();
@@ -799,12 +204,10 @@
                 const jitterBuffer = this.deviceInfo.jitter_buffer_ms || 30;
                 const processingLatency = 2;
                 
-                let networkLatency = 10; // default
+                let networkLatency = 10;
                 
                 if (this.protocol === 'websocket') {
                     networkLatency = this.metrics.networkLatency || 15;
-                } else if (this.protocol === 'webrtc' && this.webrtcClient) {
-                    networkLatency = this.webrtcClient.getLatency() || 8;
                 }
                 
                 let contextLatency = 0;
@@ -885,61 +288,47 @@
                 document.getElementById('channel-count').textContent = `CHANNELS: ${numChannels}`;
             }
             
-
             async toggleChannel(channel, button) {
-    console.log(`[App] toggleChannel(${channel}) INICIADO`);
-    console.log(`[App] Protocolo actual: ${this.protocol}`);
-    console.log(`[App] Audio initialized: ${this.audioInitialized}`);
-    
-    const strip = button.closest('.channel-strip');
-    
-    if (this.activeChannels.has(channel)) {
-        // Desactivar
-        console.log(`[App] Desactivando canal ${channel}`);
-        this.activeChannels.delete(channel);
-        button.classList.remove('active');
-        strip.classList.remove('active');
-        
-        if (this.channelProcessors[channel]) {
-            if (this.protocol === 'websocket') {
-                this.channelProcessors[channel].panNode.disconnect();
-                this.channelProcessors[channel].gainNode.disconnect();
-                if (this.channelProcessors[channel].workletNode) {
-                    this.channelProcessors[channel].workletNode.disconnect();
+                console.log(`[App] toggleChannel(${channel}) INICIADO`);
+                
+                const strip = button.closest('.channel-strip');
+                
+                if (this.activeChannels.has(channel)) {
+                    console.log(`[App] Desactivando canal ${channel}`);
+                    this.activeChannels.delete(channel);
+                    button.classList.remove('active');
+                    strip.classList.remove('active');
+                    
+                    if (this.channelProcessors[channel]) {
+                        this.channelProcessors[channel].panNode.disconnect();
+                        this.channelProcessors[channel].gainNode.disconnect();
+                        if (this.channelProcessors[channel].workletNode) {
+                            this.channelProcessors[channel].workletNode.disconnect();
+                        }
+                        delete this.channelProcessors[channel];
+                    }
+                } else {
+                    console.log(`[App] Activando canal ${channel}`);
+                    this.activeChannels.add(channel);
+                    button.classList.add('active');
+                    strip.classList.add('active');
+                    
+                    if (!this.audioContext) {
+                        console.log('[App] Iniciando WebSocket audio...');
+                        const success = await this.initAudioContext();
+                        if (!success) {
+                            console.error('[App] Error iniciando WebSocket audio');
+                            return;
+                        }
+                    }
+                    this.createChannelProcessor(channel);
                 }
+                
+                this.updateSubscription();
+                
+                document.getElementById('audio-status').textContent = 
+                    `AUDIO: ${this.activeChannels.size} ACTIVE (${this.metrics.protocol})`;
             }
-            delete this.channelProcessors[channel];
-        }
-    } else {
-        // Activar
-        console.log(`[App] Activando canal ${channel}`);
-        this.activeChannels.add(channel);
-        button.classList.add('active');
-        strip.classList.add('active');
-        
-        // Iniciar audio según protocolo
-        if (this.protocol === 'websocket' && !this.audioContext) {
-            console.log('[App] Iniciando WebSocket audio...');
-            const success = await this.initAudioContext();
-            if (!success) {
-                console.error('[App] Error iniciando WebSocket audio');
-                return;
-            }
-        }
-        if (this.protocol === 'websocket') {
-            this.createChannelProcessor(channel);
-        }
-    }
-    
-    console.log(`[App] Canales activos después del toggle: ${this.activeChannels.size}`);
-    console.log(`[App] Llamando a updateSubscription()...`);
-    
-    // ✅ CRÍTICO: Llamar a updateSubscription
-    this.updateSubscription();
-    
-    document.getElementById('audio-status').textContent = 
-        `AUDIO: ${this.activeChannels.size} ACTIVE (${this.metrics.protocol})`;
-}
          
             createChannelProcessor(channel) {
                 try {
@@ -1024,7 +413,6 @@
                         
                         for (let i = 0; i < copyLength; i++) {
                             const sample = chunk[i] * gain;
-                            // Simple panning: -1 = full left, 1 = full right
                             outputL[outputIndex + i] = sample * (1 - Math.max(0, pan));
                             outputR[outputIndex + i] = sample * (1 + Math.min(0, pan));
                         }
@@ -1063,11 +451,9 @@
                     gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
                 });
                 
-                if (this.protocol === 'websocket' && this.socket?.connected) {
+                if (this.socket?.connected) {
                     this.socket.emit('subscribe', { channels, gains });
                     console.log('[WebSocket] Suscripción actualizada:', channels);
-                } else if (this.protocol === 'webrtc' && this.webrtcClient?.isConnected()) {
-                    this.webrtcClient.subscribe(channels, gains);
                 }
             }
             
@@ -1076,10 +462,8 @@
                     this.channelProcessors[channel].gain = gain;
                     this.channelProcessors[channel].gainNode.gain.value = gain;
                     
-                    if (this.protocol === 'websocket' && this.socket?.connected) {
+                    if (this.socket?.connected) {
                         this.socket.emit('update_gain', { channel, gain });
-                    } else if (this.protocol === 'webrtc' && this.webrtcClient?.isConnected()) {
-                        this.webrtcClient.updateGain(channel, gain);
                     }
                 }
             }
@@ -1093,8 +477,6 @@
             }
             
             handleAudioData(data) {
-                if (this.protocol !== 'websocket') return;
-                
                 const view = new DataView(data);
                 const channel = view.getUint32(0, true);
                 
@@ -1105,7 +487,6 @@
                 
                 if (audioData.length === 0) return;
                 
-                // Actualizar VU meter
                 const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
                 const db = 20 * Math.log10(Math.max(rms, 0.00001));
                 const percentage = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
@@ -1140,23 +521,8 @@
             }
             
             updateMetricsDisplay() {
-                // Obtener métricas según protocolo
-                if (this.protocol === 'webrtc' && this.webrtcClient) {
-                    const webrtcMetrics = this.webrtcClient.getMetrics();
-                    this.metrics.audioLatency = webrtcMetrics.audioLatency || webrtcMetrics.connectionLatency || 0;
-                    this.metrics.packetLoss = webrtcMetrics.packetLoss || 0;
-                    this.metrics.jitter = webrtcMetrics.jitter || 0;
-                    this.metrics.quality = webrtcMetrics.quality || 'unknown';
-                    
-                    // Usar latencia de WebRTC
-                    this.metrics.estimatedLatency = this.metrics.audioLatency || this.metrics.estimatedLatency;
-                    
-                } else if (this.protocol === 'websocket') {
-                    this.metrics.protocol = 'WebSocket';
-                    this.calculateEstimatedLatency();
-                }
+                this.calculateEstimatedLatency();
                 
-                // Actualizar elementos UI
                 const latencyEl = document.getElementById('latency');
                 if (latencyEl) {
                     const latency = Math.round(this.metrics.estimatedLatency);
@@ -1175,19 +541,12 @@
                 
                 const networkEl = document.getElementById('network');
                 if (networkEl) {
-                    let networkValue;
-                    if (this.protocol === 'webrtc') {
-                        networkValue = this.metrics.audioLatency || this.metrics.networkLatency;
-                    } else {
-                        networkValue = this.metrics.networkLatency;
-                    }
-                    const network = Math.round(networkValue);
+                    const network = Math.round(this.metrics.networkLatency);
                     networkEl.textContent = network;
                     networkEl.className = 'metric-value ' + 
                         (network <= 10 ? '' : network <= 25 ? 'warning' : 'bad');
                 }
                 
-                // Actualizar protocolo display
                 this.updateProtocolDisplay();
             }
             
@@ -1195,8 +554,6 @@
                 const protocolEl = document.getElementById('protocol');
                 if (protocolEl) {
                     protocolEl.textContent = this.metrics.protocol;
-                    protocolEl.className = 'metric-value ' + 
-                        (this.protocol === 'webrtc' ? '' : 'warning');
                 }
             }
             
@@ -1228,7 +585,6 @@
             }
         }
 
-        // Iniciar aplicación cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', () => {
             window.audioMonitor = new AudioMonitor();
         });

@@ -10,7 +10,7 @@ class AudioProcessor extends AudioWorkletProcessor {
         // Buffer circular para datos
         this.buffer = [];
         this.targetSize = options.processorOptions.bufferSize || 3;
-        this.minSize = Math.max(1, this.targetSize - 1);
+        this.minSize = Math.max(1, Math.floor(this.targetSize / 2));
         this.maxSize = this.targetSize * 4;
         
         // Estado
