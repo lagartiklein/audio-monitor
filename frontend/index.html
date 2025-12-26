@@ -139,6 +139,8 @@
             
             handleDeviceInfo(info) {
                 this.deviceInfo = info;
+                // ✅ Forzar WebSocket (no WebRTC)
+                info.supports_webrtc = false;
                 this.displayDeviceInfo(info);
                 this.createMixerConsole(info.channels);
                 this.calculateEstimatedLatency();

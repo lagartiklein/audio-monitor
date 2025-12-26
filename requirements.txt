@@ -1,9 +1,7 @@
-Flask>=2.3.0
-Flask-SocketIO>=5.3.0
-python-socketio>=5.9.0
-eventlet>=0.33.0
-numpy>=1.24.0
-sounddevice>=0.4.6
-aiohttp>=3.8.0
-aiortc>=1.5.0
-av>=10.0.0
+Flask==2.3.3
+Flask-SocketIO==5.3.4
+eventlet==0.33.3
+sounddevice==0.4.6
+numpy==1.24.3
+python-socketio==5.9.0
+engineio==4.4.0
