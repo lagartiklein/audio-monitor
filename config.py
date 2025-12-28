@@ -1,17 +1,19 @@
-# REDUCIDO PARA RF CRÍTICO
+# ⚡ CONFIGURACIÓN BÁSICA RF + WEB (COLAS SEPARADAS)
 SAMPLE_RATE = 48000
-BLOCKSIZE = 256          # 5.33ms ⭐ REDUCIDO PARA RF
-QUEUE_SIZE = 2           # ⭐ MINIMO 2 BLOQUES PARA BUFFER PING-PONG (CORREGIDO)
+BLOCKSIZE = 64
+
+# ⚡ CONFIGURACIÓN DE COLAS SEPARADAS
+QUEUE_SIZE = 3          # Tamaño default (para compatibilidad)
+NATIVE_QUEUE_SIZE = 2   # Cola pequeña para baja latencia nativa
+WEB_QUEUE_SIZE = 4      # Cola más grande para web (tolerancia a jitter)
+
 WEB_PORT = 5100
 WEB_HOST = '0.0.0.0'
 NATIVE_PORT = 5101
 NATIVE_HOST = '0.0.0.0'
-NATIVE_MAX_CLIENTS = 5   # ⭐ REDUCIDO PARA LAN
-VERBOSE = False
-LOG_QUEUE_WARNINGS = False
+NATIVE_MAX_CLIENTS = 5
+DEBUG = True
+LOG_QUEUE_STATS = True  # Log estadísticas de colas
 
-# ⭐ NUEVO: PARÁMETROS RF
-RF_MODE = True
-RF_MAX_LATENCY_MS = 20   # ⭐ MÁXIMO 20ms LATENCIA
-RF_DROP_OLD_MS = 30      # ⭐ DESCARTAR >30ms
-RF_BUFFER_MS = 10        # ⭐ BUFFER MÍNIMO
+LOG_LEVEL = 'INFO'  # 'DEBUG' para troubleshooting
+STATS_INTERVAL = 5.0  # Segundos entre reportes de estadísticas

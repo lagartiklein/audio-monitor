@@ -1,539 +1,258 @@
-import sys, signal, threading, time, socket, argparse, os, webbrowser
-
-from datetime import datetime
-
-import queue
-
-
+import sys, signal, threading, time, socket, os, webbrowser
+from audio_server.audio_capture import AudioCapture
+from audio_server.channel_manager import ChannelManager
+from audio_server.native_server import NativeAudioServer
+from audio_server.websocket_server import app, socketio, init_server
+import config
 
 def get_local_ip():
-
     try:
-
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
         s.connect(("8.8.8.8", 80))
-
         ip = s.getsockname()[0]
-
         s.close()
-
         return ip
-
     except:
-
         return "localhost"
 
-
-
-def print_banner():
-
+def run_server():
     print("\n" + "="*60)
-
-    print("       SERVIDOR DE AUDIO MULTICANAL")
-
+    print("  SERVIDOR AUDIO RF + WEB DIRECTO (SIN COLAS)")
     print("="*60)
-
-    print(f"⏰ Inicio: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-    print("="*60)
-
-
-
-def run_dual_mode():
-
-    print_banner()
-
-    print("🚀 Iniciando modo DUAL (Nativo + Web)...")
-
     
-
-    from audio_server.audio_capture import AudioCapture
-
-    from audio_server.channel_manager import ChannelManager
-
-    from audio_server.native_server import NativeAudioServer
-
-    from audio_server.audio_broadcaster import AudioBroadcaster
-
-    from audio_server.websocket_server import app, socketio, init_server, start_audio_thread
-
-    
-
-    import config
-
- 
-
     audio_capture = None
-
     native_server = None
-
-    broadcaster = None
-
+    web_handler = None
     
-
     def cleanup():
-
-        print("\n" + "="*60)
-
-        print("🛑 Deteniendo servidor...")
-
-        print("="*60)
-
-        
-
-        if broadcaster: 
-
-            print("🔌 Deteniendo broadcaster...")
-
-            broadcaster.stop()
-
-        if native_server: 
-
-            print("🔌 Deteniendo servidor nativo...")
-
+        print("\n🛑 Deteniendo...")
+        if native_server:
             native_server.stop()
-
-        if audio_capture: 
-
-            print("🎙️  Deteniendo captura de audio...")
-
+        if audio_capture:
             audio_capture.stop_capture()
-
-        
-
-        print("✅ Servidor detenido correctamente")
-
-        print("="*60)
-
+        print("✅ Detenido")
     
-
     def signal_handler(sig, frame):
-
-        print(f"\n⚠️  Señal {sig} recibida, deteniendo...")
-
         cleanup()
-
         sys.exit(0)
-
     
-
     signal.signal(signal.SIGINT, signal_handler)
-
     signal.signal(signal.SIGTERM, signal_handler)
-
     
-
     try:
-
-        print("🔧 Inicializando componentes...")
-
-        
-
-        # 1. Captura de audio
-
-        print("🎙️  Inicializando captura de audio...")
-
+        print("🎙️ Inicializando captura RF DIRECTA...")
         audio_capture = AudioCapture()
-
-        devices = audio_capture.list_devices()
-
+        num_channels = audio_capture.start_capture()
         
-
-        if not devices:
-
-            print("❌ No se encontraron interfaces de audio multicanal")
-
-            return 1
-
-        
-
-        print(f"✅ Encontradas {len(devices)} interfaces:")
-
-        for i, device in enumerate(devices):
-
-            print(f"   {i+1}. {device['name']} ({device['channels']} canales)")
-
-        
-
-        num_channels = audio_capture.start_capture(devices[0]['id'])
-
-        print(f"✅ Captura iniciada: {num_channels} canales")
-
-        
-
-        # 2. Channel Manager
-
         print("📡 Inicializando gestor de canales...")
-
         channel_manager = ChannelManager(num_channels)
-
         
-
-        # 3. Broadcaster
-
-        print("📡 Inicializando broadcaster...")
-
-        broadcaster = AudioBroadcaster(audio_capture)
-
-        broadcaster.start()
-
-        
-
-        # 4. Colas de audio
-
-        print("🔗 Creando colas de audio...")
-
-        web_audio_queue = broadcaster.register_consumer("websocket")
-
-        native_audio_queue = broadcaster.register_consumer("native")
-
-        
-
-        # 5. Servidor nativo
-
-        print("📱 Inicializando servidor nativo...")
-
-        native_server = NativeAudioServer(audio_capture, channel_manager)
-
-        native_server.use_broadcaster = True
-
-        native_server.audio_queue = native_audio_queue
-
+        print("📱 Inicializando servidor nativo RF...")
+        native_server = NativeAudioServer(channel_manager)
         native_server.start()
-
         
-
-        # 6. Servidor WebSocket
-
+        # ✅ Registrar callback directo para RF
+        audio_capture.register_callback(
+            native_server.on_audio_data,
+            name="native_server"
+        )
+        
         print("🌐 Inicializando servidor WebSocket...")
-
-        init_server(audio_capture, channel_manager, web_audio_queue)
-
-        start_audio_thread()
-
         
-
-        # Mostrar información de conexión
-
-        local_ip = get_local_ip()
-
-        print("\n" + "="*60)
-
-        print("✅ SERVIDOR LISTO")
-
-        print("="*60)
-
-        print(f"🌐 IP Local: {local_ip}")
-
-        print(f"📱 Puerto Nativo: {config.NATIVE_PORT}")
-
-        print(f"🌐 Puerto Web: {config.WEB_PORT}")
-
-        print(f"🎚️  Canales: {num_channels}")
-
-        print(f"⏱️  Sample Rate: {config.SAMPLE_RATE} Hz")
-
-        print(f"📦 Block Size: {config.BLOCKSIZE} samples")
-
-        print("="*60)
-
-        print("\n📋 COMANDOS DISPONIBLES:")
-
-        print("   • 'status' - Ver estado del servidor")
-
-        print("   • 'clients' - Listar clientes conectados")
-
-        print("   • 'stats' - Ver estadísticas")
-
-        print("   • 'debug' - Debug del sistema")
-
-        print("   • 'quit' o Ctrl+C - Salir")
-
-        print("="*60 + "\n")
-
-        
-
-        # Abrir navegador automáticamente
-
-        threading.Thread(
-
-            target=lambda: (time.sleep(2), webbrowser.open(f"http://localhost:{config.WEB_PORT}")), 
-
-            daemon=True
-
-        ).start()
-
-        
-
-        # Comando interactivo
-
-        def command_loop():
-
-            while True:
-
-                try:
-
-                    cmd = input("> ").strip().lower()
-
-                    
-
-                    if cmd in ['q', 'quit', 'exit']:
-
-                        print("👋 Saliendo...")
-
-                        cleanup()
-
-                        os._exit(0)
-
-                    
-
-                    elif cmd == 'status':
-
-                        if native_server:
-
-                            native_server.print_status()
-
-                        else:
-
-                            print("⚠️  Servidor nativo no disponible")
-
-                    
-
-                    elif cmd == 'clients':
-
-                        if native_server:
-
-                            with native_server.client_lock:
-
-                                clients = list(native_server.clients.keys())
-
-                                print(f"👥 Clientes conectados: {len(clients)}")
-
-                                for i, client_id in enumerate(clients, 1):
-
-                                    client = native_server.clients[client_id]
-
-                                    print(f"   {i}. {client_id[:15]} - {client.address[0]}")
-
-                        else:
-
-                            print("⚠️  Servidor nativo no disponible")
-
-                    
-
-                    elif cmd == 'stats':
-
-                        if native_server:
-
-                            print("📊 ESTADÍSTICAS:")
-
-                            print(f"   Paquetes enviados: {native_server.stats['total_packets_sent']:,}")
-
-                            print(f"   Bytes enviados: {native_server.stats['bytes_sent']:,}")
-
-                            print(f"   Errores de audio: {native_server.stats['audio_errors']}")
-
-                        else:
-
-                            print("⚠️  Servidor nativo no disponible")
-
-                    
-
-                    elif cmd == 'debug':
-
-                        print("\n" + "="*60)
-
-                        print("🐛 DEBUG DEL SISTEMA")
-
-                        print("="*60)
-
-                        
-
-                        # Estado del audio capture
-
-                        if audio_capture:
-
-                            if audio_capture.stream and audio_capture.running:
-
-                                queue_size = audio_capture.audio_queue.qsize()
-
-                                print(f"🎙️  CAPTURA DE AUDIO: ACTIVA")
-
-                                print(f"   Cola: {queue_size} bloques")
-
-                                print(f"   Canales: {audio_capture.actual_channels}")
-
-                            else:
-
-                                print(f"🎙️  CAPTURA DE AUDIO: INACTIVA")
-
-                        
-
-                        # Estado del broadcaster
-
-                        if broadcaster:
-
-                            b_stats = broadcaster.get_stats()
-
-                            print(f"🎙️  BROADCASTER:")
-
-                            print(f"   📦 Paquetes totales: {b_stats['total_packets']:,}")
-
-                            print(f"   🔗 Consumidores: {b_stats['active_consumers']}")
-
-                            for consumer, queue in broadcaster.output_queues.items():
-
-                                print(f"   📊 '{consumer}': cola={queue.qsize()}")
-
-                        
-
-                        # Estado del servidor nativo
-
-                        if native_server:
-
-                            print(f"📱 SERVIDOR NATIVO:")
-
-                            print(f"   🟢 Corriendo: {native_server.running}")
-
-                            print(f"   👥 Clientes: {len(native_server.clients)}")
-
-                            print(f"   📦 Paquetes enviados: {native_server.stats['total_packets_sent']:,}")
-
-                            
-
-                            if native_server.stats['total_packets_sent'] == 0:
-
-                                print(f"   ⚠️  ¡ALERTA! No se han enviado paquetes de audio")
-
-                        
-
-                        print("="*60 + "\n")
-
-                    
-
-                    elif cmd == 'help':
-
-                        print("📋 COMANDOS:")
-
-                        print("   status    - Ver estado del servidor")
-
-                        print("   clients   - Listar clientes conectados")
-
-                        print("   stats     - Ver estadísticas")
-
-                        print("   debug     - Debug del sistema")
-
-                        print("   quit      - Salir del servidor")
-
-                        print("   help      - Mostrar esta ayuda")
-
-                    
-
-                    elif cmd:
-
-                        print(f"❌ Comando desconocido: '{cmd}'")
-
-                        print("   Escribe 'help' para ver comandos disponibles")
-
+        # ✅ Crear handler para WebSocket
+        class WebAudioHandler:
+            def __init__(self):
+                self.packet_count = 0
                 
-
-                except (KeyboardInterrupt, EOFError):
-
-                    print("\n👋 Saliendo...")
-
-                    cleanup()
-
-                    os._exit(0)
-
+            def on_audio_data(self, audio_data):
+                """Callback para enviar audio a clientes web"""
+                self.packet_count += 1
+                
+                # Verificar que hay subscripciones
+                if not hasattr(channel_manager, 'subscriptions'):
+                    return
+                
+                for client_id, subscription in channel_manager.subscriptions.copy().items():
+                    try:
+                        if not isinstance(subscription, dict):
+                            continue
+                        
+                        channels = subscription.get('channels', [])
+                        if not channels:
+                            continue
+                        
+                        gains = subscription.get('gains', {})
+                        
+                        # Enviar batch de canales
+                        self._send_audio_batch(client_id, audio_data, channels, gains)
+                        
+                    except Exception as e:
+                        pass  # Ignorar errores de clientes específicos
+            
+            def _send_audio_batch(self, client_id, audio_data, channels, gains):
+                """Envío batch optimizado"""
+                import struct
+                import numpy as np
+                
+                try:
+                    batch_data = []
+                    
+                    for channel in channels:
+                        if channel >= audio_data.shape[1]:
+                            continue
+                        
+                        channel_data = audio_data[:, channel].copy()
+                        
+                        # Aplicar ganancia
+                        gain = gains.get(channel, 1.0)
+                        if gain != 1.0:
+                            channel_data = channel_data * gain
+                        
+                        batch_data.append((channel, channel_data))
+                    
+                    if not batch_data:
+                        return
+                    
+                    # Crear paquete binario
+                    packet_parts = [struct.pack('<I', len(batch_data))]
+                    
+                    for channel_id, channel_audio in batch_data:
+                        audio_bytes = channel_audio.astype(np.float32).tobytes()
+                        packet_parts.append(struct.pack('<I', channel_id))
+                        packet_parts.append(struct.pack('<I', len(audio_bytes)))
+                        packet_parts.append(audio_bytes)
+                    
+                    packet = b''.join(packet_parts)
+                    socketio.emit('audio_batch', packet, to=client_id)
+                    
                 except Exception as e:
-
-                    print(f"❌ Error en comando: {e}")
-
+                    pass
         
-
-        # Iniciar loop de comandos en thread separado
-
+        web_handler = WebAudioHandler()
+        
+        # ✅ Registrar callback para web
+        audio_capture.register_callback(
+            web_handler.on_audio_data,
+            name="web_server"
+        )
+        
+        # Inicializar servidor web (sin audio_queue, usa callbacks)
+        init_server(channel_manager)
+        
+        local_ip = get_local_ip()
+        print("\n" + "="*60)
+        print("✅ SERVIDORES RF + WEB DIRECTOS LISTOS")
+        print("="*60)
+        print(f"🌐 IP Local: {local_ip}")
+        print(f"📱 Puerto RF: {config.NATIVE_PORT}")
+        print(f"🌐 Puerto Web: {config.WEB_PORT}")
+        print(f"🎚️ Canales: {num_channels}")
+        print(f"📦 Blocksize: {config.BLOCKSIZE} (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.1f}ms)")
+        print(f"⚡ Modo: ENVÍO DIRECTO (sin colas)")
+        print(f"📞 Callbacks: native_server, web_server")
+        print("="*60)
+        print("\n📋 COMANDOS:")
+        print("   • 'status' - Ver estado")
+        print("   • 'clients' - Listar clientes")
+        print("   • 'stats' - Ver estadísticas")
+        print("   • 'web' - Abrir navegador")
+        print("   • 'quit' - Salir")
+        print("="*60)
+        
+        # Abrir navegador automáticamente
+        threading.Thread(
+            target=lambda: (time.sleep(2), webbrowser.open(f"http://localhost:{config.WEB_PORT}")), 
+            daemon=True
+        ).start()
+        
+        # Comando loop
+        def command_loop():
+            while True:
+                try:
+                    cmd = input("\n> ").strip().lower()
+                    
+                    if cmd in ['q', 'quit', 'exit']:
+                        cleanup()
+                        os._exit(0)
+                    
+                    elif cmd == 'status':
+                        print("📊 ESTADO:")
+                        print(f"   📱 Clientes RF: {native_server.get_client_count()}")
+                        print(f"   🌐 Clientes Web: {len(channel_manager.subscriptions)}")
+                        print(f"   🎛️ Canales: {num_channels}")
+                        print(f"   🎙️ Captura: {'Activa' if audio_capture.running else 'Inactiva'}")
+                        print(f"   📦 Posición: {native_server.get_sample_position():,}")
+                        print(f"   📞 Callbacks: {len(audio_capture.callbacks)}")
+                    
+                    elif cmd == 'clients':
+                        with native_server.client_lock:
+                            clients = list(native_server.clients.keys())
+                            print(f"📱 Clientes RF: {len(clients)}")
+                            for i, client_id in enumerate(clients, 1):
+                                client = native_server.clients[client_id]
+                                channels = len(client.subscribed_channels)
+                                print(f"   {i}. {client_id[:20]} - {client.address[0]}")
+                                print(f"       Canales: {channels}, Enviados: {client.packets_sent}, Perdidos: {client.packets_dropped}")
+                        
+                        print(f"\n🌐 Clientes Web: {len(channel_manager.subscriptions)}")
+                        for i, client_id in enumerate(list(channel_manager.subscriptions.keys()), 1):
+                            sub = channel_manager.subscriptions[client_id]
+                            channels = len(sub.get('channels', []))
+                            print(f"   {i}. {client_id[:8]} ({channels} canales)")
+                    
+                    elif cmd == 'stats':
+                        stats = native_server.get_stats()
+                        print("📊 ESTADÍSTICAS RF:")
+                        print(f"   Paquetes enviados: {stats['packets_sent']:,}")
+                        print(f"   Paquetes perdidos: {stats['packets_dropped']:,}")
+                        print(f"   Desconexiones: {stats['clients_disconnected']}")
+                        print(f"   Posición: {native_server.get_sample_position():,} samples")
+                        print(f"   Tiempo: {native_server.get_sample_position()/config.SAMPLE_RATE:.1f}s")
+                        print(f"\n📊 ESTADÍSTICAS WEB:")
+                        print(f"   Paquetes procesados: {web_handler.packet_count:,}")
+                    
+                    elif cmd == 'web':
+                        webbrowser.open(f"http://localhost:{config.WEB_PORT}")
+                        print(f"🌐 Abriendo navegador: http://localhost:{config.WEB_PORT}")
+                    
+                    elif cmd == 'help':
+                        print("📋 COMANDOS:")
+                        print("   status  - Estado general")
+                        print("   clients - Listar clientes RF y Web")
+                        print("   stats   - Estadísticas detalladas")
+                        print("   web     - Abrir navegador")
+                        print("   quit    - Salir")
+                    
+                    elif cmd:
+                        print(f"❌ Comando desconocido: '{cmd}'")
+                        print("   Use 'help' para ver comandos")
+                
+                except (KeyboardInterrupt, EOFError):
+                    cleanup()
+                    os._exit(0)
+                except Exception as e:
+                    print(f"❌ Error: {e}")
+        
         command_thread = threading.Thread(target=command_loop, daemon=True)
-
         command_thread.start()
-
         
-
-        # Ejecutar servidor WebSocket
-
-        if __name__ == '__main__':
-
-            print(f"🌐 Iniciando servidor Web en http://{local_ip}:{config.WEB_PORT}")
-
-            socketio.run(app, host=config.WEB_HOST, port=config.WEB_PORT, debug=False, log_output=False)
-
+        # Mantener vivo y ejecutar servidor WebSocket
+        print(f"\n⚡ Servidores corriendo en modo DIRECTO...")
+        print(f"   RF:  tcp://{local_ip}:{config.NATIVE_PORT}")
+        print(f"   Web: http://{local_ip}:{config.WEB_PORT}")
+        print(f"\nEsperando conexiones...\n")
         
-
+        # Ejecutar servidor WebSocket (blocking)
+        socketio.run(app, host=config.WEB_HOST, port=config.WEB_PORT, debug=False, log_output=False)
+        
     except KeyboardInterrupt:
-
-        print("\n👋 Interrupción por teclado")
-
+        print("\n👋 Interrupción")
         return 0
-
     except Exception as e:
-
-        print(f"❌ ERROR CRÍTICO: {e}")
-
+        print(f"❌ ERROR: {e}")
         import traceback
-
         traceback.print_exc()
-
         return 1
 
-
-
-def main():
-
-    parser = argparse.ArgumentParser(description='Audio Server')
-
-    parser.add_argument('--mode', choices=['web', 'native', 'dual'], default='dual')
-
-    parser.add_argument('--verbose', '-v', action='store_true', help='Mostrar logs detallados')
-
-    parser.add_argument('--port', type=int, default=5101, help='Puerto para servidor nativo')
-
-    parser.add_argument('--web-port', type=int, default=5100, help='Puerto para servidor web')
-
-    args = parser.parse_args()
-
-    
-
-    if args.verbose:
-
-        import config
-
-        config.VERBOSE = True
-
-    
-
-    # Actualizar puertos si se especifican
-
-    if args.port != 5101:
-
-        import config
-
-        config.NATIVE_PORT = args.port
-
-    
-
-    if args.web_port != 5100:
-
-        import config
-
-        config.WEB_PORT = args.web_port
-
-    
-
-    return run_dual_mode()
-
-
-
 if __name__ == '__main__':
-
-    sys.exit(main() or 0)
+    sys.exit(run_server() or 0)

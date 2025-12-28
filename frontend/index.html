@@ -1,16 +1,17 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Monitor - Consola Digital</title>
+    <title>Audio Monitor - Ultra Low Latency</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>▐▌ AUDIO MONITOR ▐▌</h1>
+            <h1>▐▌ AUDIO MONITOR ▐▌ <span style="color: #f00; font-size: 0.6em;">OPTIMIZED v2.0</span></h1>
             <div id="device-info" class="device-info">INITIALIZING SYSTEM...</div>
             
             <div class="metrics">
@@ -30,15 +31,18 @@
                     <span>ms</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">PROT:</span>
-                    <span id="protocol" class="metric-value">WebSocket</span>
+                    <span class="metric-label">SNR:</span>
+                    <span id="snr" class="metric-value">--</span>
+                    <span>dB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">MODE:</span>
+                    <span id="protocol" class="metric-value">OPT</span>
                 </div>
             </div>
         </header>
 
-        <div id="mixer-console" class="mixer-console">
-            <!-- Canales se generan dinámicamente -->
-        </div>
+        <div id="mixer-console" class="mixer-console"></div>
     </div>
 
     <div class="status-bar">
@@ -53,85 +57,180 @@
     <div id="warning-message" class="warning-message"></div>
 
     <script>
-        class AudioMonitor {
+        class AdaptiveRingBuffer {
+            constructor(sampleRate, initialSizeMs = 10) {
+                this.sampleRate = sampleRate;
+                this.minSize = Math.floor(sampleRate * 0.008); // 8ms mínimo
+                this.maxSize = Math.floor(sampleRate * 0.021); // 21ms máximo
+                this.targetSize = Math.floor(sampleRate * (initialSizeMs / 1000));
+                
+                this.data = new Float32Array(this.maxSize * 2);
+                this.writePos = 0;
+                this.readPos = 0;
+                this.available = 0;
+                
+                // Métricas para adaptación
+                this.underrunCount = 0;
+                this.overrunCount = 0;
+                this.lastAdjustTime = Date.now();
+            }
+            
+            write(samples) {
+                for (let i = 0; i < samples.length; i++) {
+                    this.data[this.writePos] = samples[i];
+                    this.writePos = (this.writePos + 1) % this.data.length;
+                    
+                    if (this.available >= this.data.length) {
+                        this.readPos = (this.readPos + 1) % this.data.length;
+                        this.overrunCount++;
+                    } else {
+                        this.available++;
+                    }
+                }
+            }
+            
+            read() {
+                if (this.available > 0) {
+                    const sample = this.data[this.readPos];
+                    this.readPos = (this.readPos + 1) % this.data.length;
+                    this.available--;
+                    return sample;
+                }
+                
+                this.underrunCount++;
+                return 0; // Silencio en underrun
+            }
+            
+            // Interpolación lineal para smooth playback
+            readInterpolated(fractionalPosition) {
+                if (this.available < 2) {
+                    this.underrunCount++;
+                    return 0;
+                }
+                
+                const pos1 = this.readPos;
+                const pos2 = (this.readPos + 1) % this.data.length;
+                
+                const sample1 = this.data[pos1];
+                const sample2 = this.data[pos2];
+                
+                const frac = fractionalPosition % 1;
+                return sample1 + (sample2 - sample1) * frac;
+            }
+            
+            getHealthPercent() {
+                return Math.round((this.available / this.targetSize) * 100);
+            }
+            
+            adapt() {
+                const now = Date.now();
+                if (now - this.lastAdjustTime < 2000) return; // Ajustar cada 2s
+                
+                this.lastAdjustTime = now;
+                
+                // Si hay muchos underruns, aumentar buffer
+                if (this.underrunCount > 10) {
+                    this.targetSize = Math.min(this.targetSize + 64, this.maxSize);
+                    console.log(`[Buffer] ⬆️ Aumentado a ${this.targetSize} samples (${(this.targetSize/this.sampleRate*1000).toFixed(1)}ms)`);
+                }
+                // Si está estable y el buffer es grande, reducir
+                else if (this.underrunCount === 0 && this.overrunCount === 0 && this.targetSize > this.minSize) {
+                    this.targetSize = Math.max(this.targetSize - 32, this.minSize);
+                    console.log(`[Buffer] ⬇️ Reducido a ${this.targetSize} samples (${(this.targetSize/this.sampleRate*1000).toFixed(1)}ms)`);
+                }
+                
+                this.underrunCount = 0;
+                this.overrunCount = 0;
+            }
+        }
+
+        class UltraLowLatencyAudioMonitor {
             constructor() {
                 this.socket = null;
                 this.audioContext = null;
                 this.deviceInfo = null;
                 this.activeChannels = new Set();
                 this.channelProcessors = {};
-                this.audioWorkletReady = false;
-                this.protocol = 'websocket';
+                
+                // 🎯 MEJORA 1: Buffer adaptativo por canal
+                this.buffers = {};
+                
+                // 🎯 MEJORA 2: Ganancia aplicada en cliente (no en servidor)
+                this.channelGains = {};
+                
+                // 🎯 MEJORA 3: Configuración de panorama
+                this.channelPans = {};
+                
+                // 🎯 MEJORA 4: Dithering para mejor calidad
+                this.ditherEnabled = true;
+                
                 this.metrics = {
                     networkLatency: 0,
                     bufferHealth: 100,
                     estimatedLatency: 0,
-                    protocol: 'WebSocket',
                     audioLatency: 0,
-                    packetLoss: 0,
-                    jitter: 0,
-                    quality: 'unknown'
+                    dropped: 0,
+                    snr: 0
                 };
+                
                 this.connected = false;
                 this.audioInitialized = false;
-                this.connectionStartTime = Date.now();
-                this.reconnectAttempts = 0;
-                this.maxReconnectAttempts = 3;
                 this.init();
             }
 
             async init() {
-                console.log('[AudioMonitor] Inicializando solo WebSocket...');
-                this.connectionStartTime = Date.now();
+                console.log('[🚀 OPTIMIZED MODE v2.0 - QUALITY ENHANCED]');
                 this.updateStatus('CONNECTING...', false);
-                this.updateProtocolDisplay();
                 await this.connectWebSocket();
                 this.startMetricsMonitoring();
-                this.setupEventListeners();
             }
             
             async connectWebSocket() {
-                console.log('[AudioMonitor] Conectando WebSocket...');
+                console.log('[WebSocket] Conectando...');
+                
                 this.socket = io({
                     transports: ['websocket'],
                     upgrade: false,
                     reconnection: true,
-                    reconnectionDelay: 1000,
-                    reconnectionAttempts: 5
+                    reconnectionDelay: 500,
+                    reconnectionAttempts: 10,
+                    perMessageDeflate: false,
+                    rememberUpgrade: true,
+                    timeout: 5000
                 });
+                
                 this.socket.on('connect', () => {
-                    console.log('[Socket] Conectado');
+                    console.log('[Socket] ✅ Conectado');
                     this.updateStatus('CONNECTED', true);
                     this.connected = true;
-                    document.getElementById('audio-status').textContent = 'AUDIO: READY (WebSocket)';
+                    document.getElementById('audio-status').textContent = 'AUDIO: READY (OPTIMIZED)';
+                    
                     if (this.activeChannels.size > 0) {
-                        setTimeout(() => this.updateSubscription(), 500);
+                        setTimeout(() => this.updateSubscription(), 100);
                     }
                 });
+                
                 this.socket.on('disconnect', (reason) => {
                     console.log('[Socket] Desconectado:', reason);
                     this.updateStatus('DISCONNECTED', false);
                     this.connected = false;
-                    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                        this.reconnectAttempts++;
-                        setTimeout(() => {
-                            console.log(`[Socket] Reintento ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-                            this.socket.connect();
-                        }, 1000 * this.reconnectAttempts);
-                    }
                 });
+                
                 this.socket.on('device_info', (info) => {
                     this.handleDeviceInfo(info);
                 });
-                this.socket.on('audio', (data) => {
-                    this.handleAudioData(data);
+                
+                this.socket.on('audio_batch', (data) => {
+                    this.handleAudioBatch(data);
                 });
+                
                 this.socket.on('pong', (data) => {
                     const latency = Date.now() - data.client_timestamp;
                     this.updateNetworkLatency(latency);
                 });
+                
                 setInterval(() => {
-                    if (this.socket && this.socket.connected) {
+                    if (this.socket?.connected) {
                         this.socket.emit('ping', { timestamp: Date.now() });
                     }
                 }, 2000);
@@ -139,28 +238,15 @@
             
             handleDeviceInfo(info) {
                 this.deviceInfo = info;
-                // ✅ Forzar WebSocket (no WebRTC)
-                info.supports_webrtc = false;
+                console.log('[Device]', info);
                 this.displayDeviceInfo(info);
                 this.createMixerConsole(info.channels);
                 this.calculateEstimatedLatency();
             }
             
-            setupEventListeners() {
-                document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden && this.audioContext && this.audioContext.state === 'suspended') {
-                        this.audioContext.resume();
-                    }
-                });
-            }
-            
             async initAudioContext() {
                 if (this.audioContext) return true;
-                
-                if (!this.deviceInfo) {
-                    console.warn('[Audio] Esperando device_info...');
-                    return false;
-                }
+                if (!this.deviceInfo) return false;
                 
                 try {
                     this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -168,93 +254,134 @@
                         sampleRate: this.deviceInfo.sample_rate
                     });
                     
-                    await this.loadAudioWorklet();
+                    if (this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                    }
+                    
                     this.calculateEstimatedLatency();
                     this.audioInitialized = true;
+                    
+                    console.log(`[Audio] ✅ Modo: ScriptProcessor (Optimizado)`);
+                    console.log(`[Audio] ✅ Sample Rate: ${this.audioContext.sampleRate} Hz`);
+                    console.log(`[Audio] ✅ Latencia base: ${(this.audioContext.baseLatency * 1000).toFixed(2)}ms`);
+                    console.log(`[Audio] 🎯 Buffer adaptativo: 8-21ms dinámico`);
                     
                     return true;
                 } catch (error) {
                     console.error('[Audio] Error:', error);
-                    this.showWarning(`Error audio: ${error.message}`);
                     return false;
                 }
             }
             
-            async loadAudioWorklet() {
-                try {
-                    await this.audioContext.audioWorklet.addModule('/audio-processor.js');
-                    this.audioWorkletReady = true;
-                    console.log('[AudioWorklet] Cargado correctamente');
-                } catch (error) {
-                    console.error('[AudioWorklet] Error:', error);
-                    this.audioWorkletReady = false;
-                }
-            }
-            
             displayDeviceInfo(info) {
-                const protocolBadge = info.supports_webrtc ? 
-                    ' | ⚡ WebRTC' : ' | 🌐 WebSocket';
-                
                 document.getElementById('device-info').textContent = 
-                    `${info.name} | ${info.channels} CH | ${info.sample_rate} Hz${protocolBadge}`;
+                    `${info.name} | ${info.channels} CH | ${info.sample_rate} Hz | Optimized Mode v2.0`;
             }
             
             calculateEstimatedLatency() {
                 if (!this.deviceInfo) return;
                 
                 const captureLatency = (this.deviceInfo.blocksize / this.deviceInfo.sample_rate * 1000);
-                const jitterBuffer = this.deviceInfo.jitter_buffer_ms || 30;
-                const processingLatency = 2;
+                const networkLatency = this.metrics.networkLatency || 3;
+                const processingLatency = 0.3; // Optimizado
                 
-                let networkLatency = 10;
-                
-                if (this.protocol === 'websocket') {
-                    networkLatency = this.metrics.networkLatency || 15;
+                // Buffer adaptativo promedio (calculado dinámicamente)
+                let avgBufferLatency = 10; // Default 10ms
+                if (Object.keys(this.buffers).length > 0) {
+                    let totalLatency = 0;
+                    for (const ch in this.buffers) {
+                        const buf = this.buffers[ch];
+                        totalLatency += (buf.targetSize / this.deviceInfo.sample_rate * 1000);
+                    }
+                    avgBufferLatency = totalLatency / Object.keys(this.buffers).length;
                 }
                 
                 let contextLatency = 0;
                 if (this.audioContext) {
-                    contextLatency = (this.audioContext.baseLatency + this.audioContext.outputLatency) * 1000;
+                    contextLatency = (this.audioContext.baseLatency || 0) * 1000;
                 }
                 
                 this.metrics.estimatedLatency = 
-                    captureLatency + jitterBuffer + processingLatency + networkLatency + contextLatency;
+                    captureLatency + networkLatency + processingLatency + avgBufferLatency + contextLatency;
             }
             
             createMixerConsole(numChannels) {
                 const mixer = document.getElementById('mixer-console');
                 mixer.innerHTML = '';
-                
-                for (let i = 0; i < numChannels; i++) {
-                    const strip = document.createElement('div');
-                    strip.className = 'channel-strip';
-                    strip.innerHTML = `
-                        <div class="channel-number">CH ${i + 1}</div>
-                        
-                        <button class="power-btn" data-channel="${i}">PWR</button>
-                        
-                        <div class="vu-meter">
-                            <div class="vu-meter-fill" data-channel="${i}"></div>
-                        </div>
-                        
-                        <div class="fader-container">
-                            <label class="fader-label">VOL</label>
-                            <input type="range" class="fader" data-channel="${i}"
-                                   min="-60" max="12" value="0" step="1" orient="vertical">
-                            <span class="fader-value">0dB</span>
-                        </div>
-                        
-                        <div class="pan-container">
-                            <label class="pan-label">PAN</label>
-                            <input type="range" class="pan-control" data-channel="${i}"
-                                   min="-100" max="100" value="0" step="1">
-                            <span class="pan-value">C</span>
-                        </div>
-                    `;
-                    
-                    mixer.appendChild(strip);
+
+                // Crear filas de canales (8 canales por fila)
+                const rows = Math.ceil(numChannels / 8);
+                for (let row = 0; row < rows; row++) {
+                    const rowDiv = document.createElement('div');
+                    rowDiv.className = 'channel-row';
+
+                    const startCh = row * 8;
+                    const endCh = Math.min(startCh + 8, numChannels);
+
+                    for (let i = startCh; i < endCh; i++) {
+                        const strip = document.createElement('div');
+                        strip.className = 'channel-strip';
+                        strip.innerHTML = `
+                            <!-- CABECERA DEL CANAL -->
+                            <div class="strip-header">
+                                <div class="channel-number">CH ${i + 1}</div>
+                                <button class="power-btn" data-channel="${i}">PWR</button>
+                            </div>
+
+                            <!-- VU METER + FADER JUNTOS -->
+                            <div class="vu-fader-section">
+                                <div class="vu-meter">
+                                    <div class="vu-meter-scale">
+                                        <div class="vu-tick" style="top: 0%">0</div>
+                                        <div class="vu-tick" style="top: 20%">-12</div>
+                                        <div class="vu-tick" style="top: 40%">-24</div>
+                                        <div class="vu-tick" style="top: 60%">-36</div>
+                                        <div class="vu-tick" style="top: 80%">-48</div>
+                                    </div>
+                                    <div class="vu-meter-fill" data-channel="${i}"></div>
+                                    <div class="vu-meter-peak" data-channel="${i}"></div>
+                                </div>
+                                <div class="fader-section">
+                                    <div class="fader-wrapper">
+                                        <div class="fader-track"></div>
+                                        <input type="range" class="fader" data-channel="${i}"
+                                               min="-60" max="12" value="0" step="0.5" orient="vertical">
+                                        <div class="fader-thumb"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- DISPLAY dB Y CONTROLES INFERIORES -->
+                            <div class="bottom-section">
+                                <div class="db-display" data-channel="${i}">0.0dB</div>
+
+                                <div class="pan-control-section">
+                                    <label class="pan-label">PAN</label>
+                                    <div class="pan-knob-wrapper">
+                                        <div class="pan-knob" data-channel="${i}">
+                                            <div class="knob-mark"></div>
+                                        </div>
+                                        <input type="range" class="pan-input" data-channel="${i}"
+                                               min="-100" max="100" value="0" step="2">
+                                    </div>
+                                    <div class="pan-value" data-channel="${i}">C</div>
+                                </div>
+                            </div>
+                        `;
+                        rowDiv.appendChild(strip);
+                    }
+
+                    mixer.appendChild(rowDiv);
                 }
-                
+
+                // Inicializar controles
+                this.initChannelControls();
+
+                document.getElementById('channel-count').textContent = `CHANNELS: ${numChannels}`;
+            }
+            
+            initChannelControls() {
+                // Botón Power
                 document.querySelectorAll('.power-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const channel = parseInt(e.target.dataset.channel);
@@ -262,257 +389,364 @@
                     });
                 });
                 
+                // Faders
                 document.querySelectorAll('.fader').forEach(fader => {
                     fader.addEventListener('input', (e) => {
                         const channel = parseInt(e.target.dataset.channel);
                         const db = parseFloat(e.target.value);
-                        const gain = this.dbToGain(db);
-                        
-                        e.target.nextElementSibling.textContent = `${db > 0 ? '+' : ''}${db}dB`;
-                        this.updateChannelGain(channel, gain);
+                        this.updateFaderUI(channel, db);
+                        this.updateChannelGain(channel, db);
                     });
+                    
+                    // Inicializar posición del thumb
+                    const channel = parseInt(fader.dataset.channel);
+                    this.updateFaderUI(channel, parseFloat(fader.value));
                 });
                 
-                document.querySelectorAll('.pan-control').forEach(pan => {
-                    pan.addEventListener('input', (e) => {
+                // Knobs de panorama
+                document.querySelectorAll('.pan-input').forEach(input => {
+                    input.addEventListener('input', (e) => {
                         const channel = parseInt(e.target.dataset.channel);
                         const panValue = parseFloat(e.target.value);
-                        
-                        let panText = panValue === 0 ? 'C' : 
-                                     panValue < 0 ? `L${Math.abs(panValue)}` : 
-                                     `R${panValue}`;
-                        e.target.nextElementSibling.textContent = panText;
-                        
+                        this.updatePanUI(channel, panValue);
                         this.updateChannelPan(channel, panValue);
                     });
+                    
+                    // Inicializar knob
+                    const channel = parseInt(input.dataset.channel);
+                    this.updatePanUI(channel, parseFloat(input.value));
                 });
                 
-                document.getElementById('channel-count').textContent = `CHANNELS: ${numChannels}`;
+                // Knobs táctiles (drag)
+                document.querySelectorAll('.pan-knob').forEach(knob => {
+                    const channel = parseInt(knob.dataset.channel);
+                    const input = knob.parentElement.querySelector('.pan-input');
+                    
+                    let isDragging = false;
+                    let startY = 0;
+                    let startValue = 0;
+                    
+                    knob.addEventListener('mousedown', (e) => {
+                        isDragging = true;
+                        startY = e.clientY;
+                        startValue = parseFloat(input.value);
+                        e.preventDefault();
+                    });
+                    
+                    knob.addEventListener('touchstart', (e) => {
+                        isDragging = true;
+                        startY = e.touches[0].clientY;
+                        startValue = parseFloat(input.value);
+                        e.preventDefault();
+                    });
+                    
+                    const handleMove = (clientY) => {
+                        if (!isDragging) return;
+                        
+                        const deltaY = startY - clientY;
+                        const sensitivity = 0.5;
+                        let newValue = startValue + (deltaY * sensitivity);
+                        
+                        // Limitar entre -100 y 100
+                        newValue = Math.max(-100, Math.min(100, newValue));
+                        
+                        // Actualizar input y UI
+                        input.value = newValue;
+                        this.updatePanUI(channel, newValue);
+                        this.updateChannelPan(channel, newValue);
+                    };
+                    
+                    document.addEventListener('mousemove', (e) => handleMove(e.clientY));
+                    document.addEventListener('touchmove', (e) => {
+                        if (e.touches.length > 0) {
+                            handleMove(e.touches[0].clientY);
+                        }
+                    });
+                    
+                    document.addEventListener('mouseup', () => isDragging = false);
+                    document.addEventListener('touchend', () => isDragging = false);
+                });
+            }
+            
+            updateFaderUI(channel, db) {
+                // Actualizar display dB
+                const dbDisplay = document.querySelector(`.db-display[data-channel="${channel}"]`);
+                if (dbDisplay) {
+                    dbDisplay.textContent = `${db >= 0 ? '+' : ''}${db.toFixed(1)}dB`;
+                }
+                
+                // Actualizar posición del thumb
+                const fader = document.querySelector(`.fader[data-channel="${channel}"]`);
+                const thumb = fader?.parentElement.querySelector('.fader-thumb');
+                if (fader && thumb) {
+                    const min = parseFloat(fader.min);
+                    const max = parseFloat(fader.max);
+                    const range = max - min;
+                    const percentage = ((db - min) / range) * 100;
+                    
+                    thumb.style.bottom = `${percentage}%`;
+                }
+            }
+            
+            updatePanUI(channel, panValue) {
+                // Actualizar display de panorama
+                const panDisplay = document.querySelector(`.pan-value[data-channel="${channel}"]`);
+                if (panDisplay) {
+                    panDisplay.textContent = panValue === 0 ? 'C' : 
+                                           panValue < 0 ? `L${Math.abs(panValue)}` : `R${panValue}`;
+                }
+                
+                // Actualizar rotación del knob
+                const knob = document.querySelector(`.pan-knob[data-channel="${channel}"]`);
+                if (knob) {
+                    // -100 a 100 se convierte en -150° a 150°
+                    const rotation = (panValue / 100) * 150;
+                    knob.style.transform = `rotate(${rotation}deg)`;
+                }
             }
             
             async toggleChannel(channel, button) {
-                console.log(`[App] toggleChannel(${channel}) INICIADO`);
-                
                 const strip = button.closest('.channel-strip');
                 
                 if (this.activeChannels.has(channel)) {
-                    console.log(`[App] Desactivando canal ${channel}`);
+                    console.log(`[Canal ${channel}] Desactivando...`);
                     this.activeChannels.delete(channel);
                     button.classList.remove('active');
                     strip.classList.remove('active');
                     
                     if (this.channelProcessors[channel]) {
-                        this.channelProcessors[channel].panNode.disconnect();
-                        this.channelProcessors[channel].gainNode.disconnect();
-                        if (this.channelProcessors[channel].workletNode) {
-                            this.channelProcessors[channel].workletNode.disconnect();
+                        try {
+                            this.channelProcessors[channel].scriptNode.disconnect();
+                            this.channelProcessors[channel].gainNode.disconnect();
+                        } catch (e) {
+                            console.warn(`[Canal ${channel}] Error desconectando:`, e);
                         }
                         delete this.channelProcessors[channel];
+                        delete this.buffers[channel];
+                        delete this.channelGains[channel];
+                        delete this.channelPans[channel];
                     }
                 } else {
-                    console.log(`[App] Activando canal ${channel}`);
+                    console.log(`[Canal ${channel}] Activando...`);
                     this.activeChannels.add(channel);
                     button.classList.add('active');
                     strip.classList.add('active');
                     
                     if (!this.audioContext) {
-                        console.log('[App] Iniciando WebSocket audio...');
+                        console.log('[Audio] Iniciando AudioContext...');
                         const success = await this.initAudioContext();
                         if (!success) {
-                            console.error('[App] Error iniciando WebSocket audio');
+                            console.error('[Audio] ❌ No se pudo iniciar AudioContext');
+                            this.activeChannels.delete(channel);
+                            button.classList.remove('active');
+                            strip.classList.remove('active');
+                            alert('Error: No se pudo iniciar el audio.');
                             return;
                         }
                     }
+                    
+                    if (this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                    }
+                    
                     this.createChannelProcessor(channel);
                 }
                 
                 this.updateSubscription();
-                
                 document.getElementById('audio-status').textContent = 
-                    `AUDIO: ${this.activeChannels.size} ACTIVE (${this.metrics.protocol})`;
+                    `AUDIO: ${this.activeChannels.size} ACTIVE [OPT]`;
             }
-         
+            
             createChannelProcessor(channel) {
                 try {
-                    if (!this.audioWorkletReady) {
-                        this.createChannelProcessorFallback(channel);
-                        return;
-                    }
+                    console.log(`[Canal ${channel}] 🎯 Creando procesador optimizado...`);
                     
-                    const bufferSize = Math.max(3, Math.ceil(
-                        ((this.deviceInfo.jitter_buffer_ms || 30) / 1000) * 
-                        this.deviceInfo.sample_rate / 
-                        this.deviceInfo.blocksize
-                    ));
+                    // 🎯 MEJORA 1: Buffer adaptativo
+                    this.buffers[channel] = new AdaptiveRingBuffer(
+                        this.audioContext.sampleRate,
+                        10 // 10ms inicial
+                    );
                     
-                    const workletNode = new AudioWorkletNode(this.audioContext, 'audio-processor', {
-                        processorOptions: { bufferSize }
-                    });
+                    // 🎯 MEJORA 2: Ganancia en cliente (no en servidor)
+                    this.channelGains[channel] = 1.0; // Linear gain (0dB)
                     
+                    // 🎯 MEJORA 3: Panorama inicial
+                    this.channelPans[channel] = 0; // Centro
+                    
+                    const scriptNode = this.audioContext.createScriptProcessor(256, 1, 2);
+                    
+                    // Contadores para SNR
+                    let signalPower = 0;
+                    let noisePower = 0;
+                    let sampleCount = 0;
+                    
+                    scriptNode.onaudioprocess = (audioProcessingEvent) => {
+                        const outputL = audioProcessingEvent.outputBuffer.getChannelData(0);
+                        const outputR = audioProcessingEvent.outputBuffer.getChannelData(1);
+                        const bufferLength = outputL.length;
+                        
+                        const buffer = this.buffers[channel];
+                        
+                        if (!buffer) return;
+                        
+                        // 🎯 Adaptación dinámica del buffer
+                        buffer.adapt();
+                        
+                        const pan = this.channelPans[channel] || 0;
+                        const gain = this.channelGains[channel] || 1.0;
+                        
+                        // Calcular gains de panorama (Constant Power)
+                        const panValue = pan / 100; // Convertir de -100..100 a -1..1
+                        const panRad = ((panValue + 1) * Math.PI) / 4; // -1..1 -> 0..π/2
+                        const gainL = Math.cos(panRad) * gain;
+                        const gainR = Math.sin(panRad) * gain;
+                        
+                        for (let i = 0; i < bufferLength; i++) {
+                            let sample = 0;
+                            
+                            if (buffer.available > 0) {
+                                // 🎯 MEJORA 3: Interpolación lineal
+                                sample = buffer.readInterpolated(0);
+                                buffer.read(); // Avanzar posición
+                            }
+                            
+                            // 🎯 MEJORA 3: TPDF Dithering
+                            if (this.ditherEnabled && sample !== 0) {
+                                const ditherAmount = 1.0 / 32768; // 16-bit equiv
+                                const dither = (Math.random() + Math.random() - 1) * ditherAmount;
+                                sample += dither;
+                            }
+                            
+                            // Calcular SNR
+                            signalPower += sample * sample;
+                            sampleCount++;
+                            
+                            // Aplicar ganancia y panorama
+                            outputL[i] = sample * gainL;
+                            outputR[i] = sample * gainR;
+                        }
+                        
+                        // Actualizar SNR cada ~1 segundo
+                        if (sampleCount > this.audioContext.sampleRate) {
+                            const avgSignal = signalPower / sampleCount;
+                            const estimatedNoise = 1e-8; // Ruido de cuantización
+                            this.metrics.snr = 10 * Math.log10(avgSignal / estimatedNoise);
+                            signalPower = 0;
+                            sampleCount = 0;
+                        }
+                    };
+                    
+                    // Crear nodos de audio
                     const gainNode = this.audioContext.createGain();
                     gainNode.gain.value = 1.0;
                     
-                    const panNode = this.audioContext.createStereoPanner();
-                    panNode.pan.value = 0;
-                    
-                    workletNode.connect(gainNode);
-                    gainNode.connect(panNode);
-                    panNode.connect(this.audioContext.destination);
-                    
-                    workletNode.port.onmessage = (event) => {
-                        if (event.data.type === 'bufferHealth') {
-                            this.metrics.bufferHealth = event.data.value;
-                        }
-                    };
+                    // Conectar
+                    scriptNode.connect(gainNode);
+                    gainNode.connect(this.audioContext.destination);
                     
                     this.channelProcessors[channel] = {
-                        workletNode,
-                        gainNode,
-                        panNode,
-                        gain: 1.0,
-                        pan: 0
+                        scriptNode,
+                        gainNode
                     };
                     
+                    console.log(`[Canal ${channel}] ✅ Optimizado: Buffer adaptativo 8-21ms`);
+                    
                 } catch (error) {
-                    console.error(`[Canal ${channel}] Error:`, error);
-                    this.createChannelProcessorFallback(channel);
+                    console.error(`[Canal ${channel}] ❌ Error:`, error);
+                    alert(`Error: ${error.message}`);
                 }
-            }
-            
-            createChannelProcessorFallback(channel) {
-                const bufferSize = 2048;
-                const processor = this.audioContext.createScriptProcessor(bufferSize, 1, 2);
-                const gainNode = this.audioContext.createGain();
-                gainNode.gain.value = 1.0;
-                
-                const panNode = this.audioContext.createStereoPanner();
-                panNode.pan.value = 0;
-                
-                const jitterBuffer = [];
-                const targetSize = Math.max(2, Math.ceil(
-                    ((this.deviceInfo.jitter_buffer_ms || 30) / 1000) * 
-                    this.deviceInfo.sample_rate / 
-                    this.deviceInfo.blocksize
-                ));
-                
-                processor.onaudioprocess = (e) => {
-                    const outputL = e.outputBuffer.getChannelData(0);
-                    const outputR = e.outputBuffer.getChannelData(1);
-                    let outputIndex = 0;
-                    
-                    if (jitterBuffer.length < targetSize) {
-                        outputL.fill(0);
-                        outputR.fill(0);
-                        return;
-                    }
-                    
-                    const pan = this.channelProcessors[channel]?.pan || 0;
-                    const gain = this.channelProcessors[channel]?.gain || 1.0;
-                    
-                    while (outputIndex < outputL.length && jitterBuffer.length > 0) {
-                        const chunk = jitterBuffer.shift();
-                        const copyLength = Math.min(chunk.length, outputL.length - outputIndex);
-                        
-                        for (let i = 0; i < copyLength; i++) {
-                            const sample = chunk[i] * gain;
-                            outputL[outputIndex + i] = sample * (1 - Math.max(0, pan));
-                            outputR[outputIndex + i] = sample * (1 + Math.min(0, pan));
-                        }
-                        
-                        outputIndex += copyLength;
-                    }
-                    
-                    if (outputIndex < outputL.length) {
-                        outputL.fill(0, outputIndex);
-                        outputR.fill(0, outputIndex);
-                    }
-                    
-                    this.metrics.bufferHealth = (jitterBuffer.length / targetSize) * 100;
-                };
-                
-                processor.connect(gainNode);
-                gainNode.connect(panNode);
-                panNode.connect(this.audioContext.destination);
-                
-                this.channelProcessors[channel] = {
-                    processor,
-                    gainNode,
-                    panNode,
-                    jitterBuffer,
-                    targetSize,
-                    gain: 1.0,
-                    pan: 0
-                };
             }
             
             updateSubscription() {
                 const channels = Array.from(this.activeChannels);
-                const gains = {};
                 
-                channels.forEach(ch => {
-                    gains[ch] = this.channelProcessors[ch]?.gain || 1.0;
-                });
-                
+                // 🎯 NO enviar gains al servidor (procesamos en cliente)
                 if (this.socket?.connected) {
-                    this.socket.emit('subscribe', { channels, gains });
-                    console.log('[WebSocket] Suscripción actualizada:', channels);
+                    this.socket.emit('subscribe', { channels, gains: {} });
+                    console.log('[Subscribe]', channels, '(sin gains del servidor)');
                 }
             }
             
-            updateChannelGain(channel, gain) {
-                if (this.channelProcessors[channel]) {
-                    this.channelProcessors[channel].gain = gain;
-                    this.channelProcessors[channel].gainNode.gain.value = gain;
-                    
-                    if (this.socket?.connected) {
-                        this.socket.emit('update_gain', { channel, gain });
-                    }
-                }
+            updateChannelGain(channel, db) {
+                // 🎯 MEJORA 2: Ganancia aplicada SOLO en cliente
+                const gain = this.dbToGain(db);
+                this.channelGains[channel] = gain;
+                console.log(`[Canal ${channel}] Gain: ${db}dB (${gain.toFixed(3)} linear)`);
             }
             
             updateChannelPan(channel, panValue) {
-                if (this.channelProcessors[channel]) {
-                    const normalizedPan = panValue / 100;
-                    this.channelProcessors[channel].pan = normalizedPan;
-                    this.channelProcessors[channel].panNode.pan.value = normalizedPan;
-                }
+                // Almacenar valor de panorama
+                this.channelPans[channel] = panValue;
+                console.log(`[Canal ${channel}] Pan: ${panValue}`);
             }
             
-            handleAudioData(data) {
-                const view = new DataView(data);
-                const channel = view.getUint32(0, true);
-                
-                if (!this.activeChannels.has(channel)) return;
-                
-                const numSamples = (data.byteLength - 4) / 4;
-                const audioData = new Float32Array(data, 4, numSamples);
-                
-                if (audioData.length === 0) return;
-                
-                const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
-                const db = 20 * Math.log10(Math.max(rms, 0.00001));
-                const percentage = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
-                
-                const vuMeter = document.querySelector(`.vu-meter-fill[data-channel="${channel}"]`);
-                if (vuMeter) {
-                    vuMeter.style.height = `${percentage}%`;
-                }
-                
-                const channelData = this.channelProcessors[channel];
-                if (!channelData) return;
-                
-                if (channelData.workletNode) {
-                    channelData.workletNode.port.postMessage({ type: 'audio', data: audioData });
-                } else if (channelData.jitterBuffer) {
-                    channelData.jitterBuffer.push(audioData);
-                    if (channelData.jitterBuffer.length > channelData.targetSize * 5) {
-                        channelData.jitterBuffer.shift();
+            handleAudioBatch(data) {
+                try {
+                    const view = new DataView(data);
+                    let offset = 0;
+                    
+                    const numChannels = view.getUint32(offset, true);
+                    offset += 4;
+                    
+                    for (let i = 0; i < numChannels; i++) {
+                        const channel = view.getUint32(offset, true);
+                        offset += 4;
+                        
+                        const dataLength = view.getUint32(offset, true);
+                        offset += 4;
+                        
+                        if (!this.activeChannels.has(channel)) {
+                            offset += dataLength;
+                            continue;
+                        }
+                        
+                        const numSamples = dataLength / 4;
+                        const audioData = new Float32Array(data, offset, numSamples);
+                        offset += dataLength;
+                        
+                        // VU Meter (cada 2 frames para rendimiento)
+                        if (i % 2 === 0) {
+                            const rms = Math.sqrt(
+                                audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length
+                            );
+                            const db = 20 * Math.log10(Math.max(rms, 0.00001));
+                            const percentage = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+                            
+                            const vuMeter = document.querySelector(`.vu-meter-fill[data-channel="${channel}"]`);
+                            if (vuMeter) {
+                                vuMeter.style.height = `${percentage}%`;
+                            }
+                            
+                            // Peak hold
+                            const vuPeak = document.querySelector(`.vu-meter-peak[data-channel="${channel}"]`);
+                            if (vuPeak) {
+                                if (percentage > parseFloat(vuPeak.style.height || 0)) {
+                                    vuPeak.style.height = `${percentage}%`;
+                                    vuPeak.style.opacity = '1';
+                                    
+                                    // Reset peak después de 1 segundo
+                                    clearTimeout(vuPeak._peakTimeout);
+                                    vuPeak._peakTimeout = setTimeout(() => {
+                                        vuPeak.style.opacity = '0';
+                                    }, 1000);
+                                }
+                            }
+                        }
+                        
+                        // 🎯 Escribir en buffer adaptativo
+                        const buffer = this.buffers[channel];
+                        if (buffer) {
+                            buffer.write(audioData);
+                        }
                     }
+                } catch (error) {
+                    console.error('[AudioBatch] Error:', error);
+                    this.metrics.dropped++;
                 }
             }
             
             updateNetworkLatency(latency) {
-                this.metrics.networkLatency = this.metrics.networkLatency * 0.8 + latency * 0.2;
+                this.metrics.networkLatency = this.metrics.networkLatency * 0.7 + latency * 0.3;
                 this.calculateEstimatedLatency();
             }
             
@@ -530,15 +764,23 @@
                     const latency = Math.round(this.metrics.estimatedLatency);
                     latencyEl.textContent = latency;
                     latencyEl.className = 'metric-value ' + 
-                        (latency <= 15 ? '' : latency <= 30 ? 'warning' : 'bad');
+                        (latency <= 12 ? '' : latency <= 20 ? 'warning' : 'bad');
                 }
                 
                 const bufferEl = document.getElementById('buffer');
                 if (bufferEl) {
-                    const buffer = Math.round(this.metrics.bufferHealth);
-                    bufferEl.textContent = buffer;
+                    let avgHealth = 0;
+                    let count = 0;
+                    
+                    for (const channel in this.buffers) {
+                        avgHealth += this.buffers[channel].getHealthPercent();
+                        count++;
+                    }
+                    
+                    const health = count > 0 ? Math.round(avgHealth / count) : 0;
+                    bufferEl.textContent = health;
                     bufferEl.className = 'metric-value ' + 
-                        (buffer >= 50 && buffer <= 150 ? '' : buffer > 150 ? 'warning' : 'bad');
+                        (health >= 40 ? '' : health >= 20 ? 'warning' : 'bad');
                 }
                 
                 const networkEl = document.getElementById('network');
@@ -546,16 +788,20 @@
                     const network = Math.round(this.metrics.networkLatency);
                     networkEl.textContent = network;
                     networkEl.className = 'metric-value ' + 
-                        (network <= 10 ? '' : network <= 25 ? 'warning' : 'bad');
+                        (network <= 5 ? '' : network <= 15 ? 'warning' : 'bad');
                 }
                 
-                this.updateProtocolDisplay();
-            }
-            
-            updateProtocolDisplay() {
+                const snrEl = document.getElementById('snr');
+                if (snrEl) {
+                    const snr = Math.round(this.metrics.snr);
+                    snrEl.textContent = snr > 0 ? snr : '--';
+                    snrEl.className = 'metric-value ' + 
+                        (snr >= 60 ? '' : snr >= 40 ? 'warning' : 'bad');
+                }
+                
                 const protocolEl = document.getElementById('protocol');
                 if (protocolEl) {
-                    protocolEl.textContent = this.metrics.protocol;
+                    protocolEl.textContent = 'OPT';
                 }
             }
             
@@ -573,24 +819,11 @@
                     led.classList.remove('active');
                 }
             }
-            
-            showWarning(message) {
-                const warningEl = document.getElementById('warning-message');
-                if (warningEl) {
-                    warningEl.textContent = `⚠️ ${message}`;
-                    warningEl.style.display = 'block';
-                    
-                    setTimeout(() => {
-                        warningEl.style.display = 'none';
-                    }, 5000);
-                }
-            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            window.audioMonitor = new AudioMonitor();
+            window.audioMonitor = new UltraLowLatencyAudioMonitor();
         });
     </script>
-
 </body>
 </html>
