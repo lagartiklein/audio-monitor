@@ -1,258 +1,358 @@
 import sys, signal, threading, time, socket, os, webbrowser
+from concurrent.futures import ThreadPoolExecutor
+import numpy as np
+import struct
+
 from audio_server.audio_capture import AudioCapture
 from audio_server.channel_manager import ChannelManager
 from audio_server.native_server import NativeAudioServer
 from audio_server.websocket_server import app, socketio, init_server
 import config
+from gui_monitor import AudioMonitorGUI
 
-def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return "localhost"
-
-def run_server():
-    print("\n" + "="*60)
-    print("  SERVIDOR AUDIO RF + WEB DIRECTO (SIN COLAS)")
-    print("="*60)
+class AudioServerApp:
+    def __init__(self):
+        self.audio_capture = None
+        self.native_server = None
+        self.web_handler = None
+        self.channel_manager = None
+        self.gui = None
+        self.server_running = False
+        
+        # Configurar manejo de señales
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
     
-    audio_capture = None
-    native_server = None
-    web_handler = None
-    
-    def cleanup():
-        print("\n🛑 Deteniendo...")
-        if native_server:
-            native_server.stop()
-        if audio_capture:
-            audio_capture.stop_capture()
-        print("✅ Detenido")
-    
-    def signal_handler(sig, frame):
-        cleanup()
+    def signal_handler(self, sig, frame):
+        self.cleanup()
         sys.exit(0)
     
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    def get_current_stats(self):
+        """Obtener estadísticas actuales para la GUI"""
+        if not self.server_running:
+            return {
+                'clients_rf': 0,
+                'clients_web': 0,
+                'channels': 0,
+                'sample_rate': config.SAMPLE_RATE,
+                'blocksize': config.BLOCKSIZE,
+                'position': 0,
+                'packets_sent': 0,
+                'packets_dropped': 0
+            }
+        
+        stats = {
+            'clients_rf': 0,
+            'clients_web': 0,
+            'channels': 0,
+            'sample_rate': config.SAMPLE_RATE,
+            'blocksize': config.BLOCKSIZE,
+            'position': 0,
+            'packets_sent': 0,
+            'packets_dropped': 0
+        }
+        
+        if self.native_server:
+            server_stats = self.native_server.get_stats()
+            stats.update({
+                'clients_rf': self.native_server.get_client_count(),
+                'position': self.native_server.get_sample_position(),
+                'packets_sent': server_stats.get('packets_sent', 0),
+                'packets_dropped': server_stats.get('packets_dropped', 0)
+            })
+        
+        if self.channel_manager:
+            stats.update({
+                'clients_web': len(self.channel_manager.subscriptions),
+                'channels': self.channel_manager.num_channels
+            })
+        
+        return stats
     
-    try:
-        print("🎙️ Inicializando captura RF DIRECTA...")
-        audio_capture = AudioCapture()
-        num_channels = audio_capture.start_capture()
+    def start_server_with_device(self, device_id):
+        """✅ OPTIMIZADO: Iniciar servidor con dispositivo específico"""
+        if self.server_running:
+            if self.gui:
+                self.gui.queue_log_message("⚠️ El servidor ya está ejecutándose", 'WARNING')
+            return
         
-        print("📡 Inicializando gestor de canales...")
-        channel_manager = ChannelManager(num_channels)
-        
-        print("📱 Inicializando servidor nativo RF...")
-        native_server = NativeAudioServer(channel_manager)
-        native_server.start()
-        
-        # ✅ Registrar callback directo para RF
-        audio_capture.register_callback(
-            native_server.on_audio_data,
-            name="native_server"
-        )
-        
-        print("🌐 Inicializando servidor WebSocket...")
-        
-        # ✅ Crear handler para WebSocket
+        try:
+            if self.gui:
+                self.gui.queue_log_message(f"🎙️ Iniciando servidor OPTIMIZADO con dispositivo ID: {device_id}", 'RF')
+            
+            # Inicializar captura de audio
+            self.audio_capture = AudioCapture()
+            num_channels = self.audio_capture.start_capture(device_id=device_id)
+            
+            # Inicializar gestor de canales
+            self.channel_manager = ChannelManager(num_channels)
+            
+            # Inicializar servidor nativo
+            self.native_server = NativeAudioServer(self.channel_manager)
+            self.native_server.start()
+            
+            # ✅ Registrar callback directo para RF (sin copias)
+            self.audio_capture.register_callback(
+                self.native_server.on_audio_data,
+                name="native_server"
+            )
+            
+            # Inicializar handler WebSocket OPTIMIZADO
+            self.setup_web_handler_optimized()
+            
+            # Inicializar servidor WebSocket
+            init_server(self.channel_manager)
+            
+            # ✅ Registrar callback para web (con ThreadPool)
+            self.audio_capture.register_callback(
+                self.web_handler.on_audio_data,
+                name="web_server"
+            )
+            
+            self.server_running = True
+            
+            # Obtener información de red
+            local_ip = self.get_local_ip()
+            
+            # Mostrar información en GUI
+            if self.gui:
+                self.gui.queue_log_message(f"✅ SERVIDOR OPTIMIZADO INICIADO", 'SUCCESS')
+                self.gui.queue_log_message(f"", 'INFO')
+                self.gui.queue_log_message(f"🌐 INFORMACIÓN DE RED:", 'INFO')
+                self.gui.queue_log_message(f"   IP Local: {local_ip}", 'INFO')
+                self.gui.queue_log_message(f"   Puerto RF: {config.NATIVE_PORT}", 'RF')
+                self.gui.queue_log_message(f"   Puerto Web: {config.WEB_PORT}", 'WEB')
+                self.gui.queue_log_message(f"", 'INFO')
+                self.gui.queue_log_message(f"📊 CONFIGURACIÓN:", 'INFO')
+                self.gui.queue_log_message(f"   Canales: {num_channels}", 'INFO')
+                self.gui.queue_log_message(f"   Sample Rate: {config.SAMPLE_RATE} Hz", 'INFO')
+                self.gui.queue_log_message(f"   Blocksize: {config.BLOCKSIZE} samples", 'INFO')
+                self.gui.queue_log_message(f"   Latencia teórica: ~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms", 'SUCCESS')
+                self.gui.queue_log_message(f"", 'INFO')
+                self.gui.queue_log_message(f"⚡ OPTIMIZACIONES:", 'INFO')
+                self.gui.queue_log_message(f"   Socket SNDBUF: {config.SOCKET_SNDBUF} bytes", 'RF')
+                self.gui.queue_log_message(f"   TCP_NODELAY: {config.SOCKET_NODELAY}", 'RF')
+                self.gui.queue_log_message(f"   Validación: {'OFF' if not config.VALIDATE_PACKETS else 'ON'}", 'RF')
+                self.gui.queue_log_message(f"   Memoryview: {config.USE_MEMORYVIEW}", 'RF')
+                self.gui.queue_log_message(f"   Web Async: {config.WEB_ASYNC_SEND}", 'WEB')
+                self.gui.queue_log_message(f"   Compresión WS: OFF", 'WEB')
+            
+            # Iniciar servidor WebSocket en thread separado
+            websocket_thread = threading.Thread(
+                target=self.run_websocket_server,
+                daemon=True
+            )
+            websocket_thread.start()
+            
+            # Abrir navegador automáticamente
+            threading.Thread(
+                target=lambda: (time.sleep(2), webbrowser.open(f"http://localhost:{config.WEB_PORT}")), 
+                daemon=True
+            ).start()
+            
+        except Exception as e:
+            error_msg = f"❌ Error al iniciar servidor: {str(e)}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            if self.gui:
+                self.gui.queue_log_message(error_msg, 'ERROR')
+            self.cleanup()
+    
+    def setup_web_handler_optimized(self):
+        """✅ OPTIMIZADO: Handler WebSocket con ThreadPool y envío directo"""
         class WebAudioHandler:
             def __init__(self):
                 self.packet_count = 0
+                self.channel_manager = None
+                
+                # ✅ ThreadPool para envío asíncrono
+                if config.WEB_ASYNC_SEND:
+                    self.executor = ThreadPoolExecutor(
+                        max_workers=config.WEB_MAX_WORKERS,
+                        thread_name_prefix="web_sender"
+                    )
+                else:
+                    self.executor = None
                 
             def on_audio_data(self, audio_data):
-                """Callback para enviar audio a clientes web"""
+                """✅ OPTIMIZADO: Callback no-bloqueante"""
                 self.packet_count += 1
                 
-                # Verificar que hay subscripciones
-                if not hasattr(channel_manager, 'subscriptions'):
+                if not self.channel_manager or not hasattr(self.channel_manager, 'subscriptions'):
                     return
                 
-                for client_id, subscription in channel_manager.subscriptions.copy().items():
-                    try:
-                        if not isinstance(subscription, dict):
-                            continue
-                        
-                        channels = subscription.get('channels', [])
-                        if not channels:
-                            continue
-                        
-                        gains = subscription.get('gains', {})
-                        
-                        # Enviar batch de canales
-                        self._send_audio_batch(client_id, audio_data, channels, gains)
-                        
-                    except Exception as e:
-                        pass  # Ignorar errores de clientes específicos
-            
-            def _send_audio_batch(self, client_id, audio_data, channels, gains):
-                """Envío batch optimizado"""
-                import struct
-                import numpy as np
+                # ✅ Convertir memoryview a ndarray solo una vez
+                if isinstance(audio_data, memoryview):
+                    audio_data = np.frombuffer(audio_data, dtype=np.float32)
+                    # Reshape según número de canales del manager
+                    num_channels = self.channel_manager.num_channels
+                    audio_data = audio_data.reshape(-1, num_channels)
                 
+                # Snapshot de clientes
+                clients = list(self.channel_manager.subscriptions.items())
+                
+                # ✅ Enviar en paralelo sin bloquear
+                if self.executor:
+                    for client_id, subscription in clients:
+                        self.executor.submit(
+                            self._send_client_async,
+                            client_id,
+                            audio_data,
+                            subscription
+                        )
+                else:
+                    # Modo síncrono (fallback)
+                    for client_id, subscription in clients:
+                        self._send_client_sync(client_id, audio_data, subscription)
+            
+            def _send_client_async(self, client_id, audio_data, subscription):
+                """✅ Envío asíncrono por cliente"""
                 try:
-                    batch_data = []
+                    if not isinstance(subscription, dict):
+                        return
+                    
+                    channels = subscription.get('channels', [])
+                    gains = subscription.get('gains', {})
+                    
+                    if channels:
+                        self._send_audio_optimized(client_id, audio_data, channels, gains)
+                except:
+                    pass
+            
+            def _send_client_sync(self, client_id, audio_data, subscription):
+                """Envío síncrono (fallback)"""
+                try:
+                    if not isinstance(subscription, dict):
+                        return
+                    
+                    channels = subscription.get('channels', [])
+                    gains = subscription.get('gains', {})
+                    
+                    if channels:
+                        self._send_audio_optimized(client_id, audio_data, channels, gains)
+                except:
+                    pass
+            
+            def _send_audio_optimized(self, client_id, audio_data, channels, gains):
+                """✅ OPTIMIZADO: Envío por canal sin batch"""
+                try:
+                    timestamp = int(time.time() * 1000)
                     
                     for channel in channels:
                         if channel >= audio_data.shape[1]:
                             continue
                         
-                        channel_data = audio_data[:, channel].copy()
+                        # Obtener datos del canal
+                        channel_data = audio_data[:, channel]
                         
-                        # Aplicar ganancia
+                        # Aplicar ganancia si es necesaria
                         gain = gains.get(channel, 1.0)
                         if gain != 1.0:
                             channel_data = channel_data * gain
                         
-                        batch_data.append((channel, channel_data))
-                    
-                    if not batch_data:
-                        return
-                    
-                    # Crear paquete binario
-                    packet_parts = [struct.pack('<I', len(batch_data))]
-                    
-                    for channel_id, channel_audio in batch_data:
-                        audio_bytes = channel_audio.astype(np.float32).tobytes()
-                        packet_parts.append(struct.pack('<I', channel_id))
-                        packet_parts.append(struct.pack('<I', len(audio_bytes)))
-                        packet_parts.append(audio_bytes)
-                    
-                    packet = b''.join(packet_parts)
-                    socketio.emit('audio_batch', packet, to=client_id)
-                    
-                except Exception as e:
-                    pass
-        
-        web_handler = WebAudioHandler()
-        
-        # ✅ Registrar callback para web
-        audio_capture.register_callback(
-            web_handler.on_audio_data,
-            name="web_server"
-        )
-        
-        # Inicializar servidor web (sin audio_queue, usa callbacks)
-        init_server(channel_manager)
-        
-        local_ip = get_local_ip()
-        print("\n" + "="*60)
-        print("✅ SERVIDORES RF + WEB DIRECTOS LISTOS")
-        print("="*60)
-        print(f"🌐 IP Local: {local_ip}")
-        print(f"📱 Puerto RF: {config.NATIVE_PORT}")
-        print(f"🌐 Puerto Web: {config.WEB_PORT}")
-        print(f"🎚️ Canales: {num_channels}")
-        print(f"📦 Blocksize: {config.BLOCKSIZE} (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.1f}ms)")
-        print(f"⚡ Modo: ENVÍO DIRECTO (sin colas)")
-        print(f"📞 Callbacks: native_server, web_server")
-        print("="*60)
-        print("\n📋 COMANDOS:")
-        print("   • 'status' - Ver estado")
-        print("   • 'clients' - Listar clientes")
-        print("   • 'stats' - Ver estadísticas")
-        print("   • 'web' - Abrir navegador")
-        print("   • 'quit' - Salir")
-        print("="*60)
-        
-        # Abrir navegador automáticamente
-        threading.Thread(
-            target=lambda: (time.sleep(2), webbrowser.open(f"http://localhost:{config.WEB_PORT}")), 
-            daemon=True
-        ).start()
-        
-        # Comando loop
-        def command_loop():
-            while True:
-                try:
-                    cmd = input("\n> ").strip().lower()
-                    
-                    if cmd in ['q', 'quit', 'exit']:
-                        cleanup()
-                        os._exit(0)
-                    
-                    elif cmd == 'status':
-                        print("📊 ESTADO:")
-                        print(f"   📱 Clientes RF: {native_server.get_client_count()}")
-                        print(f"   🌐 Clientes Web: {len(channel_manager.subscriptions)}")
-                        print(f"   🎛️ Canales: {num_channels}")
-                        print(f"   🎙️ Captura: {'Activa' if audio_capture.running else 'Inactiva'}")
-                        print(f"   📦 Posición: {native_server.get_sample_position():,}")
-                        print(f"   📞 Callbacks: {len(audio_capture.callbacks)}")
-                    
-                    elif cmd == 'clients':
-                        with native_server.client_lock:
-                            clients = list(native_server.clients.keys())
-                            print(f"📱 Clientes RF: {len(clients)}")
-                            for i, client_id in enumerate(clients, 1):
-                                client = native_server.clients[client_id]
-                                channels = len(client.subscribed_channels)
-                                print(f"   {i}. {client_id[:20]} - {client.address[0]}")
-                                print(f"       Canales: {channels}, Enviados: {client.packets_sent}, Perdidos: {client.packets_dropped}")
+                        # ✅ Enviar directamente como binary (sin batch)
+                        audio_bytes = channel_data.astype(np.float32).tobytes()
                         
-                        print(f"\n🌐 Clientes Web: {len(channel_manager.subscriptions)}")
-                        for i, client_id in enumerate(list(channel_manager.subscriptions.keys()), 1):
-                            sub = channel_manager.subscriptions[client_id]
-                            channels = len(sub.get('channels', []))
-                            print(f"   {i}. {client_id[:8]} ({channels} canales)")
-                    
-                    elif cmd == 'stats':
-                        stats = native_server.get_stats()
-                        print("📊 ESTADÍSTICAS RF:")
-                        print(f"   Paquetes enviados: {stats['packets_sent']:,}")
-                        print(f"   Paquetes perdidos: {stats['packets_dropped']:,}")
-                        print(f"   Desconexiones: {stats['clients_disconnected']}")
-                        print(f"   Posición: {native_server.get_sample_position():,} samples")
-                        print(f"   Tiempo: {native_server.get_sample_position()/config.SAMPLE_RATE:.1f}s")
-                        print(f"\n📊 ESTADÍSTICAS WEB:")
-                        print(f"   Paquetes procesados: {web_handler.packet_count:,}")
-                    
-                    elif cmd == 'web':
-                        webbrowser.open(f"http://localhost:{config.WEB_PORT}")
-                        print(f"🌐 Abriendo navegador: http://localhost:{config.WEB_PORT}")
-                    
-                    elif cmd == 'help':
-                        print("📋 COMANDOS:")
-                        print("   status  - Estado general")
-                        print("   clients - Listar clientes RF y Web")
-                        print("   stats   - Estadísticas detalladas")
-                        print("   web     - Abrir navegador")
-                        print("   quit    - Salir")
-                    
-                    elif cmd:
-                        print(f"❌ Comando desconocido: '{cmd}'")
-                        print("   Use 'help' para ver comandos")
-                
-                except (KeyboardInterrupt, EOFError):
-                    cleanup()
-                    os._exit(0)
+                        # ✅ Usar binary mode para evitar conversión base64
+                        socketio.emit('audio_channel', {
+                            'channel': channel,
+                            'timestamp': timestamp,
+                            'data': audio_bytes
+                        }, to=client_id, binary=True)
+                        
                 except Exception as e:
-                    print(f"❌ Error: {e}")
+                    if config.DEBUG:
+                        print(f"[WEB] Error envío: {e}")
+            
+            def cleanup(self):
+                """Limpiar recursos"""
+                if self.executor:
+                    self.executor.shutdown(wait=False)
         
-        command_thread = threading.Thread(target=command_loop, daemon=True)
-        command_thread.start()
+        self.web_handler = WebAudioHandler()
+        self.web_handler.channel_manager = self.channel_manager
         
-        # Mantener vivo y ejecutar servidor WebSocket
-        print(f"\n⚡ Servidores corriendo en modo DIRECTO...")
-        print(f"   RF:  tcp://{local_ip}:{config.NATIVE_PORT}")
-        print(f"   Web: http://{local_ip}:{config.WEB_PORT}")
-        print(f"\nEsperando conexiones...\n")
+        if self.gui:
+            if config.WEB_ASYNC_SEND:
+                self.gui.queue_log_message(f"✅ Web handler: ASYNC con {config.WEB_MAX_WORKERS} workers", 'WEB')
+            else:
+                self.gui.queue_log_message(f"✅ Web handler: SYNC", 'WEB')
+    
+    def run_websocket_server(self):
+        """Ejecutar servidor WebSocket"""
+        try:
+            socketio.run(
+                app,
+                host=config.WEB_HOST,
+                port=config.WEB_PORT,
+                debug=False,
+                log_output=False,
+                use_reloader=False
+            )
+        except Exception as e:
+            error_msg = f"❌ Error en servidor WebSocket: {str(e)}"
+            print(error_msg)
+            if self.gui:
+                self.gui.queue_log_message(error_msg, 'ERROR')
+    
+    def stop_server(self):
+        """Detener servidor"""
+        self.cleanup()
+    
+    def cleanup(self):
+        """Limpiar recursos"""
+        if self.gui:
+            self.gui.queue_log_message("🛑 Deteniendo servidor...", 'WARNING')
         
-        # Ejecutar servidor WebSocket (blocking)
-        socketio.run(app, host=config.WEB_HOST, port=config.WEB_PORT, debug=False, log_output=False)
+        if self.native_server:
+            self.native_server.stop()
+            self.native_server = None
         
-    except KeyboardInterrupt:
-        print("\n👋 Interrupción")
-        return 0
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+        if self.web_handler and hasattr(self.web_handler, 'cleanup'):
+            self.web_handler.cleanup()
+            self.web_handler = None
+        
+        if self.audio_capture:
+            self.audio_capture.stop_capture()
+            self.audio_capture = None
+        
+        self.server_running = False
+        
+        if self.gui:
+            self.gui.queue_log_message("✅ Servidor detenido", 'SUCCESS')
+    
+    def get_local_ip(self):
+        """Obtener IP local"""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "localhost"
+    
+    def run(self):
+        """Ejecutar aplicación principal"""
+        print("\n" + "="*70)
+        print("  FICHATECH MONITOR - Audio RF Server OPTIMIZED")
+        print("="*70)
+        print(f"  ⚡ Latencia objetivo: <5ms (RF) / <15ms (Web)")
+        print(f"  📦 Blocksize: {config.BLOCKSIZE} samples (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms)")
+        print(f"  🎯 Optimizaciones: Socket buffers, TCP_NODELAY, ThreadPool")
+        print("="*70)
+        print("🚀 Iniciando interfaz gráfica...\n")
+        
+        # Iniciar GUI
+        self.gui = AudioMonitorGUI(self)
+        
+        # Ejecutar GUI
+        self.gui.run()
+
+def main():
+    app = AudioServerApp()
+    sys.exit(app.run() or 0)
 
 if __name__ == '__main__':
-    sys.exit(run_server() or 0)
+    main()
