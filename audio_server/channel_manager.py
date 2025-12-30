@@ -17,12 +17,12 @@ class ChannelManager:
         self.num_channels = num_channels
         self.subscriptions = {}  # client_id -> subscription_data
         self.client_types = {}   # client_id -> "native" | "web"
-        # ✅ CORREGIDO: socketio se inyecta desde websocket_server
+        # ✅ socketio se inyecta desde websocket_server
         self.socketio = None
         print(f"[ChannelManager] ✅ Inicializado: {num_channels} canales")
     
     def set_socketio(self, socketio_instance):
-        """✅ NUEVO: Método para inyectar socketio después de inicialización"""
+        """✅ Método para inyectar socketio después de inicialización"""
         self.socketio = socketio_instance
         logger.info("[ChannelManager] ✅ SocketIO registrado")
     
@@ -152,7 +152,7 @@ class ChannelManager:
             for ch in range(self.num_channels):
                 sub['mutes'][ch] = ch != sub['pre_listen']
 
-        # ✅ CORREGIDO: Emitir solo si socketio está disponible
+        # ✅ CORREGIDO: Emitir sin 'broadcast' parameter
         if self.socketio:
             try:
                 self.socketio.emit('mix_updated', {
@@ -164,7 +164,7 @@ class ChannelManager:
                     'solos': list(sub['solos']),
                     'pre_listen': sub['pre_listen'],
                     'master_gain': sub['master_gain']
-                }, broadcast=True)
+                })  # ✅ SIN broadcast=True
             except Exception as e:
                 logger.error(f"[ChannelManager] Error emitiendo mix_updated: {e}")
         

@@ -1,7 +1,99 @@
-Flask==2.3.3
-Flask-SocketIO==5.3.4
-eventlet==0.33.3
-sounddevice==0.4.6
-numpy==1.24.3
-python-socketio==5.9.0
-engineio==4.4.0
+# ============================================================================
+# FICHATECH MONITOR - DEPENDENCIAS
+# Audio RF Server con control web multiplataforma
+# ============================================================================
+# Compatible con Python 3.9 - 3.13
+# ============================================================================
+
+# ============================================================================
+# BUILD TOOLS (requerido para Python 3.13)
+# ============================================================================
+setuptools>=65.0.0
+wheel>=0.38.0
+
+# ============================================================================
+# AUDIO CORE
+# ============================================================================
+sounddevice>=0.4.6          # Captura de audio multiplataforma (PortAudio)
+numpy>=1.26.0               # ✅ Python 3.13 requiere numpy >= 1.26
+scipy>=1.11.4               # Funciones científicas (requerido por sounddevice)
+
+# ============================================================================
+# WEB SERVER & WEBSOCKETS
+# ============================================================================
+Flask>=3.0.0                # Framework web para interfaz de control
+Flask-SocketIO>=5.3.5       # WebSocket bidireccional para tiempo real
+python-socketio>=5.10.0     # Cliente/servidor Socket.IO
+python-engineio>=4.8.0      # Motor de transporte bajo nivel
+
+# ============================================================================
+# WEBSOCKET DEPENDENCIES
+# ============================================================================
+simple-websocket>=1.0.0     # WebSocket simple para Flask-SocketIO
+wsproto>=1.2.0              # Protocolo WebSocket
+h11>=0.14.0                 # Protocolo HTTP/1.1 (requerido por wsproto)
+
+# ============================================================================
+# NETWORKING
+# ============================================================================
+dnspython>=2.4.2            # Resolución DNS (requerido por engineio)
+
+# ============================================================================
+# UTILIDADES
+# ============================================================================
+packaging>=23.2             # Manejo de versiones y especificaciones
+
+# ============================================================================
+# PYINSTALLER (para compilar a exe)
+# ============================================================================
+pyinstaller>=6.3.0          # Compilador Python a ejecutable
+
+# ============================================================================
+# NOTAS DE INSTALACIÓN
+# ============================================================================
+# 
+# IMPORTANTE: Python 3.13 es MUY NUEVO
+# Recomendamos usar Python 3.11 o 3.12 para máxima compatibilidad
+#
+# 1. Actualizar pip, setuptools y wheel PRIMERO:
+#    python -m pip install --upgrade pip setuptools wheel
+#
+# 2. Crear entorno virtual:
+#    python -m venv .venv
+#
+# 3. Activar entorno virtual:
+#    Windows: .venv\Scripts\activate
+#    Linux/Mac: source .venv/bin/activate
+#
+# 4. Instalar dependencias:
+#    pip install -r requirements.txt
+#
+# 5. Verificar instalación:
+#    python -c "import sounddevice, numpy, flask, flask_socketio; print('✅ OK')"
+#
+# ============================================================================
+# VERSIONES COMPATIBLES
+# ============================================================================
+# Python: 3.9, 3.10, 3.11, 3.12, 3.13 (experimental)
+# Sistema Operativo: Windows 10/11, Linux, macOS
+# Arquitectura: x64 (recomendado), x86
+#
+# RECOMENDADO: Python 3.11 o 3.12 para máxima estabilidad
+#
+# ============================================================================
+# DEPENDENCIAS DEL SISTEMA
+# ============================================================================
+# Windows:
+#   - Visual C++ Redistributable 2015-2022
+#     https://aka.ms/vs/17/release/vc_redist.x64.exe
+#
+# Linux (Ubuntu/Debian):
+#   sudo apt-get install python3-dev portaudio19-dev
+#
+# Linux (Fedora/RHEL):
+#   sudo dnf install python3-devel portaudio-devel
+#
+# macOS:
+#   brew install portaudio
+#
+# ============================================================================
