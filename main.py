@@ -3,6 +3,19 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import struct
 
+# ✅ NUEVO: Función para obtener rutas correctas en exe
+def get_base_path():
+    """Obtener ruta base que funciona tanto en desarrollo como en exe"""
+    if getattr(sys, 'frozen', False):
+        # Ejecutando como exe de PyInstaller
+        return sys._MEIPASS
+    else:
+        # Ejecutando como script Python
+        return os.path.dirname(os.path.abspath(__file__))
+
+# ✅ NUEVO: Configurar rutas antes de imports
+sys.path.insert(0, get_base_path())
+
 from audio_server.audio_capture import AudioCapture
 from audio_server.channel_manager import ChannelManager
 from audio_server.native_server import NativeAudioServer
@@ -24,6 +37,8 @@ class AudioServerApp:
         signal.signal(signal.SIGTERM, self.signal_handler)
     
     def signal_handler(self, sig, frame):
+        """Manejar señales de interrupción"""
+        print("\n[Main] 🛑 Señal de interrupción recibida")
         self.cleanup()
         sys.exit(0)
     
@@ -136,6 +151,10 @@ class AudioServerApp:
                 self.gui.queue_log_message(f"   Memoryview: {config.USE_MEMORYVIEW}", 'RF')
                 self.gui.queue_log_message(f"   Web Async: {config.WEB_ASYNC_SEND}", 'WEB')
                 self.gui.queue_log_message(f"   Compresión WS: OFF", 'WEB')
+                self.gui.queue_log_message(f"", 'INFO')
+                self.gui.queue_log_message(f"🌐 URLS DE ACCESO:", 'SUCCESS')
+                self.gui.queue_log_message(f"   Local: http://localhost:{config.WEB_PORT}", 'WEB')
+                self.gui.queue_log_message(f"   Red: http://{local_ip}:{config.WEB_PORT}", 'WEB')
             
             # Iniciar servidor WebSocket en thread separado
             websocket_thread = threading.Thread(
@@ -157,6 +176,7 @@ class AudioServerApp:
             traceback.print_exc()
             if self.gui:
                 self.gui.queue_log_message(error_msg, 'ERROR')
+                self.gui.queue_log_message("Ver detalles en consola", 'ERROR')
             self.cleanup()
     
     def setup_web_handler_optimized(self):
@@ -282,13 +302,17 @@ class AudioServerApp:
     def run_websocket_server(self):
         """Ejecutar servidor WebSocket"""
         try:
+            if self.gui:
+                self.gui.queue_log_message("🌐 Iniciando servidor WebSocket...", 'WEB')
+            
             socketio.run(
                 app,
                 host=config.WEB_HOST,
                 port=config.WEB_PORT,
                 debug=False,
                 log_output=False,
-                use_reloader=False
+                use_reloader=False,
+                allow_unsafe_werkzeug=True  # ✅ Para evitar warnings en producción
             )
         except Exception as e:
             error_msg = f"❌ Error en servidor WebSocket: {str(e)}"
@@ -298,29 +322,53 @@ class AudioServerApp:
     
     def stop_server(self):
         """Detener servidor"""
+        if self.gui:
+            self.gui.queue_log_message("🛑 Solicitando detención del servidor...", 'WARNING')
         self.cleanup()
     
     def cleanup(self):
         """Limpiar recursos"""
+        if not self.server_running:
+            return
+        
         if self.gui:
             self.gui.queue_log_message("🛑 Deteniendo servidor...", 'WARNING')
         
+        print("\n[Main] 🧹 Limpiando recursos...")
+        
+        # Detener servidor nativo
         if self.native_server:
-            self.native_server.stop()
-            self.native_server = None
+            try:
+                print("[Main] 🛑 Deteniendo servidor nativo...")
+                self.native_server.stop()
+                self.native_server = None
+            except Exception as e:
+                print(f"[Main] ⚠️ Error al detener servidor nativo: {e}")
         
+        # Limpiar web handler
         if self.web_handler and hasattr(self.web_handler, 'cleanup'):
-            self.web_handler.cleanup()
-            self.web_handler = None
+            try:
+                print("[Main] 🛑 Limpiando web handler...")
+                self.web_handler.cleanup()
+                self.web_handler = None
+            except Exception as e:
+                print(f"[Main] ⚠️ Error al limpiar web handler: {e}")
         
+        # Detener captura de audio
         if self.audio_capture:
-            self.audio_capture.stop_capture()
-            self.audio_capture = None
+            try:
+                print("[Main] 🛑 Deteniendo captura de audio...")
+                self.audio_capture.stop_capture()
+                self.audio_capture = None
+            except Exception as e:
+                print(f"[Main] ⚠️ Error al detener captura: {e}")
         
         self.server_running = False
         
         if self.gui:
             self.gui.queue_log_message("✅ Servidor detenido", 'SUCCESS')
+        
+        print("[Main] ✅ Limpieza completada")
     
     def get_local_ip(self):
         """Obtener IP local"""
@@ -341,18 +389,125 @@ class AudioServerApp:
         print(f"  ⚡ Latencia objetivo: <5ms (RF) / <15ms (Web)")
         print(f"  📦 Blocksize: {config.BLOCKSIZE} samples (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms)")
         print(f"  🎯 Optimizaciones: Socket buffers, TCP_NODELAY, ThreadPool")
+        
+        # ✅ Mostrar información de PyInstaller
+        if getattr(sys, 'frozen', False):
+            print(f"  📦 Modo: EJECUTABLE (PyInstaller)")
+            print(f"  📁 Base Path: {get_base_path()}")
+        else:
+            print(f"  🐍 Modo: DESARROLLO (Python)")
+        
         print("="*70)
         print("🚀 Iniciando interfaz gráfica...\n")
         
-        # Iniciar GUI
-        self.gui = AudioMonitorGUI(self)
+        try:
+            # Iniciar GUI
+            self.gui = AudioMonitorGUI(self)
+            
+            # Ejecutar GUI (blocking)
+            self.gui.run()
+            
+        except Exception as e:
+            print(f"\n❌ Error crítico en GUI: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Asegurar limpieza
+            self.cleanup()
+            
+            return 1
         
-        # Ejecutar GUI
-        self.gui.run()
+        # Limpieza final
+        self.cleanup()
+        return 0
 
 def main():
-    app = AudioServerApp()
-    sys.exit(app.run() or 0)
+    """Punto de entrada principal"""
+    # ✅ NUEVO: Manejar excepciones no capturadas en modo exe
+    try:
+        print(f"\n{'='*70}")
+        print(f"  FICHATECH MONITOR - Starting...")
+        print(f"{'='*70}")
+        
+        # Verificar entorno
+        if getattr(sys, 'frozen', False):
+            print(f"✅ Running as executable")
+            print(f"📁 Executable path: {sys.executable}")
+            print(f"📁 Working directory: {os.getcwd()}")
+            print(f"📁 Base path: {get_base_path()}")
+        else:
+            print(f"✅ Running as Python script")
+            print(f"📁 Script path: {__file__}")
+        
+        print(f"{'='*70}\n")
+        
+        # Crear y ejecutar app
+        app = AudioServerApp()
+        exit_code = app.run()
+        
+        print(f"\n{'='*70}")
+        print(f"  Application exited with code: {exit_code}")
+        print(f"{'='*70}\n")
+        
+        sys.exit(exit_code or 0)
+        
+    except KeyboardInterrupt:
+        print("\n\n[Main] ⚠️ Interrupted by user (Ctrl+C)")
+        sys.exit(0)
+        
+    except Exception as e:
+        error_msg = f"\n❌ FATAL ERROR: {str(e)}\n"
+        print(error_msg)
+        
+        import traceback
+        traceback.print_exc()
+        
+        # En modo exe sin consola, guardar error en archivo
+        if getattr(sys, 'frozen', False):
+            try:
+                error_file = os.path.join(
+                    os.path.dirname(sys.executable), 
+                    f'error_log_{int(time.time())}.txt'
+                )
+                
+                with open(error_file, 'w', encoding='utf-8') as f:
+                    f.write("="*70 + "\n")
+                    f.write("FICHATECH MONITOR - ERROR LOG\n")
+                    f.write("="*70 + "\n\n")
+                    f.write(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"Executable: {sys.executable}\n")
+                    f.write(f"Working Dir: {os.getcwd()}\n")
+                    f.write(f"Base Path: {get_base_path()}\n\n")
+                    f.write("="*70 + "\n")
+                    f.write("ERROR DETAILS\n")
+                    f.write("="*70 + "\n\n")
+                    f.write(f"Error: {str(e)}\n\n")
+                    f.write("Traceback:\n")
+                    f.write(traceback.format_exc())
+                
+                print(f"\n💾 Error log saved to: {error_file}")
+                
+                # Mostrar mensaje al usuario
+                try:
+                    import tkinter as tk
+                    from tkinter import messagebox
+                    
+                    root = tk.Tk()
+                    root.withdraw()
+                    
+                    messagebox.showerror(
+                        "Fichatech Monitor - Error",
+                        f"Error fatal:\n\n{str(e)}\n\n"
+                        f"Log guardado en:\n{error_file}"
+                    )
+                    
+                except:
+                    pass
+                
+            except Exception as log_error:
+                print(f"⚠️ No se pudo guardar log de error: {log_error}")
+        
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

@@ -7,7 +7,7 @@ import sys
 
 class AudioCapture:
     """
-    ✅ OPTIMIZADO: Captura directa con prioridad RT y sin copias
+    ✅ OPTIMIZADO: Captura directa con prioridad RT y VU meters reales
     """
     def __init__(self):
         self.stream = None
@@ -18,6 +18,13 @@ class AudioCapture:
         
         # ✅ Callbacks directos (sin colas)
         self.callbacks = []  # Lista de funciones callback
+        
+        # 🎚️ VU METERS: Sistema de análisis de niveles
+        self.vu_callback = None
+        self.vu_update_interval = config.VU_UPDATE_INTERVAL if hasattr(config, 'VU_UPDATE_INTERVAL') else 100  # ms
+        self.vu_last_update = 0
+        self.vu_peak_hold = {}  # {channel: peak_value}
+        self.vu_peak_decay = 0.95  # Factor de decaimiento de picos
         
     def set_realtime_priority(self):
         """✅ Configurar prioridad real-time en Linux/macOS"""
@@ -96,6 +103,83 @@ class AudioCapture:
         with self.callback_lock:
             self.callbacks = [(n, cb) for n, cb in self.callbacks if cb != callback]
     
+    def register_vu_callback(self, callback):
+        """
+        🎚️ NUEVO: Registrar callback para niveles VU
+        El callback recibirá: dict {channel: {'rms': float, 'peak': float, 'db': float}}
+        """
+        self.vu_callback = callback
+        print(f"[RF] 🎚️ VU callback registrado")
+    
+    def calculate_vu_levels(self, audio_data):
+        """
+        🎚️ NUEVO: Calcular niveles RMS y peak por canal
+        """
+        if not self.vu_callback:
+            return
+        
+        import time
+        current_time = time.time() * 1000  # ms
+        
+        # Limitar frecuencia de actualización
+        if current_time - self.vu_last_update < self.vu_update_interval:
+            return
+        
+        self.vu_last_update = current_time
+        
+        try:
+            # Convertir memoryview a ndarray si es necesario
+            if isinstance(audio_data, memoryview):
+                audio_array = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, self.actual_channels)
+            else:
+                audio_array = audio_data
+            
+            if audio_array.size == 0:
+                return
+            
+            levels = {}
+            
+            for ch in range(audio_array.shape[1]):
+                channel_data = audio_array[:, ch]
+                
+                # RMS (Root Mean Square) - nivel promedio
+                rms = np.sqrt(np.mean(channel_data ** 2))
+                
+                # Peak - valor máximo absoluto
+                peak = np.max(np.abs(channel_data))
+                
+                # Peak hold con decaimiento
+                if ch in self.vu_peak_hold:
+                    self.vu_peak_hold[ch] = max(peak, self.vu_peak_hold[ch] * self.vu_peak_decay)
+                else:
+                    self.vu_peak_hold[ch] = peak
+                
+                # Convertir a dB (con clipping para evitar -inf)
+                rms_db = 20 * np.log10(max(rms, 1e-6))  # Mínimo -120dB
+                peak_db = 20 * np.log10(max(peak, 1e-6))
+                
+                # Normalizar a rango 0-100 para VU meter visual
+                # -60dB = 0%, 0dB = 100%
+                rms_percent = max(0, min(100, (rms_db + 60) / 60 * 100))
+                peak_percent = max(0, min(100, (peak_db + 60) / 60 * 100))
+                
+                levels[ch] = {
+                    'rms': rms,  # Valor lineal
+                    'peak': peak,  # Valor lineal
+                    'rms_db': rms_db,  # dB
+                    'peak_db': peak_db,  # dB
+                    'rms_percent': rms_percent,  # Para UI (0-100)
+                    'peak_percent': peak_percent,  # Para UI (0-100)
+                    'peak_hold': self.vu_peak_hold[ch]
+                }
+            
+            # Enviar niveles al callback
+            self.vu_callback(levels)
+            
+        except Exception as e:
+            if config.DEBUG:
+                print(f"[RF] ⚠️ Error calculando VU: {e}")
+    
     def start_capture(self, device_id=None):
         """Iniciar captura de audio con dispositivo específico"""
         if device_id is None:
@@ -107,14 +191,15 @@ class AudioCapture:
         channels = min(device_info['max_input_channels'], 32)
         
         print(f"\n{'='*70}")
-        print(f"[RF] 🎙️  INICIANDO CAPTURA OPTIMIZADA")
+        print(f"[RF] 🎙️ INICIANDO CAPTURA OPTIMIZADA")
         print(f"{'='*70}")
         print(f"   Dispositivo: {device_info['name']}")
         print(f"   📊 Canales: {channels}")
-        print(f"   ⚙️  Sample Rate: {config.SAMPLE_RATE} Hz")
+        print(f"   ⚙️ Sample Rate: {config.SAMPLE_RATE} Hz")
         print(f"   📦 Block Size: {config.BLOCKSIZE} samples (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms)")
         print(f"   📞 Callbacks registrados: {len(self.callbacks)}")
         print(f"   ⚡ Modo: DIRECTO (sin colas)")
+        print(f"   🎚️ VU Meters: {'ENABLED' if self.vu_callback else 'DISABLED'}")
         print(f"   🎯 Latencia teórica: ~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms")
         
         # ✅ Establecer prioridad ANTES de crear stream
@@ -142,10 +227,19 @@ class AudioCapture:
         return channels
     
     def _audio_callback(self, indata, frames, time_info, status):
-        """✅ Callback optimizado - usa memoryview sin copias"""
+        """✅ Callback optimizado - usa memoryview sin copias + VU meters"""
         if status:
             print(f"[RF] ⚠️ Status: {status}")
         
+        # 🎚️ CALCULAR VU LEVELS (si está habilitado)
+        if self.vu_callback:
+            try:
+                self.calculate_vu_levels(indata)
+            except Exception as e:
+                if config.DEBUG:
+                    print(f"[RF] ⚠️ Error VU: {e}")
+        
+        # PROCESAR CALLBACKS DE AUDIO
         with self.callback_lock:
             if not self.callbacks:
                 return
@@ -180,6 +274,9 @@ class AudioCapture:
             
             with self.callback_lock:
                 self.callbacks.clear()
+            
+            self.vu_callback = None
+            self.vu_peak_hold.clear()
     
     def get_device_info(self):
         """Obtener información del dispositivo actual"""
@@ -188,7 +285,8 @@ class AudioCapture:
                 'channels': self.actual_channels,
                 'running': self.running,
                 'callbacks': len(self.callbacks),
-                'rt_priority': self.rt_priority_set
+                'rt_priority': self.rt_priority_set,
+                'vu_enabled': self.vu_callback is not None
             }
         return None
     
@@ -204,5 +302,7 @@ class AudioCapture:
             'latency_ms': config.BLOCKSIZE / config.SAMPLE_RATE * 1000,
             'callbacks': len(self.callbacks),
             'rt_priority': self.rt_priority_set,
-            'running': self.running
+            'running': self.running,
+            'vu_enabled': self.vu_callback is not None,
+            'vu_update_interval': self.vu_update_interval
         }

@@ -1,3 +1,4 @@
+# native_server.py
 import socket, threading, time, json, struct, numpy as np, logging
 from audio_server.native_protocol import NativeAndroidProtocol
 from collections import defaultdict
@@ -8,40 +9,39 @@ logger = logging.getLogger(__name__)
 
 class NativeClient:
     def __init__(self, client_id: str, sock: socket.socket, address: tuple, persistent_id: str = None):
-        self.id = client_id  # ID de socket (temporal)
-        self.persistent_id = persistent_id or client_id  # ✅ ID persistente del cliente
+        self.id = client_id
+        self.is_temp_id = True  # Flag para indicar que ID es temporal
+        self.persistent_id = persistent_id or client_id
         self.socket = sock
         self.address = address
-        self.status = 1
+        self.status = 1  # 1=activo, 0=inactivo
         self.last_heartbeat = time.time()
         self.last_activity = time.time()
-        self.subscribed_channels = set()
+        self.subscribed_channels = set()  # ✅ Ahora manejado desde web
         self.rf_mode = False
         self.persistent = False
-        self.auto_reconnect = False  # ✅ NUEVO: Cliente soporta auto-reconexión
+        self.auto_reconnect = False
         self.packets_sent = 0
         self.packets_dropped = 0
         self.connection_time = time.time()
-        self.reconnection_count = 0  # ✅ Contador de reconexiones
+        self.reconnection_count = 0
+        self.reconnection_delay = 1000  # ms
+        self.last_reconnect_attempt = 0
         
-        # ✅ Socket optimizado para RF
+        # Socket optimizado
         try:
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config.SOCKET_SNDBUF)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config.SOCKET_RCVBUF)
-            
-            # ✅ Timeout más largo para RF (tolerar micro-cortes)
-            self.socket.settimeout(30.0)  # 30 segundos vs 2 segundos anterior
+            self.socket.settimeout(30.0)
             
             if config.TCP_KEEPALIVE:
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                 if hasattr(socket, 'TCP_KEEPIDLE'):
-                    self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)  # 10s vs 1s
-                    self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 5)   # 5s vs 1s
+                    self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
+                    self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 5)
                     self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
                     
-            logger.info(f"✅ Socket RF: SNDBUF={config.SOCKET_SNDBUF}, TIMEOUT=30s, KEEPALIVE=10s")
-            
         except Exception as e:
             logger.warning(f"⚠️ Socket options: {e}")
     
@@ -53,13 +53,11 @@ class NativeClient:
         self.update_activity()
     
     def is_alive(self, timeout: float = 120.0) -> bool:
-        # ✅ Si soporta auto-reconexión, no desconectar por timeout
         if self.auto_reconnect and self.status == 1:
             return True
         return (time.time() - self.last_heartbeat < timeout) and (self.status == 1)
     
     def send_bytes_direct(self, data: bytes) -> bool:
-        """Envío directo sin lock (sendall es thread-safe)"""
         if self.status == 0 or not data:
             return False
         
@@ -68,11 +66,9 @@ class NativeClient:
             self.packets_sent += 1
             self.update_activity()
             return True
-            
         except (BrokenPipeError, ConnectionError, OSError):
             self.status = 0
             return False
-            
         except Exception as e:
             if config.DEBUG:
                 logger.warning(f"⚠️ {self.id[:15]} - Error envío: {e}")
@@ -115,6 +111,10 @@ class NativeClient:
                    f"Reconexiones: {self.reconnection_count}")
         self.status = 0
         try: 
+            self.socket.shutdown(socket.SHUT_RDWR)
+        except:
+            pass
+        try:
             self.socket.close()
         except: 
             pass
@@ -125,15 +125,14 @@ class NativeAudioServer:
         self.channel_manager = channel_manager
         self.running = False
         self.server_socket = None
-        self.clients = {}  # client_id -> NativeClient
+        self.clients = {}
         self.client_lock = threading.RLock()
         self.accept_thread = None
         self.maintenance_thread = None
         
-        # ✅ NUEVO: Cache de estado persistente
-        self.persistent_state = defaultdict(dict)  # persistent_id -> {'channels': [...], 'last_seen': timestamp}
+        self.persistent_state = defaultdict(dict)
         self.persistent_lock = threading.Lock()
-        self.STATE_CACHE_TIMEOUT = 300  # 5 minutos
+        self.STATE_CACHE_TIMEOUT = getattr(config, 'RF_STATE_CACHE_TIMEOUT', 300)
         
         self.sample_position_lock = threading.Lock()
         self.sample_position = 0
@@ -143,9 +142,10 @@ class NativeAudioServer:
             'packets_dropped': 0,
             'clients_connected': 0,
             'clients_disconnected': 0,
-            'clients_reconnected': 0,  # ✅ NUEVO
+            'clients_reconnected': 0,
             'bytes_sent': 0,
-            'uptime': 0
+            'uptime': 0,
+            'cached_states': 0
         }
         self.start_time = time.time()
         self.stats_lock = threading.Lock()
@@ -173,25 +173,25 @@ class NativeAudioServer:
         self.maintenance_thread.start()
         
         logger.info(f"\n{'='*70}")
-        logger.info(f"🟢 SERVIDOR RF MODO PERSISTENTE")
+        logger.info(f"🟢 SERVIDOR RF MODO RECEPTOR PURO")
         logger.info(f"{'='*70}")
         logger.info(f"   🌐 Host: {config.NATIVE_HOST}:{config.NATIVE_PORT}")
         logger.info(f"   📦 BLOCKSIZE: {config.BLOCKSIZE} samples (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms)")
         logger.info(f"   🎵 SAMPLE_RATE: {config.SAMPLE_RATE} Hz")
-        logger.info(f"   🔌 Socket TIMEOUT: 30s (RF tolerante)")
+        logger.info(f"   🔌 Socket TIMEOUT: 30s")
         logger.info(f"   🔄 Auto-reconexión: ENABLED")
         logger.info(f"   💾 Estado cache: {self.STATE_CACHE_TIMEOUT}s")
+        logger.info(f"   ✅ Canales gestionados desde WEB")
         logger.info(f"{'='*70}\n")
     
     def _maintenance_loop(self):
-        """Thread de mantenimiento - limpia cache y clientes"""
         while self.running:
             time.sleep(30)
             
             try:
                 current_time = time.time()
                 
-                # ✅ Limpiar cache de estado viejo
+                # Limpiar estado persistente expirado
                 with self.persistent_lock:
                     expired = [
                         pid for pid, state in self.persistent_state.items()
@@ -201,14 +201,11 @@ class NativeAudioServer:
                         logger.info(f"🗑️ Limpiando estado expirado: {pid[:15]}")
                         del self.persistent_state[pid]
                 
-                # ✅ Solo desconectar clientes realmente muertos
+                # Verificar clientes inactivos
                 with self.client_lock:
                     clients_to_remove = []
                     
                     for client_id, client in list(self.clients.items()):
-                        # Solo desconectar si:
-                        # - No soporta auto-reconexión Y está inactivo
-                        # - O el socket está cerrado
                         if client.status == 0:
                             clients_to_remove.append(client_id)
                         elif not client.auto_reconnect and (current_time - client.last_activity > 60):
@@ -216,10 +213,14 @@ class NativeAudioServer:
                             clients_to_remove.append(client_id)
                     
                     for client_id in clients_to_remove:
-                        self._disconnect_client(client_id, preserve_state=True)
+                        client = self.clients.get(client_id)
+                        preserve = client.auto_reconnect if client else False
+                        self._disconnect_client(client_id, preserve_state=preserve)
                 
+                # Actualizar estadísticas
                 with self.stats_lock:
                     self.stats['uptime'] = int(time.time() - self.start_time)
+                    self.stats['cached_states'] = len(self.persistent_state)
                     
             except Exception as e:
                 if config.DEBUG:
@@ -242,21 +243,19 @@ class NativeAudioServer:
         logger.info(f"   Paquetes: {stats['packets_sent']}")
     
     def _accept_loop(self):
-        """Loop de aceptación de clientes"""
         while self.running:
             try:
                 client_socket, address = self.server_socket.accept()
-                client_id = f"rf_{address[0]}_{int(time.time() * 1000)}"
+                temp_id = f"temp_{address[0]}_{int(time.time() * 1000)}"
                 
-                # ✅ Crear cliente (persistent_id se establece en handshake)
-                client = NativeClient(client_id, client_socket, address)
+                client = NativeClient(temp_id, client_socket, address)
                 
                 with self.client_lock:
-                    self.clients[client_id] = client
+                    self.clients[temp_id] = client
                     self.stats['clients_connected'] += 1
                 
-                logger.info(f"✅ Cliente RF: {client_id[:15]} ({address[0]})")
-                threading.Thread(target=self._client_read_loop, args=(client_id,), daemon=True).start()
+                logger.info(f"✅ Cliente RF: {temp_id[:15]} ({address[0]})")
+                threading.Thread(target=self._client_read_loop, args=(temp_id,), daemon=True).start()
                 
             except BlockingIOError:
                 time.sleep(0.01)
@@ -265,7 +264,6 @@ class NativeAudioServer:
                     logger.error(f"Error accept: {e}")
     
     def _client_read_loop(self, client_id: str):
-        """Loop de lectura de cliente"""
         client = self.clients.get(client_id)
         if not client: 
             return
@@ -322,7 +320,6 @@ class NativeAudioServer:
                 client.update_heartbeat()
                 
             except socket.timeout:
-                # ✅ Timeout normal en RF - no desconectar
                 client.update_activity()
                 continue
             except (ConnectionError, BrokenPipeError, OSError):
@@ -332,13 +329,11 @@ class NativeAudioServer:
                     logger.error(f"❌ Read loop: {e}")
                 time.sleep(1)
         
-        # ✅ Preservar estado si soporta auto-reconexión
         self._disconnect_client(client_id, preserve_state=client.auto_reconnect)
     
     def _recv_exact(self, sock: socket.socket, size: int):
-        """Recibir exactamente 'size' bytes"""
         data = b''
-        timeout = 60.0  # ✅ 60s para RF (vs 30s anterior)
+        timeout = 60.0
         start = time.time()
         
         while len(data) < size and (time.time() - start) < timeout:
@@ -355,97 +350,140 @@ class NativeAudioServer:
         return data if len(data) == size else None
     
     def _handle_control_message(self, client: NativeClient, message: dict):
-        """Manejar mensajes de control"""
         msg_type = message.get('type', '')
-        
+
         if msg_type == 'handshake':
-            # ✅ Extraer ID persistente
-            persistent_id = message.get('client_id', client.id)
+            # ✅ AGREGAR al inicio del bloque handshake:
+            persistent_id = message.get('client_id')
+
+            # Validar que el cliente envió su UUID
+            if not persistent_id:
+                logger.error(f"❌ Handshake sin client_id UUID desde {client.address}")
+                return
+
+            # ✅ AGREGAR: Verificar si es reconexión
+            is_reconnection = False
+            old_temp_id = client.id
+
+            with self.client_lock:
+                # Si ya existe un cliente con este persistent_id, es reconexión
+                if persistent_id in self.clients:
+                    is_reconnection = True
+                    logger.info(f"🔄 Reconexión detectada: {persistent_id[:15]}")
+
+            # ✅ AGREGAR: Cambiar ID del cliente
+            client.id = persistent_id
             client.persistent_id = persistent_id
+            client.is_temp_id = False
+
+            # ✅ AGREGAR: Actualizar diccionario de clientes
+            with self.client_lock:
+                # Remover entrada temporal
+                if old_temp_id in self.clients:
+                    del self.clients[old_temp_id]
+
+                # Agregar con ID persistente
+                self.clients[persistent_id] = client
+
+            logger.info(f"✅ ID actualizado: {old_temp_id[:25]} → {persistent_id[:15]}")
+
+            # ❌ ELIMINAR estas líneas (ya no son necesarias):
+            # persistent_id = message.get('client_id', client.id)
+            # client.persistent_id = persistent_id
+
+            # CONTINUAR con el código existente...
             client.rf_mode = message.get('rf_mode', False)
             client.persistent = message.get('persistent', False)
-            client.auto_reconnect = message.get('auto_reconnect', False)  # ✅ NUEVO
-            
-            # ✅ Verificar si es reconexión
-            is_reconnection = False
-            with self.persistent_lock:
-                if persistent_id in self.persistent_state:
-                    is_reconnection = True
-                    cached_state = self.persistent_state[persistent_id]
-                    
-                    # ✅ Restaurar suscripciones automáticamente
-                    cached_channels = cached_state.get('channels', [])
-                    if cached_channels:
-                        client.subscribed_channels = set(cached_channels)
-                        self.channel_manager.subscribe_client(client.id, cached_channels)
-                        client.reconnection_count = cached_state.get('reconnection_count', 0) + 1
-                        
-                        logger.info(f"🔄 RECONEXIÓN #{client.reconnection_count}: {persistent_id[:15]}")
-                        logger.info(f"   Auto-restaurando {len(cached_channels)} canales")
-                        
-                        with self.stats_lock:
+            client.auto_reconnect = message.get('auto_reconnect', False)
+
+            # ✅ MODIFICAR logging:
+            logger.info(f"🤝 {client.id[:15]} - HANDSHAKE: "
+                       f"reconnection={is_reconnection}, "
+                       f"auto_reconnect={client.auto_reconnect}")
+
+            # ✅ BUSCAR estado persistente (mantener código existente pero actualizar key)
+            restored_state = None
+            if client.auto_reconnect:
+                with self.persistent_lock:
+                    # ✅ USAR persistent_id (ahora es igual a client.id)
+                    if persistent_id in self.persistent_state:
+                        restored_state = self.persistent_state[persistent_id]
+                        logger.info(f"💾 Estado restaurado para: {persistent_id[:15]}")
+                        self.persistent_state[persistent_id]['last_seen'] = time.time()
+
+                        # ✅ AGREGAR: Incrementar contador de reconexiones
+                        if is_reconnection:
+                            client.reconnection_count = restored_state.get('reconnection_count', 0) + 1
                             self.stats['clients_reconnected'] += 1
-            
-            logger.info(f"⭐ {client.id[:15]} - HANDSHAKE: "
-                       f"persistent={client.persistent}, "
-                       f"auto_reconnect={client.auto_reconnect}, "
-                       f"reconnection={is_reconnection}")
-            
+
+            # ✅ MODIFICAR: Registrar en channel_manager con ID persistente
+            channels_to_subscribe = []
+            if restored_state and 'channels' in restored_state:
+                channels_to_subscribe = restored_state['channels']
+                logger.info(f"📡 Canales restaurados: {len(channels_to_subscribe)} canales")
+
+            # ❌ REEMPLAZAR:
+            # self.channel_manager.subscribe_client(
+            #     client.id, 
+            #     channels_to_subscribe,
+            #     client_type="native"
+            # )
+
+            # ✅ CON ESTO (usar persistent_id explícitamente):
+            self.channel_manager.subscribe_client(
+                persistent_id,  # ← Ahora es igual a client.id, pero explícito
+                channels_to_subscribe,
+                client_type="native"
+            )
+
+            # ✅ MODIFICAR: Aplicar estado restaurado
+            if restored_state:
+                # ❌ REEMPLAZAR:
+                # self.channel_manager.update_client_mix(
+                #     client.id,
+
+                # ✅ CON ESTO:
+                self.channel_manager.update_client_mix(
+                    persistent_id,  # ← ID persistente
+                    gains=restored_state.get('gains', {}),
+                    pans=restored_state.get('pans', {}),
+                    mutes=restored_state.get('mutes', {}),
+                    solos=restored_state.get('solos', []),
+                    pre_listen=restored_state.get('pre_listen'),
+                    master_gain=restored_state.get('master_gain', 1.0)
+                )
+
+            # ✅ RESTO DEL CÓDIGO: handshake_response (mantener igual)
             response = NativeAndroidProtocol.create_control_packet(
                 'handshake_response',
                 {
-                    'server_version': '2.3.0-RF-PERSISTENT',
+                    'server_version': '2.4.0-RF-WEB-CONTROL',
                     'protocol_version': NativeAndroidProtocol.PROTOCOL_VERSION,
                     'sample_rate': config.SAMPLE_RATE,
                     'max_channels': self.channel_manager.num_channels,
                     'status': 'ready_rf',
                     'rf_mode': client.rf_mode,
                     'persistent': True,
-                    'auto_reconnect_supported': True,  # ✅ NUEVO
-                    'state_restored': is_reconnection,  # ✅ NUEVO
-                    'restored_channels': list(client.subscribed_channels) if is_reconnection else [],
+                    'auto_reconnect_supported': True,
                     'server_blocksize': config.BLOCKSIZE,
-                    'latency_ms': config.BLOCKSIZE / config.SAMPLE_RATE * 1000
+                    'latency_ms': config.BLOCKSIZE / config.SAMPLE_RATE * 1000,
+                    'web_controlled': True,
+                    'state_restored': restored_state is not None,
+                    # ✅ AGREGAR: Informar al cliente su ID persistente
+                    'persistent_id': persistent_id,
+                    'is_reconnection': is_reconnection
                 },
                 client.rf_mode
             )
             
             if response:
                 client.send_bytes_direct(response)
-        
-        elif msg_type == 'subscribe':
-            channels = message.get('channels', [])
-            valid = [ch for ch in channels if 0 <= ch < self.channel_manager.num_channels]
             
-            if valid:
-                client.subscribed_channels = set(valid)
-                logger.info(f"✅ {client.id[:15]} - Canales: {valid}")
-                self.channel_manager.subscribe_client(client.id, valid)
-                
-                # ✅ Guardar en cache persistente
-                with self.persistent_lock:
-                    self.persistent_state[client.persistent_id] = {
-                        'channels': valid,
-                        'last_seen': time.time(),
-                        'reconnection_count': client.reconnection_count
-                    }
-                
-                response = NativeAndroidProtocol.create_control_packet(
-                    'subscription_confirmed',
-                    {
-                        'channels': valid,
-                        'status': 'subscribed_rf',
-                        'blocksize': config.BLOCKSIZE,
-                        'sample_position': self.get_sample_position(),
-                        'cached': True  # ✅ Estado será cacheado
-                    },
-                    client.rf_mode
-                )
-                
-                if response:
-                    client.send_bytes_direct(response)
+            # Notificar a web clients (mantener)
+            self._notify_web_clients_update()
         
         elif msg_type == 'heartbeat':
+            # MANTENER código existente sin cambios
             response = NativeAndroidProtocol.create_control_packet(
                 'heartbeat_response',
                 {
@@ -456,6 +494,15 @@ class NativeAudioServer:
             )
             if response:
                 client.send_bytes_direct(response)
+    
+    def _notify_web_clients_update(self):
+        """Notificar a websocket server sobre cambio de clientes"""
+        try:
+            from audio_server import websocket_server
+            websocket_server.broadcast_clients_update()
+        except Exception as e:
+            if config.DEBUG:
+                logger.error(f"Error notificando web: {e}")
     
     def on_audio_data(self, audio_data):
         """Callback directo desde AudioCapture"""
@@ -477,15 +524,23 @@ class NativeAudioServer:
                     clients_to_remove.append(client_id)
                     continue
                 
-                if not client.subscribed_channels:
+                # ✅ Obtener canales desde channel_manager
+                subscription = self.channel_manager.get_client_subscription(client_id)
+                if not subscription:
                     continue
+                
+                channels = subscription.get('channels', [])
+                if not channels:
+                    continue
+                
+                # Actualizar subscribed_channels del cliente
+                client.subscribed_channels = set(channels)
                 
                 try:
                     if client.send_audio_android(audio_data, current_position):
                         sent += 1
                     else:
                         self.update_stats(packets_dropped=1)
-                        # ✅ Solo remover si NO soporta auto-reconexión
                         if not client.auto_reconnect:
                             clients_to_remove.append(client_id)
                 except Exception as e:
@@ -503,29 +558,55 @@ class NativeAudioServer:
                 self.update_stats(packets_sent=sent)
     
     def _disconnect_client(self, client_id: str, preserve_state: bool = False):
-        """Desconectar cliente (opcionalmente preservando estado)"""
         with self.client_lock:
             client = self.clients.pop(client_id, None)
             if client:
                 self.update_stats(clients_disconnected=1)
-                
-                # ✅ Guardar estado antes de cerrar
+
                 if preserve_state and client.auto_reconnect:
                     with self.persistent_lock:
-                        self.persistent_state[client.persistent_id] = {
-                            'channels': list(client.subscribed_channels),
-                            'last_seen': time.time(),
-                            'reconnection_count': client.reconnection_count
-                        }
-                    logger.info(f"💾 Estado guardado: {client.persistent_id[:15]} "
-                               f"({len(client.subscribed_channels)} canales)")
-                
-                logger.info(f"❌ Desconectado: {client_id[:15]} "
-                           f"(preserved={preserve_state})")
+                        subscription = self.channel_manager.get_client_subscription(client_id)
+                        if subscription:
+                            # ✅ USAR client.persistent_id (que ahora es igual a client_id)
+                            # PERO dejar claro que estamos guardando por persistent_id
+                            self.persistent_state[client.persistent_id] = {
+                                'channels': subscription.get('channels', []),
+                                'gains': subscription.get('gains', {}),
+                                'pans': subscription.get('pans', {}),
+                                'mutes': subscription.get('mutes', {}),
+                                'solos': list(subscription.get('solos', set())),
+                                'pre_listen': subscription.get('pre_listen'),
+                                'master_gain': subscription.get('master_gain', 1.0),
+                                'last_seen': time.time(),
+                                'reconnection_count': client.reconnection_count,
+                                'client_type': 'native'
+                            }
+                            logger.info(f"💾 Estado guardado para reconexión: {client.persistent_id[:15]}")
+                        elif client.persistent_id in self.persistent_state:
+                            # Si ya existe, actualizar last_seen
+                            self.persistent_state[client.persistent_id]['last_seen'] = time.time()
+
+                logger.info(f"🔌 Desconectado: {client_id[:15]} (reconnect={preserve_state})")
                 client.close()
-                
-                # ✅ Solo desuscribir del channel_manager (no borrar de cache)
+
                 self.channel_manager.unsubscribe_client(client_id)
+
+                # ✅ AGREGAR: Notificar desconexión a Web UI
+                self._notify_client_disconnected(client_id)
+
+    # ✅ AGREGAR este método nuevo después de _disconnect_client:
+    def _notify_client_disconnected(self, client_id):
+        """Notificar a web clients sobre desconexión"""
+        try:
+            from audio_server import websocket_server
+            websocket_server.socketio.emit('client_disconnected', {
+                'client_id': client_id,
+                'timestamp': int(time.time() * 1000)
+            }, broadcast=True)
+            logger.info(f"📢 Notificación de desconexión enviada: {client_id[:15]}")
+        except Exception as e:
+            if config.DEBUG:
+                logger.error(f"Error notificando desconexión: {e}")
     
     def get_sample_position(self):
         with self.sample_position_lock:
@@ -547,7 +628,6 @@ class NativeAudioServer:
             stats = self.stats.copy()
             stats['active_clients'] = len(self.clients)
             
-            # ✅ Estadísticas de cache
             with self.persistent_lock:
                 stats['cached_states'] = len(self.persistent_state)
             

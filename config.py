@@ -30,6 +30,10 @@ WEB_HOST = '0.0.0.0'
 NATIVE_PORT = 5101
 NATIVE_HOST = '0.0.0.0'
 NATIVE_MAX_CLIENTS = 5
+# 🎚️ CONFIGURACIÓN VU METERS
+# ============================================================================
+VU_UPDATE_INTERVAL = 100  # ms - Frecuencia de actualización de VU meters
+VU_PEAK_DECAY = 0.95      # Factor de decaimiento de picos (0.9-0.99)
 
 # ============================================================================
 # OPTIMIZACIONES DE SOCKET - RF MODE
@@ -53,6 +57,7 @@ RF_RECONNECT_DELAY_MS = 1000        # ✅ Delay inicial: 1 segundo
 RF_MAX_RECONNECT_DELAY_MS = 8000    # ✅ Delay máximo: 8 segundos
 RF_RECONNECT_BACKOFF = 1.5          # ✅ Factor de backoff exponencial
 RF_STATE_CACHE_TIMEOUT = 300        # ✅ Cache de estado: 5 minutos
+RF_MAX_RECONNECT_ATTEMPTS = 10      # ✅ Máximo de intentos de reconexión
 
 # ============================================================================
 # DEBUG Y LOGS
@@ -78,10 +83,25 @@ USE_MEMORYVIEW = True           # ✅ Usar memoryview en lugar de copy()
 # ============================================================================
 # WEB OPTIMIZATIONS
 # ============================================================================
-WEB_COMPRESSION = True         # ✅ Sin compresión WebSocket (reduce latencia)
+WEB_COMPRESSION = False         # ✅ Sin compresión WebSocket (reduce latencia)
 WEB_ASYNC_SEND = True           # ✅ Envío asíncrono con ThreadPool
 WEB_MAX_WORKERS = 4             # Workers para envío paralelo
 WEB_BINARY_MODE = True          # ✅ Modo binario puro (sin base64)
+
+# ============================================================================
+# SEGURIDAD Y LÍMITES
+# ============================================================================
+MAX_CHANNELS_PER_CLIENT = 32    # ✅ Máximo de canales por cliente
+MAX_GAIN_VALUE = 10.0           # ✅ Ganancia máxima permitida
+MAX_MASTER_GAIN = 5.0           # ✅ Ganancia master máxima
+NATIVE_HEARTBEAT_TIMEOUT = 120  # ✅ Timeout heartbeat nativo (segundos)
+WEB_HEARTBEAT_TIMEOUT = 60      # ✅ Timeout heartbeat web (segundos)
+
+# ============================================================================
+# BUFFER SIZES OPTIMIZADOS
+# ============================================================================
+AUDIO_BUFFER_POOL_SIZE = 10     # ✅ Pool de buffers reutilizables
+MAX_CONCURRENT_SENDS = 4        # ✅ Envíos concurrentes máximos
 
 # ============================================================================
 # AUDIO WORKLET (No usado en WiFi sin HTTPS)

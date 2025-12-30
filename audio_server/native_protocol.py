@@ -32,37 +32,41 @@ class NativeAndroidProtocol:
     def create_audio_packet(audio_data, active_channels, sample_position, sequence=0, rf_mode=False):
         """
         ✅ OPTIMIZADO: Soporta Int16 para -50% reducción de datos
-        
-        Args:
-            audio_data: numpy array o memoryview con shape (samples, channels)
-            active_channels: lista de índices de canales activos
-            sample_position: posición actual de la muestra
-            sequence: número de secuencia del paquete (no usado en RF)
-            rf_mode: flag para modo RF
-            
-        Returns:
-            bytes: Paquete completo con header + payload, o None si hay error
         """
         try:
+            # ✅ Validación temprana
+            if not active_channels or len(active_channels) == 0:
+                return None
+            
             # ✅ Convertir memoryview a ndarray si es necesario
             if isinstance(audio_data, memoryview):
-                audio_data = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, len(active_channels))
+                num_channels = len(active_channels)
+                # Calcular samples basado en el tamaño del memoryview
+                total_samples = len(audio_data) // 4  # float32 = 4 bytes
+                if total_samples % num_channels != 0:
+                    logger.warning(f"⚠️ Tamaño de audio inconsistente: {total_samples} samples, {num_channels} channels")
+                    return None
+                    
+                audio_data = np.frombuffer(audio_data, dtype=np.float32, count=total_samples)
+                audio_data = audio_data.reshape(-1, num_channels)
+            
+            if audio_data.size == 0 or audio_data.shape[1] == 0:
+                return None
             
             samples, total_channels = audio_data.shape
             
-            # Validación mínima
-            if samples == 0 or total_channels == 0 or not active_channels:
+            # ✅ Filtrar canales válidos
+            valid_channels = [ch for ch in active_channels if 0 <= ch < total_channels]
+            if not valid_channels:
+                if config.DEBUG:
+                    logger.debug(f"⚠️ No hay canales válidos para enviar: {active_channels} (max: {total_channels-1})")
                 return None
             
             # ✅ Crear channel mask eficientemente
-            channel_mask = sum(1 << ch for ch in active_channels if 0 <= ch < 48)
-            
-            # ✅ Validar canales (solo una vez)
-            valid_channels = [ch for ch in active_channels if ch < total_channels]
-            if not valid_channels:
-                if config.DEBUG:
-                    logger.warning(f"⚠️ No hay canales válidos: {active_channels} (max: {total_channels-1})")
-                return None
+            channel_mask = 0
+            for ch in valid_channels:
+                if 0 <= ch < 48:  # Máximo 48 canales soportados
+                    channel_mask |= (1 << ch)
             
             # ✅ Seleccionar y entrelazar datos (operación única)
             selected_data = audio_data[:, valid_channels]
@@ -72,12 +76,12 @@ class NativeAndroidProtocol:
             use_int16 = getattr(config, 'USE_INT16_ENCODING', True)
             
             if use_int16:
-                # ✅ CODIFICACIÓN INT16
-                # Clamping: asegurar que está en rango [-1.0, 1.0]
-                interleaved_clamped = np.clip(interleaved, -1.0, 1.0)
+                # ✅ CODIFICACIÓN INT16 CON VALIDACIÓN
+                # Clamping: asegurar que está en rango [-0.9999, 0.9999] para evitar overflow
+                np.clip(interleaved, -0.9999, 0.9999, out=interleaved)
                 
-                # Convertir float [-1.0, 1.0] a int16 [-32768, 32767]
-                interleaved_int16 = (interleaved_clamped * 32767.0).astype(np.int16)
+                # Convertir float [-0.9999, 0.9999] a int16 [-32767, 32767]
+                interleaved_int16 = (interleaved * 32767.0).astype(np.int16)
                 
                 # Convertir a big-endian bytes
                 audio_bytes = interleaved_int16.astype('>i2').tobytes()
@@ -88,16 +92,17 @@ class NativeAndroidProtocol:
                 audio_bytes = interleaved.astype('>f4').tobytes()
                 flags = NativeAndroidProtocol.FLAG_FLOAT32
             
-            # ✅ Construir payload eficientemente
+            # ✅ Validar tamaño del payload
             payload_size = 12 + len(audio_bytes)
+            if payload_size > NativeAndroidProtocol.MAX_AUDIO_PAYLOAD:
+                if config.DEBUG:
+                    logger.warning(f"⚠️ Payload demasiado grande: {payload_size} bytes")
+                return None
+            
+            # ✅ Construir payload eficientemente
             payload = bytearray(payload_size)
             NativeAndroidProtocol._payload_struct.pack_into(payload, 0, sample_position, channel_mask)
             payload[12:] = audio_bytes
-            
-            # ✅ Validar tamaño (solo si está habilitado)
-            if config.VALIDATE_PACKETS and len(payload) > NativeAndroidProtocol.MAX_AUDIO_PAYLOAD:
-                logger.error(f"❌ Payload muy grande: {len(payload)} bytes")
-                return None
             
             # ✅ Configurar flags RF
             if rf_mode:
@@ -137,14 +142,6 @@ class NativeAndroidProtocol:
     def create_control_packet(message_type, data=None, rf_mode=False):
         """
         ✅ OPTIMIZADO: Crear paquete de control con header binario
-        
-        Args:
-            message_type: tipo de mensaje (string)
-            data: diccionario con datos adicionales
-            rf_mode: flag para modo RF
-            
-        Returns:
-            bytes: Paquete completo con header + payload JSON, o None si hay error
         """
         if data is None: 
             data = {}
@@ -289,12 +286,18 @@ class NativeAndroidProtocol:
             
             audio_bytes = payload_bytes[12:]
             
-            # Por defecto asumimos Float32 para debugging del servidor
-            # (En producción este método no se usa)
-            num_floats = len(audio_bytes) // 4
-            audio_array = np.frombuffer(audio_bytes, dtype='>f4', count=num_floats)
+            # Determinar formato basado en tamaño
+            if len(audio_bytes) % 2 == 0 and len(audio_bytes) // 2 == len(active_channels) * (len(audio_bytes) // (len(active_channels) * 2)):
+                # Probablemente Int16
+                num_shorts = len(audio_bytes) // 2
+                audio_array = np.frombuffer(audio_bytes, dtype='>i2', count=num_shorts)
+                audio_array = audio_array.astype(np.float32) / 32767.0
+            else:
+                # Float32
+                num_floats = len(audio_bytes) // 4
+                audio_array = np.frombuffer(audio_bytes, dtype='>f4', count=num_floats)
             
-            samples_per_channel = num_floats // len(active_channels) if active_channels else 0
+            samples_per_channel = len(audio_array) // len(active_channels) if active_channels else 0
             
             return {
                 'sample_position': sample_position,
