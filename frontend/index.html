@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fichatech Monitor</title>
+    <title>Control Center - Audio RF</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         * {
@@ -101,30 +101,6 @@
         .client-info {
             font-size: 0.85em;
             color: #0a0;
-        }
-        
-        .client-actions {
-            margin-top: 8px;
-            display: flex;
-            gap: 4px;
-        }
-        
-        .action-btn {
-            padding: 3px 6px;
-            background: #222;
-            color: #00ff00;
-            border: 1px solid #333;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.7em;
-            font-family: 'Courier New', monospace;
-            transition: all 0.2s;
-        }
-        
-        .action-btn:hover {
-            background: #00ff00;
-            color: #000;
-            border-color: #00ff00;
         }
         
         .mixer-area {
@@ -374,7 +350,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎛️ FICHATECH MONITOR</h1>
+            <h1>🎛️ CONTROL CENTER</h1>
             <div style="color: #0a0; font-size: 0.9em; margin-top: 10px;">
                 RF Audio Streaming Control
             </div>
@@ -398,7 +374,6 @@
                         <button class="btn" id="btn-select-none">None</button>
                         <button class="btn" id="btn-clear-solo">Clear Solo</button>
                         <button class="btn" id="btn-clear-pfl">Clear PFL</button>
-                        <button class="btn" id="btn-reset-client">Reset</button>
                     </div>
                 </div>
                 
@@ -452,51 +427,6 @@
                 this.socket.on('mix_updated', (data) => {
                     console.log('[Mix Updated]', data);
                 });
-
-                this.socket.on('channels_set', (data) => {
-                    console.log('[Channels Set]', data);
-                    // Actualizar UI si es el cliente seleccionado
-                    if (this.selectedClientId === data.client_id) {
-                        this.renderMixer(data.client_id);
-                    }
-                });
-
-                this.socket.on('client_reset', (data) => {
-                    console.log('[Client Reset]', data);
-                    alert(`Cliente ${data.client_id.substring(0, 8)} reseteado`);
-                    this.socket.emit('get_clients'); // Refrescar lista
-                });
-
-                this.socket.on('error', (data) => {
-                    console.error('[Error]', data);
-                    alert(`Error: ${data.message}`);
-                });
-
-                this.socket.on('client_disconnected', (data) => {
-                    console.log('🔌 Cliente desconectado:', data.client_id);
-                    this.handleClientDisconnected(data);
-                });
-            }
-
-            handleClientDisconnected(data) {
-                const clientId = data.client_id;
-
-                // Remover de memoria
-                if (this.clients[clientId]) {
-                    console.log(`🗑️ Removiendo cliente: ${clientId.substring(0, 8)}`);
-                    delete this.clients[clientId];
-                }
-
-                // Si era el cliente seleccionado, limpiar mixer
-                if (this.selectedClientId === clientId) {
-                    this.selectedClientId = null;
-                    document.getElementById('mixer-title').textContent = '❌ Cliente desconectado';
-                    document.getElementById('channel-grid').innerHTML = 
-                        '<div class="no-client-msg">El cliente se desconectó. Selecciona otro cliente.</div>';
-                }
-
-                // Refrescar lista de clientes
-                this.socket.emit('get_clients');
             }
 
             setupEventListeners() {
@@ -514,10 +444,6 @@
 
                 document.getElementById('btn-clear-pfl').addEventListener('click', () => {
                     this.clearPFL();
-                });
-
-                document.getElementById('btn-reset-client').addEventListener('click', () => {
-                    this.resetSelectedClient();
                 });
             }
 
@@ -542,19 +468,17 @@
                     const typeIcon = client.type === 'native' ? '📱' : '🌐';
                     const typeName = client.type === 'native' ? 'Android' : 'Web';
 
-                    // ✅ AGREGAR BOTONES DE ACCIÓN
                     item.innerHTML = `
                         <div class="client-name">${typeIcon} ${typeName}</div>
                         <div class="client-info">ID: ${client.id.substring(0, 8)}...</div>
                         <div class="client-info">Canales: ${client.active_channels}</div>
                         ${client.has_solo ? '<div class="client-info" style="color: #ff0;">SOLO</div>' : ''}
                         ${client.pre_listen !== null ? '<div class="client-info" style="color: #f0f;">PFL</div>' : ''}
-                        
-                        <div class="client-actions">
-                            <button class="action-btn" onclick="window.controlCenter.resetClient('${client.id}')">Reset</button>
-                            <button class="action-btn" onclick="window.controlCenter.selectClient('${client.id}')">Control</button>
-                        </div>
                     `;
+
+                    item.addEventListener('click', () => {
+                        this.selectClient(client.id);
+                    });
 
                     container.appendChild(item);
                 });
@@ -568,14 +492,7 @@
                     item.classList.remove('selected');
                 });
                 
-                // Find and select the clicked item
-                document.querySelectorAll('.client-item').forEach(item => {
-                    if (item.querySelector('.action-btn') && 
-                        item.querySelector('.action-btn').onclick && 
-                        item.querySelector('.action-btn').onclick.toString().includes(clientId)) {
-                        item.classList.add('selected');
-                    }
-                });
+                event.currentTarget?.classList.add('selected');
 
                 const client = this.clients[clientId];
                 if (!client) return;
@@ -635,32 +552,23 @@
                     // Event listeners
                     const onBtn = strip.querySelector('.on-btn');
                     if (isActive) onBtn.classList.add('active');
-                    onBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
+                    onBtn.addEventListener('click', () => {
                         this.toggleChannel(clientId, i);
                     });
 
                     const soloBtn = strip.querySelector('.solo');
-                    soloBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
+                    soloBtn.addEventListener('click', () => {
                         this.toggleSolo(clientId, i);
                     });
 
                     const pflBtn = strip.querySelector('.pfl');
-                    pflBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
+                    pflBtn.addEventListener('click', () => {
                         this.setPFL(clientId, i);
                     });
 
                     const fader = strip.querySelector('.fader');
                     fader.addEventListener('input', (e) => {
-                        e.stopPropagation();
                         this.updateGain(clientId, i, parseFloat(e.target.value));
-                    });
-
-                    // Add click listener to select this channel strip
-                    strip.addEventListener('click', () => {
-                        this.selectClient(clientId);
                     });
 
                     container.appendChild(strip);
@@ -680,7 +588,10 @@
                     channels.push(channel);
                 }
 
-                this.setClientChannels(clientId, channels);
+                this.socket.emit('update_client_mix', {
+                    target_client_id: clientId,
+                    channels: channels
+                });
 
                 // Update local
                 client.channels = channels;
@@ -692,36 +603,20 @@
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                let solos = client.has_solo ? [...(client.solos || [])] : [];
-                const index = solos.indexOf(channel);
-
-                if (index >= 0) {
-                    solos.splice(index, 1);
-                } else {
-                    solos.push(channel);
-                }
-
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    solos: solos
-                });
-
-                console.log('[Solo]', clientId, channel, solos);
+                // TODO: Implementar lógica de solo
+                console.log('[Solo]', clientId, channel);
             }
 
             setPFL(clientId, channel) {
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                const currentPFL = client.pre_listen;
-                const newPFL = currentPFL === channel ? null : channel;
-
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
-                    pre_listen: newPFL
+                    pre_listen: channel
                 });
 
-                console.log('[PFL]', clientId, newPFL);
+                console.log('[PFL]', clientId, channel);
             }
 
             updateGain(clientId, channel, db) {
@@ -743,13 +638,28 @@
                 if (!this.selectedClientId) return;
                 
                 const channels = Array.from({length: this.deviceInfo.channels}, (_, i) => i);
-                this.setClientChannels(this.selectedClientId, channels);
+                
+                this.socket.emit('update_client_mix', {
+                    target_client_id: this.selectedClientId,
+                    channels: channels
+                });
+
+                this.clients[this.selectedClientId].channels = channels;
+                this.clients[this.selectedClientId].active_channels = channels.length;
+                this.renderMixer(this.selectedClientId);
             }
 
             selectNoChannels() {
                 if (!this.selectedClientId) return;
                 
-                this.setClientChannels(this.selectedClientId, []);
+                this.socket.emit('update_client_mix', {
+                    target_client_id: this.selectedClientId,
+                    channels: []
+                });
+
+                this.clients[this.selectedClientId].channels = [];
+                this.clients[this.selectedClientId].active_channels = 0;
+                this.renderMixer(this.selectedClientId);
             }
 
             clearSolos() {
@@ -767,39 +677,6 @@
                 this.socket.emit('update_client_mix', {
                     target_client_id: this.selectedClientId,
                     pre_listen: null
-                });
-            }
-
-            resetSelectedClient() {
-                if (!this.selectedClientId) return;
-                
-                if (confirm(`¿Resetear configuración del cliente ${this.selectedClientId.substring(0, 8)}?`)) {
-                    this.resetClient(this.selectedClientId);
-                }
-            }
-
-            // ✅ NUEVOS MÉTODOS
-            setClientChannels(clientId, channels) {
-                if (!this.socket) return;
-                
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    channels: channels
-                });
-            }
-
-            resetClient(clientId) {
-                if (!this.socket) return;
-                
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    channels: [],
-                    gains: {},
-                    pans: {},
-                    mutes: {},
-                    solos: [],
-                    pre_listen: null,
-                    master_gain: 1.0
                 });
             }
 

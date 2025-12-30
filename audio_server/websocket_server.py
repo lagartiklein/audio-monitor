@@ -1,46 +1,41 @@
+"""
+WebSocket Server - COMPLETE & FIXED
+✅ Control centralizado desde Web UI
+✅ Gestión de clientes nativos y web
+✅ Broadcast optimizado
+✅ Detección de clientes zombie
+"""
+
 from flask import Flask, send_from_directory, request
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, disconnect
 import time
 import os
-import sys
-import config
 import logging
+import config
 
-# ✅ NUEVO: Función para rutas en PyInstaller
-def get_base_path():
-    """Obtener ruta base que funciona en desarrollo y exe"""
-    if getattr(sys, 'frozen', False):
-        return sys._MEIPASS
-    else:
-        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-BASE_DIR = get_base_path()
+# Configurar rutas
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 
-# ✅ Verificar que frontend existe
-if not os.path.exists(FRONTEND_DIR):
-    print(f"⚠️ WARNING: Frontend directory not found at {FRONTEND_DIR}")
-    # Intentar buscar en directorio actual
-    alt_frontend = os.path.join(os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else __file__), 'frontend')
-    if os.path.exists(alt_frontend):
-        FRONTEND_DIR = alt_frontend
-        print(f"✅ Found frontend at: {FRONTEND_DIR}")
-    else:
-        print(f"❌ Frontend not found. Web UI may not work.")
+# Configurar logging
+logger = logging.getLogger(__name__)
 
+# Crear aplicación Flask
 app = Flask(__name__, 
             static_folder=FRONTEND_DIR,
             template_folder=FRONTEND_DIR)
 
-app.config['SECRET_KEY'] = 'audio-monitor-key'
+app.config['SECRET_KEY'] = 'audio-monitor-key-v2.5-fixed'
 
+# Configurar SocketIO
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*", 
-    ping_timeout=30,
-    ping_interval=10,
+    async_mode='threading',
+    ping_timeout=30,  # ✅ AUMENTADO: 30s (era 10s)
+    ping_interval=10,  # ✅ Cada 10s
     compression=False,
-    max_http_buffer_size=2000000,
+    max_http_buffer_size=1000000,
     engineio_logger=False,
     logger=False,
     always_connect=True,
@@ -48,86 +43,79 @@ socketio = SocketIO(
     binary=True
 )
 
+# Estado global
 channel_manager = None
-logger = logging.getLogger(__name__)
-
-# 🎚️ VU METERS: Sistema de broadcast
-vu_last_broadcast = 0
-vu_broadcast_interval = 100  # ms - sincronizado con audio_capture
+web_clients = {}  # ✅ NUEVO: Tracking de clientes web
+web_clients_lock = __import__('threading').Lock()
 
 def init_server(manager):
-    """✅ CORREGIDO: Inicializar servidor WebSocket y registrar socketio"""
+    """Inicializar servidor WebSocket"""
     global channel_manager
     channel_manager = manager
-    # ✅ Inyectar socketio en channel_manager
-    channel_manager.set_socketio(socketio)
-    print(f"[WebSocket] ✅ Inicializado (Control Central + VU Meters)")
-    print(f"[WebSocket] 📁 Frontend Dir: {FRONTEND_DIR}")
+    
+    # ✅ Inyectar socketio en channel_manager para broadcasts
+    if hasattr(channel_manager, 'set_socketio'):
+        channel_manager.set_socketio(socketio)
+    
+    logger.info(f"[WebSocket] ✅ Inicializado (Control Central)")
+    logger.info(f"[WebSocket]    Puerto: {config.WEB_PORT}")
+    logger.info(f"[WebSocket]    Frontend: {FRONTEND_DIR}")
+    logger.info(f"[WebSocket]    Ping interval: 10s, timeout: 30s")
 
-def broadcast_vu_levels(levels):
-    """
-    🎚️ Broadcast de niveles VU a todos los clientes web
-    
-    Args:
-        levels: dict {channel: {'rms_percent': float, 'peak_percent': float, ...}}
-    """
-    global vu_last_broadcast
-    
-    current_time = time.time() * 1000
-    
-    # Throttling para no saturar websocket
-    if current_time - vu_last_broadcast < vu_broadcast_interval:
-        return
-    
-    vu_last_broadcast = current_time
-    
-    try:
-        # Preparar datos simplificados para envío
-        simplified_levels = {}
-        for ch, data in levels.items():
-            simplified_levels[ch] = {
-                'rms': round(data['rms_percent'], 1),  # 0-100
-                'peak': round(data['peak_percent'], 1),  # 0-100
-                'db': round(data['rms_db'], 1)  # dB real
-            }
-        
-        # Broadcast a todos los clientes conectados
-        socketio.emit('vu_levels', {
-            'levels': simplified_levels,
-            'timestamp': int(current_time)
-        })
-        
-    except Exception as e:
-        if config.DEBUG:
-            logger.error(f"Error broadcasting VU levels: {e}")
+
+# ============================================================================
+# RUTAS FLASK
+# ============================================================================
 
 @app.route('/')
 def index():
-    if os.path.exists(os.path.join(app.static_folder, 'index.html')):
-        return send_from_directory(app.static_folder, 'index.html')
-    else:
-        return f"""
-        <html>
-        <head><title>Fichatech Monitor - Error</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #0a0a0a; color: #00ff00;">
-            <h1>❌ Frontend Not Found</h1>
-            <p>Frontend directory: <code>{app.static_folder}</code></p>
-            <p>Expected: <code>{os.path.join(app.static_folder, 'index.html')}</code></p>
-            <hr>
-            <p>Base DIR: <code>{BASE_DIR}</code></p>
-            <p>Frozen: <code>{getattr(sys, 'frozen', False)}</code></p>
-        </body>
-        </html>
-        """, 404
+    """Página principal"""
+    return send_from_directory(app.static_folder, 'index.html')
+
 
 @app.route('/<path:path>')
 def static_files(path):
-    return send_from_directory(app.static_folder, path)
+    """Archivos estáticos"""
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        logger.error(f"Error sirviendo archivo {path}: {e}")
+        return "File not found", 404
+
+
+@app.errorhandler(404)
+def not_found(e):
+    """Redirect 404 a index.html para SPA routing"""
+    return send_from_directory(app.static_folder, 'index.html')
+
+
+# ============================================================================
+# EVENTOS SOCKETIO - CONEXIÓN
+# ============================================================================
 
 @socketio.on('connect')
 def handle_connect():
+    """Cliente web conectado"""
     client_id = request.sid
-    if channel_manager:
+    
+    # ✅ Registrar cliente web
+    with web_clients_lock:
+        web_clients[client_id] = {
+            'connected_at': time.time(),
+            'last_activity': time.time(),
+            'address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', 'Unknown')
+        }
+    
+    logger.info(f"[WebSocket] ✅ Cliente web conectado: {client_id[:8]} ({request.remote_addr})")
+    
+    if not channel_manager:
+        logger.warning(f"[WebSocket] ⚠️ Channel manager no inicializado")
+        emit('error', {'message': 'Server not ready'})
+        return
+    
+    try:
+        # ✅ Enviar información del dispositivo
         device_info = {
             'name': 'Audio Interface RF',
             'channels': channel_manager.num_channels,
@@ -135,182 +123,158 @@ def handle_connect():
             'blocksize': config.BLOCKSIZE,
             'latency_ms': config.BLOCKSIZE / config.SAMPLE_RATE * 1000,
             'mode': 'control_center',
-            'vu_enabled': True  # 🎚️ Indicar que VU está disponible
+            'version': '2.5.0-FIXED',
+            'features': {
+                'zombie_detection': True,
+                'device_change_detection': True,
+                'auto_reconnect': True,
+                'int16_encoding': getattr(config, 'USE_INT16_ENCODING', True)
+            }
         }
         emit('device_info', device_info)
         
-        # Enviar lista de clientes conectados
-        clients_info = channel_manager.get_all_clients_info()
+        # ✅ Enviar lista de clientes conectados (nativos + web)
+        clients_info = get_all_clients_info()
         emit('clients_update', {'clients': clients_info})
-    
-    print(f"[WebSocket] ✅ Conectado: {client_id[:8]}")
+        
+        # ✅ Enviar estadísticas del servidor
+        server_stats = get_server_stats()
+        emit('server_stats', server_stats)
+        
+        logger.info(f"[WebSocket]    Info enviada: {len(clients_info)} clientes totales")
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en connect: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """✅ CORREGIDO: Sin argumentos (Flask-SocketIO no pasa reason aquí)"""
+    """Cliente web desconectado"""
     client_id = request.sid
-
+    
+    # ✅ Remover de tracking
+    with web_clients_lock:
+        client_info = web_clients.pop(client_id, None)
+    
+    if client_info:
+        connection_duration = time.time() - client_info['connected_at']
+        logger.info(f"[WebSocket] 🔌 Cliente web desconectado: {client_id[:8]} "
+                   f"({connection_duration:.1f}s)")
+    
+    # ✅ Desuscribir del channel manager
     if channel_manager:
-        channel_manager.unsubscribe_client(client_id)
-        
-        # Notificar a otros clientes web
+        try:
+            channel_manager.unsubscribe_client(client_id)
+        except Exception as e:
+            logger.error(f"[WebSocket] Error desuscribiendo: {e}")
+    
+    # ✅ Notificar a otros clientes
+    try:
         broadcast_clients_update()
-        
-        # Emitir evento específico de desconexión
-        socketio.emit('client_disconnected', {
-            'client_id': client_id,
-            'timestamp': int(time.time() * 1000),
-            'client_type': 'web'
-        }, include_self=False)
+    except:
+        pass
 
-    print(f"[WebSocket] ❌ Desconectado: {client_id[:8]}")
+
+# ============================================================================
+# EVENTOS SOCKETIO - SUSCRIPCIONES Y CONTROL
+# ============================================================================
 
 @socketio.on('subscribe')
 def handle_subscribe(data):
-    """Suscribir cliente web (control panel - no recibe audio)"""
+    """
+    Suscribir cliente web a canales
+    data: {
+        'channels': [0, 1, 2, ...],
+        'gains': {0: 1.0, 1: 0.8, ...},
+        'pans': {0: 0.0, 1: -0.5, ...}
+    }
+    """
     client_id = request.sid
-    channels = data.get('channels', [])
-    gains = data.get('gains', {})
     
-    gains_int = {}
-    for k, v in gains.items():
-        try:
-            gains_int[int(k)] = float(v)
-        except:
-            pass
+    # ✅ Actualizar actividad
+    update_client_activity(client_id)
     
-    if channel_manager:
-        channel_manager.subscribe_client(client_id, channels, gains_int, client_type="web")
-        emit('subscribed', {'channels': channels})
-        print(f"[WebSocket] 📡 {client_id[:8]} suscrito: {len(channels)} canales")
-
-@socketio.on('update_client_mix')
-def handle_update_client_mix(data):
-    """✅ OPTIMIZADO: Actualizar mezcla de un cliente con validaciones"""
-    
-    # Extraer command_id si existe (para ACK)
-    command_id = data.pop('_commandId', None)
-    
-    # Validaciones
     if not channel_manager:
-        emit('command_failed', {
-            'command': 'update_client_mix',
-            'reason': 'Channel manager no disponible',
-            '_commandId': command_id
-        })
-        return
-    
-    target_client_id = data.get('target_client_id')
-    if not target_client_id:
-        emit('command_failed', {
-            'command': 'update_client_mix',
-            'reason': 'target_client_id requerido',
-            '_commandId': command_id
-        })
-        return
-    
-    # Verificar que el cliente existe
-    if target_client_id not in channel_manager.subscriptions:
-        emit('command_failed', {
-            'command': 'update_client_mix',
-            'reason': f'Cliente {target_client_id[:8]} no encontrado',
-            'client_id': target_client_id,
-            '_commandId': command_id
-        })
+        emit('error', {'message': 'Channel manager not available'})
         return
     
     try:
-        # ✅ Convertir gains dict keys a int si es necesario
-        gains = data.get('gains')
-        if gains:
-            gains_converted = {}
-            for k, v in gains.items():
-                try:
-                    channel_int = int(k)
-                    gain_float = float(v)
-                    # Validar rango
-                    if 0.0 <= gain_float <= 10.0:
-                        gains_converted[channel_int] = gain_float
-                    else:
-                        logger.warning(f"Gain fuera de rango: {gain_float}")
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Error convirtiendo gain: {k}={v}, {e}")
-            data['gains'] = gains_converted if gains_converted else None
+        channels = data.get('channels', [])
+        gains = data.get('gains', {})
+        pans = data.get('pans', {})
         
-        # ✅ Convertir pans dict keys a int
-        pans = data.get('pans')
-        if pans:
-            pans_converted = {}
-            for k, v in pans.items():
-                try:
-                    channel_int = int(k)
-                    pan_float = float(v)
-                    # Validar rango
-                    if -1.0 <= pan_float <= 1.0:
-                        pans_converted[channel_int] = pan_float
-                    else:
-                        logger.warning(f"Pan fuera de rango: {pan_float}")
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Error convirtiendo pan: {k}={v}, {e}")
-            data['pans'] = pans_converted if pans_converted else None
+        # ✅ Convertir keys a int
+        gains_int = {}
+        pans_int = {}
         
-        # ✅ Convertir mutes dict keys a int
-        mutes = data.get('mutes')
-        if mutes:
-            mutes_converted = {}
-            for k, v in mutes.items():
-                try:
-                    mutes_converted[int(k)] = bool(v)
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Error convirtiendo mute: {k}={v}, {e}")
-            data['mutes'] = mutes_converted if mutes_converted else None
-        
-        # ✅ Validar solos (debe ser lista de ints)
-        solos = data.get('solos')
-        if solos is not None:
+        for k, v in gains.items():
             try:
-                if isinstance(solos, list):
-                    data['solos'] = [int(ch) for ch in solos if isinstance(ch, (int, str))]
-                else:
-                    data['solos'] = None
-            except (ValueError, TypeError) as e:
-                logger.warning(f"Error convirtiendo solos: {solos}, {e}")
-                data['solos'] = None
+                gains_int[int(k)] = float(v)
+            except:
+                pass
         
-        # ✅ Validar channels (debe ser lista de ints)
-        channels = data.get('channels')
-        if channels is not None:
+        for k, v in pans.items():
             try:
-                if isinstance(channels, list):
-                    data['channels'] = [int(ch) for ch in channels if isinstance(ch, (int, str))]
-                else:
-                    data['channels'] = None
-            except (ValueError, TypeError) as e:
-                logger.warning(f"Error convirtiendo channels: {channels}, {e}")
-                data['channels'] = None
+                pans_int[int(k)] = float(v)
+            except:
+                pass
         
-        # ✅ Validar pre_listen
-        pre_listen = data.get('pre_listen')
-        if pre_listen is not None:
-            try:
-                if isinstance(pre_listen, (int, str)):
-                    data['pre_listen'] = int(pre_listen) if pre_listen != 'null' else None
-            except (ValueError, TypeError):
-                data['pre_listen'] = None
+        # ✅ Suscribir cliente
+        channel_manager.subscribe_client(
+            client_id, 
+            channels, 
+            gains_int,
+            pans_int,
+            client_type="web"
+        )
         
-        # ✅ Validar master_gain
-        master_gain = data.get('master_gain')
-        if master_gain is not None:
-            try:
-                gain_float = float(master_gain)
-                if 0.0 <= gain_float <= 5.0:
-                    data['master_gain'] = gain_float
-                else:
-                    data['master_gain'] = None
-            except (ValueError, TypeError):
-                data['master_gain'] = None
+        emit('subscribed', {
+            'channels': channels,
+            'gains': gains_int,
+            'pans': pans_int
+        })
         
-        # Intentar actualizar
+        logger.info(f"[WebSocket] 📡 {client_id[:8]} suscrito: {len(channels)} canales")
+        
+        # ✅ Notificar a otros clientes
+        broadcast_clients_update()
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en subscribe: {e}")
+        emit('error', {'message': str(e)})
+
+
+@socketio.on('update_client_mix')
+def handle_update_client_mix(data):
+    """
+    ✅ Actualizar mezcla de un cliente específico (nativo o web)
+    data: {
+        'target_client_id': str,
+        'channels': [...],
+        'gains': {...},
+        'pans': {...},
+        'mutes': {...},
+        'solos': [...],
+        'pre_listen': int | None,
+        'master_gain': float
+    }
+    """
+    if not channel_manager:
+        emit('error', {'message': 'Channel manager not available'})
+        return
+    
+    # ✅ Actualizar actividad
+    update_client_activity(request.sid)
+    
+    try:
+        target_client_id = data.get('target_client_id')
+        if not target_client_id:
+            emit('error', {'message': 'target_client_id required'})
+            return
+        
+        # ✅ Actualizar mezcla
         success = channel_manager.update_client_mix(
             target_client_id,
             channels=data.get('channels'),
@@ -323,164 +287,430 @@ def handle_update_client_mix(data):
         )
         
         if success:
-            # ✅ Confirmar éxito
-            emit('command_ack', {
-                'command': 'update_client_mix',
+            emit('mix_updated', {
                 'client_id': target_client_id,
-                'timestamp': int(time.time() * 1000),
-                '_commandId': command_id
+                'status': 'ok',
+                'timestamp': int(time.time() * 1000)
             })
             
-            # ✅ Obtener estado actualizado completo
-            updated_client = channel_manager.get_client_subscription(target_client_id)
-            if updated_client:
-                # Broadcast estado actualizado a TODOS los web clients
-                client_info = {
-                    'id': target_client_id,
-                    'type': channel_manager.client_types.get(target_client_id, 'unknown'),
-                    'channels': updated_client.get('channels', []),
-                    'active_channels': len(updated_client.get('channels', [])),
-                    'gains': updated_client.get('gains', {}),
-                    'pans': updated_client.get('pans', {}),
-                    'mutes': updated_client.get('mutes', {}),
-                    'solos': list(updated_client.get('solos', set())),
-                    'has_solo': len(updated_client.get('solos', set())) > 0,
-                    'pre_listen': updated_client.get('pre_listen'),
-                    'master_gain': updated_client.get('master_gain', 1.0),
-                    'last_update': updated_client.get('last_update', 0)
-                }
-                
-                socketio.emit('client_mix_updated', {
-                    'client': client_info,
-                    'timestamp': int(time.time() * 1000)
-                })
+            logger.info(f"[WebSocket] 🎛️ Mezcla actualizada para {target_client_id[:15]}")
             
-            if config.DEBUG:
-                print(f"[WebSocket] ✅ Mix actualizado: {target_client_id[:8]}")
+            # ✅ Broadcast a todos (incluye el cambio)
+            broadcast_clients_update()
+            
         else:
-            # ❌ Cliente no encontrado o error
-            emit('command_failed', {
-                'command': 'update_client_mix',
-                'reason': f'No se pudo actualizar cliente {target_client_id[:8]}',
-                'client_id': target_client_id,
-                '_commandId': command_id
-            })
+            emit('error', {'message': f'Failed to update mix for {target_client_id}'})
     
     except Exception as e:
-        # ❌ Error inesperado
-        logger.error(f"Error en update_client_mix: {e}", exc_info=True)
-        emit('command_failed', {
-            'command': 'update_client_mix',
-            'reason': str(e),
-            'client_id': target_client_id,
-            '_commandId': command_id
-        })
-        print(f"[WebSocket] ❌ Error: {e}")
+        logger.error(f"[WebSocket] ❌ Error en update_client_mix: {e}")
+        emit('error', {'message': str(e)})
+
 
 @socketio.on('get_clients')
 def handle_get_clients():
-    """✅ Obtener lista de clientes con estado completo"""
-    if channel_manager:
-        clients_info = channel_manager.get_all_clients_info()
+    """
+    ✅ Obtener lista completa de clientes (nativos + web)
+    """
+    update_client_activity(request.sid)
+    
+    try:
+        clients_info = get_all_clients_info()
+        emit('clients_list', {
+            'clients': clients_info,
+            'timestamp': int(time.time() * 1000)
+        })
         
-        # ✅ Agregar información completa de cada cliente
-        detailed_clients = []
-        for client in clients_info:
-            subscription = channel_manager.get_client_subscription(client['id'])
-            if subscription:
-                client['gains'] = subscription.get('gains', {})
-                client['pans'] = subscription.get('pans', {})
-                client['mutes'] = subscription.get('mutes', {})
-                client['solos'] = list(subscription.get('solos', set()))
-            detailed_clients.append(client)
-        
-        emit('clients_list', {'clients': detailed_clients})
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en get_clients: {e}")
+        emit('error', {'message': str(e)})
+
 
 @socketio.on('update_gain')
 def handle_update_gain(data):
-    """Actualizar ganancia (self - legacy, usar update_client_mix)"""
+    """
+    Actualizar ganancia de un canal (para el cliente actual)
+    data: {
+        'channel': int,
+        'gain': float
+    }
+    """
     client_id = request.sid
-    channel = data.get('channel')
-    gain = data.get('gain')
+    update_client_activity(client_id)
     
-    if channel_manager:
+    if not channel_manager:
+        return
+    
+    try:
+        channel = data.get('channel')
+        gain = data.get('gain')
+        
+        if channel is None or gain is None:
+            return
+        
+        # ✅ Actualizar en channel manager
         if client_id in channel_manager.subscriptions:
-            try:
-                channel_manager.subscriptions[client_id]['gains'][int(channel)] = float(gain)
-            except Exception as e:
-                if config.DEBUG:
-                    print(f"[WebSocket] Error update_gain: {e}")
+            channel_manager.subscriptions[client_id]['gains'][int(channel)] = float(gain)
+            
+            if config.DEBUG:
+                logger.debug(f"[WebSocket] 🎚️ {client_id[:8]} - Canal {channel}: {gain:.2f}")
+    
+    except Exception as e:
+        if config.DEBUG:
+            logger.error(f"[WebSocket] Error update_gain: {e}")
+
+
+@socketio.on('update_pan')
+def handle_update_pan(data):
+    """
+    ✅ NUEVO: Actualizar panorama de un canal
+    data: {
+        'channel': int,
+        'pan': float (-1.0 a 1.0)
+    }
+    """
+    client_id = request.sid
+    update_client_activity(client_id)
+    
+    if not channel_manager:
+        return
+    
+    try:
+        channel = data.get('channel')
+        pan = data.get('pan')
+        
+        if channel is None or pan is None:
+            return
+        
+        # ✅ Actualizar en channel manager
+        if client_id in channel_manager.subscriptions:
+            channel_manager.subscriptions[client_id]['pans'][int(channel)] = float(pan)
+            
+            if config.DEBUG:
+                logger.debug(f"[WebSocket] 🔊 {client_id[:8]} - Canal {channel} pan: {pan:.2f}")
+    
+    except Exception as e:
+        if config.DEBUG:
+            logger.error(f"[WebSocket] Error update_pan: {e}")
+
+
+@socketio.on('disconnect_client')
+def handle_disconnect_client(data):
+    """
+    ✅ NUEVO: Forzar desconexión de un cliente
+    data: {
+        'target_client_id': str
+    }
+    """
+    if not channel_manager:
+        return
+    
+    update_client_activity(request.sid)
+    
+    try:
+        target_client_id = data.get('target_client_id')
+        if not target_client_id:
+            return
+        
+        logger.info(f"[WebSocket] 🔌 Desconexión forzada: {target_client_id[:15]}")
+        
+        # ✅ Desuscribir del channel manager
+        channel_manager.unsubscribe_client(target_client_id)
+        
+        # ✅ Si es cliente web, desconectar socket
+        if target_client_id in web_clients:
+            disconnect(sid=target_client_id)
+        
+        # ✅ Broadcast actualización
+        broadcast_clients_update()
+        
+        emit('client_disconnected', {
+            'client_id': target_client_id,
+            'timestamp': int(time.time() * 1000)
+        })
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] Error disconnect_client: {e}")
+
+
+# ============================================================================
+# EVENTOS SOCKETIO - MONITOREO
+# ============================================================================
 
 @socketio.on('ping')
 def handle_ping(data):
-    """Medir latencia de red"""
+    """
+    Medir latencia de red
+    data: {'timestamp': int}
+    """
+    update_client_activity(request.sid)
+    
     emit('pong', {
         'client_timestamp': data.get('timestamp', 0),
         'server_timestamp': int(time.time() * 1000)
     })
 
-@socketio.on('request_client_state')
-def handle_request_client_state(data):
-    """✅ NUEVO: Solicitar estado completo de un cliente"""
-    target_client_id = data.get('client_id')
+
+@socketio.on('get_server_stats')
+def handle_get_server_stats():
+    """
+    ✅ NUEVO: Obtener estadísticas del servidor
+    """
+    update_client_activity(request.sid)
     
-    if not channel_manager or not target_client_id:
-        emit('error', {'message': 'Invalid request'})
+    try:
+        stats = get_server_stats()
+        emit('server_stats', stats)
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] Error get_server_stats: {e}")
+
+
+@socketio.on('heartbeat')
+def handle_heartbeat(data):
+    """
+    ✅ NUEVO: Heartbeat explícito de cliente web
+    """
+    client_id = request.sid
+    update_client_activity(client_id)
+    
+    emit('heartbeat_ack', {
+        'timestamp': int(time.time() * 1000)
+    })
+
+
+# ============================================================================
+# FUNCIONES HELPER
+# ============================================================================
+
+def update_client_activity(client_id):
+    """✅ Actualizar timestamp de actividad de cliente web"""
+    with web_clients_lock:
+        if client_id in web_clients:
+            web_clients[client_id]['last_activity'] = time.time()
+
+
+def get_all_clients_info():
+    """
+    ✅ Obtener información de TODOS los clientes (nativos + web)
+    """
+    clients_info = []
+    
+    if not channel_manager:
+        return clients_info
+    
+    # ✅ Obtener clientes desde channel_manager
+    try:
+        clients_info = channel_manager.get_all_clients_info()
+    except Exception as e:
+        logger.error(f"[WebSocket] Error obteniendo clientes: {e}")
+    
+    # ✅ Enriquecer con info de web_clients
+    with web_clients_lock:
+        for client_info in clients_info:
+            client_id = client_info.get('id')
+            if client_id in web_clients:
+                web_info = web_clients[client_id]
+                client_info['address'] = web_info.get('address')
+                client_info['connected_at'] = web_info.get('connected_at')
+                client_info['last_activity'] = web_info.get('last_activity')
+    
+    return clients_info
+
+
+def get_server_stats():
+    """
+    ✅ NUEVO: Obtener estadísticas completas del servidor
+    """
+    stats = {
+        'timestamp': int(time.time() * 1000),
+        'web_clients': 0,
+        'native_clients': 0,
+        'total_clients': 0,
+        'channel_manager': {},
+        'native_server': {}
+    }
+    
+    if not channel_manager:
+        return stats
+    
+    try:
+        # ✅ Estadísticas de channel manager
+        cm_stats = channel_manager.get_stats()
+        stats['channel_manager'] = cm_stats
+        stats['web_clients'] = cm_stats.get('web_clients', 0)
+        stats['native_clients'] = cm_stats.get('native_clients', 0)
+        stats['total_clients'] = cm_stats.get('total_clients', 0)
+        
+        # ✅ Estadísticas de native server
+        try:
+            from audio_server import native_server
+            if hasattr(native_server, 'get_stats'):
+                native_stats = native_server.get_stats()
+                stats['native_server'] = native_stats
+        except:
+            pass
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] Error obteniendo stats: {e}")
+    
+    return stats
+
+
+def broadcast_clients_update():
+    """
+    ✅ Enviar actualización de clientes a TODOS los web clients
+    """
+    if not channel_manager:
         return
     
-    subscription = channel_manager.get_client_subscription(target_client_id)
-    if subscription:
-        client_state = {
-            'client_id': target_client_id,
-            'channels': subscription.get('channels', []),
-            'gains': subscription.get('gains', {}),
-            'pans': subscription.get('pans', {}),
-            'mutes': subscription.get('mutes', {}),
-            'solos': list(subscription.get('solos', set())),
-            'pre_listen': subscription.get('pre_listen'),
-            'master_gain': subscription.get('master_gain', 1.0),
-            'client_type': channel_manager.client_types.get(target_client_id, 'unknown')
-        }
-        emit('client_state', client_state)
-    else:
-        emit('error', {'message': 'Client not found'})
-
-# Broadcast de actualización de clientes (llamado desde native_server)
-def broadcast_clients_update():
-    """✅ CORREGIDO: Enviar actualización de clientes sin 'broadcast' parameter"""
-    if channel_manager:
-        clients_info = channel_manager.get_all_clients_info()
+    try:
+        clients_info = get_all_clients_info()
         
-        # Agregar info completa
-        detailed_clients = []
-        for client in clients_info:
-            subscription = channel_manager.get_client_subscription(client['id'])
-            if subscription:
-                client['gains'] = subscription.get('gains', {})
-                client['pans'] = subscription.get('pans', {})
-                client['mutes'] = subscription.get('mutes', {})
-                client['solos'] = list(subscription.get('solos', set()))
-            detailed_clients.append(client)
+        socketio.emit('clients_update', {
+            'clients': clients_info,
+            'timestamp': int(time.time() * 1000)
+        }, broadcast=True)
         
-        # ✅ CORREGIDO: Sin 'broadcast=True' - emit() ya hace broadcast por defecto
-        socketio.emit('clients_update', {'clients': detailed_clients})
+        if config.DEBUG:
+            logger.debug(f"[WebSocket] 📢 Broadcast: {len(clients_info)} clientes")
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en broadcast: {e}")
 
-@app.errorhandler(404)
-def not_found(e):
-    if os.path.exists(os.path.join(app.static_folder, 'index.html')):
-        return send_from_directory(app.static_folder, 'index.html')
-    else:
-        return f"""
-        <html>
-        <head><title>404 - Not Found</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #0a0a0a; color: #00ff00;">
-            <h1>❌ 404 - Not Found</h1>
-            <p>Requested path: <code>{request.path}</code></p>
-            <p>Frontend directory: <code>{app.static_folder}</code></p>
-        </body>
-        </html>
-        """, 404
+
+def broadcast_client_disconnected(client_id):
+    """
+    ✅ NUEVO: Notificar desconexión de cliente específico
+    """
+    try:
+        socketio.emit('client_disconnected', {
+            'client_id': client_id,
+            'timestamp': int(time.time() * 1000)
+        }, broadcast=True)
+        
+        logger.info(f"[WebSocket] 📢 Broadcast desconexión: {client_id[:15]}")
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] Error broadcast disconnect: {e}")
+
+
+# ============================================================================
+# MANTENIMIENTO EN BACKGROUND
+# ============================================================================
+
+def start_maintenance_thread():
+    """
+    ✅ NUEVO: Thread de mantenimiento para limpiar clientes web inactivos
+    """
+    import threading
+    
+    def maintenance_loop():
+        while True:
+            time.sleep(30)  # Cada 30 segundos
+            
+            try:
+                current_time = time.time()
+                timeout = 120.0  # 2 minutos sin actividad
+                
+                with web_clients_lock:
+                    inactive_clients = []
+                    
+                    for client_id, info in web_clients.items():
+                        last_activity = info.get('last_activity', 0)
+                        if current_time - last_activity > timeout:
+                            inactive_clients.append(client_id)
+                    
+                    if inactive_clients:
+                        logger.info(f"[WebSocket] 🧹 Limpiando {len(inactive_clients)} clientes web inactivos")
+                        
+                        for client_id in inactive_clients:
+                            web_clients.pop(client_id, None)
+                            
+                            # Desuscribir del channel manager
+                            if channel_manager:
+                                channel_manager.unsubscribe_client(client_id)
+                            
+                            # Desconectar socket
+                            try:
+                                disconnect(sid=client_id)
+                            except:
+                                pass
+                
+                # Broadcast actualización
+                if inactive_clients:
+                    broadcast_clients_update()
+                    
+            except Exception as e:
+                logger.error(f"[WebSocket] Error en maintenance: {e}")
+    
+    thread = threading.Thread(target=maintenance_loop, daemon=True)
+    thread.start()
+    logger.info("[WebSocket] ✅ Thread de mantenimiento iniciado")
+
+
+# ============================================================================
+# INICIALIZACIÓN
+# ============================================================================
+
+# ✅ Iniciar thread de mantenimiento al importar
+start_maintenance_thread()
+
+
+# ============================================================================
+# MAIN - Para testing standalone
+# ============================================================================
 
 if __name__ == '__main__':
-    print("[WebSocket] 🚀 Servidor WebSocket iniciando...")
-    socketio.run(app, host=config.WEB_HOST, port=config.WEB_PORT, debug=False)
+    print("\n" + "="*70)
+    print("  WEBSOCKET SERVER - STANDALONE MODE")
+    print("="*70)
+    print(f"  🌐 Host: {config.WEB_HOST}:{config.WEB_PORT}")
+    print(f"  📁 Frontend: {FRONTEND_DIR}")
+    print("="*70 + "\n")
+    
+    # Mock channel manager para testing
+    class MockChannelManager:
+        def __init__(self):
+            self.num_channels = 8
+            self.subscriptions = {}
+        
+        def subscribe_client(self, client_id, channels, gains=None, pans=None, client_type="web"):
+            self.subscriptions[client_id] = {
+                'channels': channels,
+                'gains': gains or {},
+                'pans': pans or {},
+                'client_type': client_type
+            }
+        
+        def unsubscribe_client(self, client_id):
+            self.subscriptions.pop(client_id, None)
+        
+        def get_all_clients_info(self):
+            return [
+                {
+                    'id': cid,
+                    'type': sub['client_type'],
+                    'channels': sub['channels'],
+                    'active_channels': len(sub['channels'])
+                }
+                for cid, sub in self.subscriptions.items()
+            ]
+        
+        def get_stats(self):
+            return {
+                'total_clients': len(self.subscriptions),
+                'web_clients': sum(1 for s in self.subscriptions.values() if s['client_type'] == 'web'),
+                'native_clients': sum(1 for s in self.subscriptions.values() if s['client_type'] == 'native')
+            }
+    
+    init_server(MockChannelManager())
+    
+    socketio.run(
+        app,
+        host=config.WEB_HOST,
+        port=config.WEB_PORT,
+        debug=False,
+        log_output=True,
+        use_reloader=False,
+        allow_unsafe_werkzeug=True
+    )
