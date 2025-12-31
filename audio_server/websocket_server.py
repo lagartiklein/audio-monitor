@@ -20,6 +20,11 @@ FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 # Configurar logging
 logger = logging.getLogger(__name__)
 
+# ✅ SUPRIMIR logs innecesarios
+logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
+logging.getLogger('flask.app').setLevel(logging.WARNING)
+logging.getLogger('flask_socketio').setLevel(logging.WARNING)
+
 # Crear aplicación Flask
 app = Flask(__name__, 
             static_folder=FRONTEND_DIR,
@@ -48,8 +53,42 @@ channel_manager = None
 web_clients = {}  # ✅ NUEVO: Tracking de clientes web
 web_clients_lock = __import__('threading').Lock()
 
+# ✅ Estado persistente para clientes web (auto-reconexión)
+web_persistent_state = {}
+web_persistent_lock = __import__('threading').Lock()
+
+# ✅ Configuración de limpieza de estados persistentes
+WEB_STATE_CACHE_TIMEOUT = 604800  # 7 días (1 semana)
+WEB_MAX_PERSISTENT_STATES = 200  # Máximo 200 estados (más para músicos recurrentes)
+
+def cleanup_expired_web_states():
+    """Limpiar estados persistentes expirados para web clients"""
+    current_time = time.time()
+    
+    with web_persistent_lock:
+        expired = [
+            pid for pid, state in web_persistent_state.items()
+            if current_time - state.get('saved_at', 0) > WEB_STATE_CACHE_TIMEOUT
+        ]
+        
+        for pid in expired:
+            logger.info(f"🗑️ Limpiando estado web expirado: {pid[:20]}")
+            del web_persistent_state[pid]
+        
+        # Limitar cantidad máxima de estados
+        if len(web_persistent_state) > WEB_MAX_PERSISTENT_STATES:
+            # Eliminar los más antiguos
+            sorted_states = sorted(
+                web_persistent_state.items(),
+                key=lambda x: x[1].get('saved_at', 0)
+            )
+            to_remove = len(web_persistent_state) - WEB_MAX_PERSISTENT_STATES
+            for pid, _ in sorted_states[:to_remove]:
+                logger.info(f"🗑️ Limpiando estado web por límite: {pid[:20]}")
+                del web_persistent_state[pid]
+
+
 def init_server(manager):
-    """Inicializar servidor WebSocket"""
     global channel_manager
     channel_manager = manager
     
@@ -61,6 +100,24 @@ def init_server(manager):
     logger.info(f"[WebSocket]    Puerto: {config.WEB_PORT}")
     logger.info(f"[WebSocket]    Frontend: {FRONTEND_DIR}")
     logger.info(f"[WebSocket]    Ping interval: 10s, timeout: 30s")
+
+
+def cleanup_initial_state():
+    """Limpieza inicial de estados persistentes y clientes inválidos."""
+    logger.info("[WebSocket] 🔄 Limpieza inicial de estados y clientes")
+
+    # Limpiar estados persistentes expirados
+    cleanup_expired_web_states()
+
+    # Limpiar clientes web desconectados
+    with web_clients_lock:
+        disconnected_clients = [
+            client_id for client_id, client_info in web_clients.items()
+            if time.time() - client_info['last_activity'] > WEB_STATE_CACHE_TIMEOUT
+        ]
+        for client_id in disconnected_clients:
+            logger.info(f"[WebSocket] 🗑️ Eliminando cliente desconectado: {client_id[:8]}")
+            del web_clients[client_id]
 
 
 # ============================================================================
@@ -79,7 +136,7 @@ def static_files(path):
     try:
         return send_from_directory(app.static_folder, path)
     except Exception as e:
-        logger.error(f"Error sirviendo archivo {path}: {e}")
+        logger.debug(f"Error sirviendo archivo {path}: {e}")
         return "File not found", 404
 
 
@@ -143,6 +200,33 @@ def handle_connect():
         
         logger.info(f"[WebSocket]    Info enviada: {len(clients_info)} clientes totales")
         
+        # ✅ Verificar estado persistente para auto-reconexión
+        persistent_id = f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
+        with web_persistent_lock:
+            if persistent_id in web_persistent_state:
+                saved_state = web_persistent_state[persistent_id]
+                logger.info(f"[WebSocket] 💾 Estado persistente encontrado para {persistent_id[:20]}")
+                
+                # Resuscribir automáticamente
+                try:
+                    channel_manager.subscribe_client(
+                        client_id,
+                        saved_state.get('channels', []),
+                        gains=saved_state.get('gains', {}),
+                        pans=saved_state.get('pans', {}),
+                        client_type="web"
+                    )
+                    logger.info(f"[WebSocket] ✅ Cliente resuscrito automáticamente: {len(saved_state.get('channels', []))} canales")
+                    
+                    # Notificar al cliente que se resuscrito
+                    emit('auto_resubscribed', {
+                        'channels': saved_state.get('channels', []),
+                        'gains': saved_state.get('gains', {}),
+                        'pans': saved_state.get('pans', {})
+                    })
+                except Exception as e:
+                    logger.error(f"[WebSocket] Error resuscrbiendo: {e}")
+        
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en connect: {e}")
         import traceback
@@ -153,6 +237,24 @@ def handle_connect():
 def handle_disconnect():
     """Cliente web desconectado"""
     client_id = request.sid
+    
+    # ✅ Generar persistent_id y guardar estado antes de desuscribir
+    persistent_id = f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
+    if channel_manager:
+        subscription = channel_manager.get_client_subscription(client_id)
+        if subscription:
+            with web_persistent_lock:
+                web_persistent_state[persistent_id] = {
+                    'channels': subscription.get('channels', []),
+                    'gains': subscription.get('gains', {}),
+                    'pans': subscription.get('pans', {}),
+                    'mutes': subscription.get('mutes', {}),
+                    'solos': list(subscription.get('solos', set())),
+                    'pre_listen': subscription.get('pre_listen'),
+                    'master_gain': subscription.get('master_gain', 1.0),
+                    'saved_at': time.time()
+                }
+                logger.info(f"[WebSocket] 💾 Estado guardado para reconexión: {persistent_id[:20]}")
     
     # ✅ Remover de tracking
     with web_clients_lock:
@@ -501,6 +603,23 @@ def get_all_clients_info():
     # ✅ Obtener clientes desde channel_manager
     try:
         clients_info = channel_manager.get_all_clients_info()
+        
+        # ✅ FILTRAR solo clientes realmente conectados
+        connected_client_ids = set()
+        
+        # Obtener clientes conectados del servidor nativo
+        if hasattr(channel_manager, 'native_server') and channel_manager.native_server:
+            with channel_manager.native_server.client_lock:
+                connected_client_ids = set(channel_manager.native_server.clients.keys())
+        
+        # Filtrar la lista
+        filtered_clients = [
+            client for client in clients_info 
+            if client['id'] in connected_client_ids or client.get('type') == 'web'
+        ]
+        
+        clients_info = filtered_clients
+        
     except Exception as e:
         logger.error(f"[WebSocket] Error obteniendo clientes: {e}")
     
@@ -557,25 +676,22 @@ def get_server_stats():
 
 
 def broadcast_clients_update():
-    """
-    ✅ Enviar actualización de clientes a TODOS los web clients
-    """
-    if not channel_manager:
-        return
-    
+    """Optimización de la actualización de clientes."""
     try:
-        clients_info = get_all_clients_info()
-        
-        socketio.emit('clients_update', {
-            'clients': clients_info,
-            'timestamp': int(time.time() * 1000)
-        }, broadcast=True)
-        
-        if config.DEBUG:
-            logger.debug(f"[WebSocket] 📢 Broadcast: {len(clients_info)} clientes")
-        
+        with web_clients_lock:
+            clients_info = [
+                {
+                    'id': client_id,
+                    'address': client_info['address'],
+                    'connected_at': client_info['connected_at'],
+                    'last_activity': client_info['last_activity']
+                }
+                for client_id, client_info in web_clients.items()
+            ]
+        socketio.emit('clients_update', {'clients': clients_info}, broadcast=True)
+        logger.info(f"[WebSocket] 📡 Actualización enviada: {len(clients_info)} clientes")
     except Exception as e:
-        logger.error(f"[WebSocket] ❌ Error en broadcast: {e}")
+        logger.error(f"[WebSocket] ❌ Error en broadcast_clients_update: {e}")
 
 
 def broadcast_client_disconnected(client_id):
@@ -583,10 +699,11 @@ def broadcast_client_disconnected(client_id):
     ✅ NUEVO: Notificar desconexión de cliente específico
     """
     try:
-        socketio.emit('client_disconnected', {
-            'client_id': client_id,
-            'timestamp': int(time.time() * 1000)
-        }, broadcast=True)
+        with app.app_context():
+            socketio.emit('client_disconnected', {
+                'client_id': client_id,
+                'timestamp': int(time.time() * 1000)
+            }, include_self=False)
         
         logger.info(f"[WebSocket] 📢 Broadcast desconexión: {client_id[:15]}")
         
@@ -638,7 +755,11 @@ def start_maintenance_thread():
                 
                 # Broadcast actualización
                 if inactive_clients:
-                    broadcast_clients_update()
+                    # broadcast_clients_update()  # ✅ REMOVED: Causa errores de contexto
+                    pass
+                
+                # ✅ Limpiar estados persistentes expirados
+                cleanup_expired_web_states()
                     
             except Exception as e:
                 logger.error(f"[WebSocket] Error en maintenance: {e}")

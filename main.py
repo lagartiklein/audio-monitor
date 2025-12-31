@@ -42,9 +42,63 @@ from audio_server.native_server import NativeAudioServer
 
 from audio_server.websocket_server import app, socketio, init_server
 
+from audio_server.scene_manager import SceneManager  # ✅ NUEVO
+
 import config
 
 from gui_monitor import AudioMonitorGUI
+
+
+
+# ✅ NUEVO: Función de integración de persistencia
+
+def integrate_persistence_with_native_server(native_server, channel_manager):
+
+    """
+
+    Integrar sistema de persistencia con el servidor nativo
+
+    """
+
+    class ConfigPersistence:
+
+        def __init__(self):
+
+            self.client_configs = {}
+
+        
+
+        def save_client_config(self, address, channels, gains, pans):
+
+            """Guardar configuración de cliente"""
+
+            self.client_configs[address] = {
+
+                'channels': channels,
+
+                'gains': gains,
+
+                'pans': pans,
+
+                'timestamp': time.time()
+
+            }
+
+        
+
+        def get_stats(self):
+
+            """Obtener estadísticas"""
+
+            return {
+
+                'total_clients': len(self.client_configs)
+
+            }
+
+    
+
+    return ConfigPersistence()
 
 
 
@@ -63,6 +117,12 @@ class AudioServerApp:
         self.gui = None
 
         self.server_running = False
+
+        self.config_persistence = None
+
+        self.scene_manager = None  # ✅ NUEVO
+
+        self.selected_device_id = -1  # ✅ NUEVO: guardar device_id seleccionado
 
         
 
@@ -192,9 +252,19 @@ class AudioServerApp:
 
             
 
+            # ✅ GUARDAR device_id seleccionado (para SceneManager)
+
+            self.selected_device_id = device_id
+
+            
+
             # Inicializar captura de audio
 
             self.audio_capture = AudioCapture()
+
+            # ✅ También guardar en audio_capture para SceneManager
+
+            self.audio_capture.selected_device_id = device_id
 
             num_channels = self.audio_capture.start_capture(device_id=device_id)
 
@@ -211,6 +281,46 @@ class AudioServerApp:
             self.native_server = NativeAudioServer(self.channel_manager)
 
             self.native_server.start()
+
+            
+
+            # ✅ NUEVO: Integrar sistema de persistencia
+
+            self.config_persistence = integrate_persistence_with_native_server(
+
+                self.native_server,
+
+                self.channel_manager
+
+            )
+
+            
+
+            if self.gui:
+
+                self.gui.queue_log_message("💾 Sistema de persistencia activado", 'SUCCESS')
+
+                stats = self.config_persistence.get_stats()
+
+                self.gui.queue_log_message(f"   Configs cargadas: {stats['total_clients']}", 'INFO')
+
+            
+
+            # ✅ NUEVO: Inicializar SceneManager
+
+            self.scene_manager = SceneManager(scenes_dir='scenes')
+
+            self.scene_manager.set_main_app(self)
+
+            
+
+            if self.gui:
+
+                self.gui.queue_log_message("🎬 Sistema de escenas activado", 'SUCCESS')
+
+                scene_stats = self.scene_manager.get_stats()
+
+                self.gui.queue_log_message(f"   Escenas disponibles: {scene_stats['total_scenes']}", 'INFO')
 
             
 
@@ -552,15 +662,16 @@ class AudioServerApp:
 
                         # ✅ Usar binary mode para evitar conversión base64
 
-                        socketio.emit('audio_channel', {
+                        with app.app_context():
+                            socketio.emit('audio_channel', {
 
-                            'channel': channel,
+                                'channel': channel,
 
-                            'timestamp': timestamp,
+                                'timestamp': timestamp,
 
-                            'data': audio_bytes
+                                'data': audio_bytes
 
-                        }, to=client_id, binary=True)
+                            }, to=client_id, binary=True)
 
                         
 
@@ -739,6 +850,266 @@ class AudioServerApp:
         
 
         print("[Main] ✅ Limpieza completada")
+
+    
+
+    # ========================================================================
+
+    # MÉTODOS PARA SCENE MANAGER
+
+    # ========================================================================
+
+    
+
+    def save_current_scene(self, name, description=""):
+
+        """
+
+        Guardar escena actual
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return False, "Sistema de escenas no inicializado"
+
+        
+
+        if not self.server_running:
+
+            return False, "Servidor no está corriendo"
+
+        
+
+        try:
+
+            success, message = self.scene_manager.save_scene(name, description)
+
+            return success, message
+
+        except Exception as e:
+
+            return False, f"Error: {str(e)}"
+
+    
+
+    def load_scene(self, name):
+
+        """
+
+        Cargar escena
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return False, "Sistema de escenas no inicializado"
+
+        
+
+        if not self.server_running:
+
+            return False, "Servidor no está corriendo"
+
+        
+
+        try:
+
+            success, message = self.scene_manager.load_scene(name)
+
+            
+
+            # Notificar a GUI para refrescar
+
+            if self.gui and success:
+
+                self.gui.queue_log_message(f"✅ {message}", 'SUCCESS')
+
+                # Refrescar mixer si está abierto
+
+                if hasattr(self.gui, 'refresh_mixer_clients'):
+
+                    self.gui.root.after(100, self.gui.refresh_mixer_clients)
+
+            
+
+            return success, message
+
+        except Exception as e:
+
+            return False, f"Error: {str(e)}"
+
+    
+
+    def get_available_scenes(self):
+
+        """
+
+        Obtener lista de escenas disponibles
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return []
+
+        
+
+        try:
+
+            return self.scene_manager.list_scenes()
+
+        except Exception as e:
+
+            print(f"Error obteniendo escenas: {e}")
+
+            return []
+
+    
+
+    def delete_scene(self, name):
+
+        """
+
+        Eliminar escena
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return False, "Sistema de escenas no inicializado"
+
+        
+
+        try:
+
+            return self.scene_manager.delete_scene(name)
+
+        except Exception as e:
+
+            return False, f"Error: {str(e)}"
+
+    
+
+    def export_scene(self, name, destination_path):
+
+        """
+
+        Exportar escena
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return False, "Sistema de escenas no inicializado"
+
+        
+
+        try:
+
+            return self.scene_manager.export_scene(name, destination_path)
+
+        except Exception as e:
+
+            return False, f"Error: {str(e)}"
+
+    
+
+    def import_scene(self, source_path):
+
+        """
+
+        Importar escena
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return False, "Sistema de escenas no inicializado"
+
+        
+
+        try:
+
+            return self.scene_manager.import_scene(source_path)
+
+        except Exception as e:
+
+            return False, f"Error: {str(e)}"
+
+    
+
+    def get_scene_details(self, name):
+
+        """
+
+        Obtener detalles de una escena
+
+        Llamado desde GUI
+
+        """
+
+        if not self.scene_manager:
+
+            return None
+
+        
+
+        try:
+
+            return self.scene_manager.get_scene_details(name)
+
+        except Exception as e:
+
+            print(f"Error obteniendo detalles: {e}")
+
+            return None
+
+    
+
+    def validate_scene_compatibility(self, scene_name):
+
+        """
+
+        Validar si una escena es compatible
+
+        Llamado desde GUI antes de cargar
+
+        """
+
+        if not self.scene_manager:
+
+            return False, "Sistema de escenas no inicializado"
+
+        
+
+        try:
+
+            scene_data = self.scene_manager.get_scene_details(scene_name)
+
+            if not scene_data:
+
+                return False, "Escena no encontrada"
+
+            
+
+            return self.scene_manager.validate_scene_compatibility(scene_data)
+
+        except Exception as e:
+
+            return False, f"Error: {str(e)}"
 
     
 

@@ -1,4 +1,4 @@
-# native_server.py - FIXED
+# native_server.py - FIXED: Elimina clientes duplicados
 import socket, threading, time, json, struct, numpy as np, logging
 from audio_server.native_protocol import NativeAndroidProtocol
 from collections import defaultdict
@@ -20,20 +20,20 @@ class NativeClient:
         self.subscribed_channels = set()
         self.rf_mode = False
         self.persistent = False
-        self.auto_reconnect = False
+        self.auto_reconnect = True
         self.packets_sent = 0
         self.packets_dropped = 0
         self.connection_time = time.time()
         self.reconnection_count = 0
-        self.consecutive_send_failures = 0  # ✅ NUEVO: Contador de fallos
-        self.max_consecutive_failures = 5   # ✅ NUEVO: Límite de fallos
+        self.consecutive_send_failures = 0
+        self.max_consecutive_failures = 5
         
         # Socket optimizado
         try:
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config.SOCKET_SNDBUF)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config.SOCKET_RCVBUF)
-            self.socket.settimeout(5.0)  # ✅ REDUCIDO: 5s (era 30s)
+            self.socket.settimeout(5.0)
             
             if config.TCP_KEEPALIVE:
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -53,41 +53,32 @@ class NativeClient:
         self.update_activity()
     
     def is_alive(self, timeout: float = 30.0) -> bool:
-        """✅ FIXED: Verificar que el cliente está REALMENTE vivo"""
+        """Verificar que el cliente está REALMENTE vivo"""
         if self.status == 0:
             return False
         
-        # ✅ Verificar socket
         if not self._is_socket_alive():
             return False
         
-        # ✅ Verificar actividad reciente
         time_since_activity = time.time() - self.last_activity
         if time_since_activity > timeout:
-            logger.warning(f"⚠️ Cliente {self.id[:15]} inactivo por {time_since_activity:.1f}s")
             return False
         
-        # ✅ Verificar fallos consecutivos
         if self.consecutive_send_failures >= self.max_consecutive_failures:
-            logger.warning(f"⚠️ Cliente {self.id[:15]} con {self.consecutive_send_failures} fallos consecutivos")
             return False
         
         return True
     
     def _is_socket_alive(self) -> bool:
-        """✅ NUEVO: Verificar si socket está realmente conectado"""
+        """Verificar si socket está realmente conectado"""
         try:
-            # Usar select con timeout 0 para verificar si socket está listo
             import select
             _, writable, errors = select.select([], [self.socket], [self.socket], 0)
             
             if errors:
-                logger.debug(f"Socket {self.id[:15]} tiene errores")
                 return False
             
-            # Verificar si socket está cerrado
             if self.socket.fileno() == -1:
-                logger.debug(f"Socket {self.id[:15]} cerrado")
                 return False
             
             return True
@@ -96,38 +87,34 @@ class NativeClient:
             return False
     
     def send_bytes_direct(self, data: bytes) -> bool:
-        """✅ FIXED: Envío con verificación y timeout"""
+        """Envío con verificación y timeout"""
         if self.status == 0 or not data:
             return False
         
-        # ✅ Verificar socket antes de enviar
         if not self._is_socket_alive():
             self.status = 0
             self.consecutive_send_failures += 1
             return False
         
         try:
-            # ✅ Enviar con timeout explícito
             original_timeout = self.socket.gettimeout()
-            self.socket.settimeout(0.1)  # 100ms timeout para envío
+            self.socket.settimeout(0.1)
             
             try:
                 self.socket.sendall(data)
                 self.packets_sent += 1
-                self.consecutive_send_failures = 0  # ✅ Reset en éxito
+                self.consecutive_send_failures = 0
                 self.update_activity()
                 return True
             finally:
                 self.socket.settimeout(original_timeout)
                 
         except socket.timeout:
-            logger.warning(f"⚠️ Timeout enviando a {self.id[:15]}")
             self.consecutive_send_failures += 1
             self.packets_dropped += 1
             return False
             
-        except (BrokenPipeError, ConnectionError, OSError) as e:
-            logger.warning(f"⚠️ Conexión perdida con {self.id[:15]}: {e}")
+        except (BrokenPipeError, ConnectionError, OSError):
             self.status = 0
             self.consecutive_send_failures += 1
             return False
@@ -169,14 +156,13 @@ class NativeClient:
         return False
     
     def close(self):
-        """✅ IMPROVED: Cierre más robusto"""
+        """Cierre más robusto"""
         connection_duration = time.time() - self.connection_time
         logger.info(f"🔌 {self.id[:15]} - Duración: {connection_duration:.1f}s, "
                    f"Enviados: {self.packets_sent}, Perdidos: {self.packets_dropped}, "
                    f"Reconexiones: {self.reconnection_count}")
         self.status = 0
         
-        # ✅ Cerrar socket de forma más agresiva
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
         except:
@@ -187,11 +173,28 @@ class NativeClient:
         except:
             pass
         
-        # ✅ Invalidar el socket
         self.socket = None
 
 
 class NativeAudioServer:
+    def get_connected_clients(self):
+        """✅ FIXED: Solo devolver clientes REALMENTE conectados y vivos"""
+        clients_info = []
+        with self.client_lock:
+            for addr, client in list(self.clients.items()):
+                # ✅ VERIFICAR: Solo incluir clientes con status=1 Y que están vivos
+                if client.status == 1 and client.is_alive():
+                    # ✅ VERIFICAR: No es un temp_id (ya hizo handshake)
+                    if not client.is_temp_id:
+                        clients_info.append({
+                            'address': f"{addr[0]}:{addr[1]}",
+                            'channels': list(getattr(client, 'subscribed_channels', [])),
+                            'connected_time': getattr(client, 'connection_time', 0),
+                            'last_activity': getattr(client, 'last_activity', 0),
+                            'packets_sent': getattr(client, 'packets_sent', 0)
+                        })
+        return clients_info
+    
     def __init__(self, channel_manager):
         self.channel_manager = channel_manager
         self.running = False
@@ -201,10 +204,11 @@ class NativeAudioServer:
         self.accept_thread = None
         self.maintenance_thread = None
         
+        # ✅ REDUCIDO: Cache de estado persistente más corto
         self.persistent_state = defaultdict(dict)
         self.persistent_lock = threading.Lock()
-        self.STATE_CACHE_TIMEOUT = getattr(config, 'RF_STATE_CACHE_TIMEOUT', 300)
-        self.MAX_PERSISTENT_STATES = 50  # ✅ NUEVO: Límite máximo
+        self.STATE_CACHE_TIMEOUT = 60  # ✅ REDUCIDO: 60 segundos (era 300)
+        self.MAX_PERSISTENT_STATES = 10  # ✅ REDUCIDO: Máximo 10 (era 50)
         
         self.sample_position_lock = threading.Lock()
         self.sample_position = 0
@@ -215,7 +219,7 @@ class NativeAudioServer:
             'clients_connected': 0,
             'clients_disconnected': 0,
             'clients_reconnected': 0,
-            'clients_zombie_killed': 0,  # ✅ NUEVO
+            'clients_zombie_killed': 0,
             'bytes_sent': 0,
             'uptime': 0,
             'cached_states': 0
@@ -246,21 +250,22 @@ class NativeAudioServer:
         self.maintenance_thread.start()
         
         logger.info(f"\n{'='*70}")
-        logger.info(f"🟢 SERVIDOR RF MODO RECEPTOR PURO - FIXED")
+        logger.info(f"🟢 SERVIDOR RF MODO RECEPTOR PURO - FIXED (NO DUPLICADOS)")
         logger.info(f"{'='*70}")
         logger.info(f"   🌐 Host: {config.NATIVE_HOST}:{config.NATIVE_PORT}")
         logger.info(f"   📦 BLOCKSIZE: {config.BLOCKSIZE} samples (~{config.BLOCKSIZE/config.SAMPLE_RATE*1000:.2f}ms)")
         logger.info(f"   🎵 SAMPLE_RATE: {config.SAMPLE_RATE} Hz")
-        logger.info(f"   🔌 Socket TIMEOUT: 5s (REDUCED)")
+        logger.info(f"   🔌 Socket TIMEOUT: 5s")
         logger.info(f"   🔄 Auto-reconexión: ENABLED")
         logger.info(f"   💾 Estado cache: {self.STATE_CACHE_TIMEOUT}s (Max: {self.MAX_PERSISTENT_STATES})")
         logger.info(f"   ✅ Zombie detection: ENABLED")
+        logger.info(f"   🚫 Duplicate prevention: ENABLED")
         logger.info(f"{'='*70}\n")
     
     def _maintenance_loop(self):
-        """✅ IMPROVED: Mantenimiento más agresivo"""
+        """Mantenimiento más agresivo"""
         while self.running:
-            time.sleep(10)  # ✅ REDUCIDO: Cada 10s (era 30s)
+            time.sleep(5)  # ✅ MÁS FRECUENTE: Cada 5s (era 10s)
             
             try:
                 current_time = time.time()
@@ -277,7 +282,6 @@ class NativeAudioServer:
                     
                     # ✅ 2. Limitar cantidad de estados guardados
                     if len(self.persistent_state) > self.MAX_PERSISTENT_STATES:
-                        # Eliminar los más antiguos
                         sorted_states = sorted(
                             self.persistent_state.items(),
                             key=lambda x: x[1].get('last_seen', 0)
@@ -287,11 +291,19 @@ class NativeAudioServer:
                             logger.info(f"🗑️ Limpiando estado por límite: {pid[:15]}")
                             del self.persistent_state[pid]
                 
-                # ✅ 3. Verificar y eliminar clientes zombies
+                # ✅ 3. NUEVO: Verificar y eliminar clientes temporales que no completaron handshake
                 with self.client_lock:
                     clients_to_remove = []
                     
                     for client_id, client in list(self.clients.items()):
+                        # ✅ Eliminar clientes temp_ que llevan más de 10s sin hacer handshake
+                        if client.is_temp_id:
+                            connection_age = current_time - client.connection_time
+                            if connection_age > 10.0:
+                                logger.warning(f"⚠️ Cliente temporal sin handshake: {client_id[:15]} ({connection_age:.1f}s)")
+                                clients_to_remove.append(client_id)
+                                continue
+                        
                         # ✅ Verificar si está realmente vivo
                         if not client.is_alive(timeout=30.0):
                             logger.warning(f"💀 Cliente zombie detectado: {client_id[:15]}")
@@ -309,9 +321,11 @@ class NativeAudioServer:
                     self.stats['uptime'] = int(time.time() - self.start_time)
                     self.stats['cached_states'] = len(self.persistent_state)
                 
-                # ✅ 5. Log periódico
-                active_clients = len([c for c in self.clients.values() if c.status == 1])
-                logger.info(f"📊 Clientes activos: {active_clients}, Zombies eliminados: {self.stats['clients_zombie_killed']}")
+                # ✅ 5. Log periódico (cada minuto)
+                if int(current_time) % 60 == 0:
+                    active_clients = len([c for c in self.clients.values() if c.status == 1 and not c.is_temp_id])
+                    temp_clients = len([c for c in self.clients.values() if c.is_temp_id])
+                    logger.info(f"📊 Clientes activos: {active_clients} (temp: {temp_clients}), Zombies eliminados: {self.stats['clients_zombie_killed']}")
                     
             except Exception as e:
                 if config.DEBUG:
@@ -346,7 +360,7 @@ class NativeAudioServer:
                     self.clients[temp_id] = client
                     self.stats['clients_connected'] += 1
                 
-                logger.info(f"✅ Cliente RF: {temp_id[:15]} ({address[0]})")
+                logger.info(f"✅ Cliente RF (temp): {temp_id[:25]} ({address[0]})")
                 threading.Thread(target=self._client_read_loop, args=(temp_id,), daemon=True).start()
                 
             except BlockingIOError:
@@ -374,13 +388,9 @@ class NativeAudioServer:
                 
                 if magic != NativeAndroidProtocol.MAGIC_NUMBER:
                     consecutive_errors += 1
-                    if config.DEBUG:
-                        logger.warning(f"⚠️ Magic inválido #{consecutive_errors} - {client_id[:15]}")
-
                     if consecutive_errors >= 5:
                         logger.warning(f"⚠️ Demasiados errores - {client_id[:15]}")
                         break
-
                     time.sleep(0.1)
                     continue
                 
@@ -422,7 +432,7 @@ class NativeAudioServer:
     
     def _recv_exact(self, sock: socket.socket, size: int):
         data = b''
-        timeout = 10.0  # ✅ REDUCIDO: 10s (era 60s)
+        timeout = 10.0
         start = time.time()
         
         while len(data) < size and (time.time() - start) < timeout:
@@ -448,12 +458,11 @@ class NativeAudioServer:
                 logger.error(f"❌ Handshake sin client_id UUID desde {client.address}")
                 return
 
-            # ✅ FIXED: Cerrar cliente viejo ANTES de sobrescribir
             is_reconnection = False
             old_temp_id = client.id
 
             with self.client_lock:
-                # ✅ Si ya existe, CERRAR el socket viejo
+                # ✅ CRITICAL: Si ya existe un cliente con ese persistent_id, CERRARLO primero
                 if persistent_id in self.clients:
                     old_client = self.clients[persistent_id]
                     is_reconnection = True
@@ -461,32 +470,38 @@ class NativeAudioServer:
                     logger.info(f"🔄 Reconexión detectada: {persistent_id[:15]}")
                     logger.info(f"   Cerrando conexión anterior...")
                     
-                    # ✅ CERRAR socket viejo
+                    # ✅ Desuscribir del channel manager
+                    self.channel_manager.unsubscribe_client(persistent_id)
+                    
+                    # ✅ CERRAR socket viejo INMEDIATAMENTE
                     try:
                         old_client.status = 0
                         old_client.close()
                     except Exception as e:
                         logger.warning(f"⚠️ Error cerrando cliente viejo: {e}")
+                    
+                    # ✅ ELIMINAR del diccionario
+                    del self.clients[persistent_id]
+                    
+                    time.sleep(0.1)  # Small delay
 
-            # Cambiar ID del cliente
-            client.id = persistent_id
-            client.persistent_id = persistent_id
-            client.is_temp_id = False
+                # ✅ Cambiar ID del cliente
+                client.id = persistent_id
+                client.persistent_id = persistent_id
+                client.is_temp_id = False  # ✅ MARCAR como NO temporal
 
-            # ✅ Actualizar diccionario de clientes
-            with self.client_lock:
-                # Remover entrada temporal
+                # ✅ Remover entrada temporal
                 if old_temp_id in self.clients and old_temp_id != persistent_id:
                     del self.clients[old_temp_id]
 
-                # ✅ AGREGAR/SOBRESCRIBIR con nuevo cliente
+                # ✅ AGREGAR con nuevo ID persistente
                 self.clients[persistent_id] = client
 
             logger.info(f"✅ ID actualizado: {old_temp_id[:25]} → {persistent_id[:15]}")
 
             client.rf_mode = message.get('rf_mode', False)
-            client.persistent = message.get('persistent', False)
-            client.auto_reconnect = message.get('auto_reconnect', False)
+            client.persistent = message.get('persistent', True)
+            client.auto_reconnect = message.get('auto_reconnect', True)
 
             logger.info(f"🤝 {client.id[:15]} - HANDSHAKE: "
                        f"reconnection={is_reconnection}, "
@@ -533,7 +548,7 @@ class NativeAudioServer:
             response = NativeAndroidProtocol.create_control_packet(
                 'handshake_response',
                 {
-                    'server_version': '2.5.0-RF-FIXED',
+                    'server_version': '2.5.1-RF-NO-DUPLICATES',
                     'protocol_version': NativeAndroidProtocol.PROTOCOL_VERSION,
                     'sample_rate': config.SAMPLE_RATE,
                     'max_channels': self.channel_manager.num_channels,
@@ -553,31 +568,21 @@ class NativeAudioServer:
             
             if response:
                 client.send_bytes_direct(response)
-            
-            self._notify_web_clients_update()
         
         elif msg_type == 'heartbeat':
             response = NativeAndroidProtocol.create_control_packet(
                 'heartbeat_response',
                 {
                     'timestamp': int(time.time() * 1000),
-                    'clients_connected': len(self.clients)
+                    'clients_connected': len([c for c in self.clients.values() if not c.is_temp_id])
                 },
                 client.rf_mode
             )
             if response:
                 client.send_bytes_direct(response)
     
-    def _notify_web_clients_update(self):
-        try:
-            from audio_server import websocket_server
-            websocket_server.broadcast_clients_update()
-        except Exception as e:
-            if config.DEBUG:
-                logger.error(f"Error notificando web: {e}")
-    
     def on_audio_data(self, audio_data):
-        """✅ IMPROVED: Envío con verificación de zombies"""
+        """Envío con verificación de zombies"""
         if not self.running:
             return
         
@@ -592,6 +597,10 @@ class NativeAudioServer:
             sent = 0
             
             for client_id, client in list(self.clients.items()):
+                # ✅ SKIP clientes temporales (no han hecho handshake)
+                if client.is_temp_id:
+                    continue
+                
                 # ✅ Verificar si está vivo ANTES de enviar
                 if not client.is_alive():
                     clients_to_remove.append(client_id)
@@ -611,7 +620,6 @@ class NativeAudioServer:
                     if client.send_audio_android(audio_data, current_position):
                         sent += 1
                     else:
-                        # ✅ Si falla el envío, verificar si debe eliminarse
                         if client.consecutive_send_failures >= client.max_consecutive_failures:
                             clients_to_remove.append(client_id)
                         self.update_stats(packets_dropped=1)
@@ -634,7 +642,7 @@ class NativeAudioServer:
             if client:
                 self.update_stats(clients_disconnected=1)
 
-                if preserve_state and client.auto_reconnect:
+                if preserve_state and client.auto_reconnect and not client.is_temp_id:
                     with self.persistent_lock:
                         subscription = self.channel_manager.get_client_subscription(client_id)
                         if subscription:
@@ -658,20 +666,7 @@ class NativeAudioServer:
                 client.close()
 
                 self.channel_manager.unsubscribe_client(client_id)
-                self._notify_client_disconnected(client_id)
 
-    def _notify_client_disconnected(self, client_id):
-        try:
-            from audio_server import websocket_server
-            websocket_server.socketio.emit('client_disconnected', {
-                'client_id': client_id,
-                'timestamp': int(time.time() * 1000)
-            }, broadcast=True)
-            logger.info(f"📢 Notificación de desconexión enviada: {client_id[:15]}")
-        except Exception as e:
-            if config.DEBUG:
-                logger.error(f"Error notificando desconexión: {e}")
-    
     def get_sample_position(self):
         with self.sample_position_lock:
             return self.sample_position
@@ -699,7 +694,7 @@ class NativeAudioServer:
     
     def get_client_count(self):
         with self.client_lock:
-            return len(self.clients)
+            return sum(1 for c in self.clients.values() if c.is_alive())
     
     def get_active_client_count(self):
         with self.client_lock:

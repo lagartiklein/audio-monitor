@@ -1,0 +1,100 @@
+{
+  "version": "1.0",
+  "scene_name": "kumbia para ti",
+  "description": "",
+  "metadata": {
+    "created_at": "2025-12-31T08:13:51.142292",
+    "last_loaded": "2025-12-31T08:20:05.472029",
+    "load_count": 1
+  },
+  "interface_info": {
+    "device_id": 57,
+    "name": "IN 01-08 (BEHRINGER UMC 1820)",
+    "channels": 8,
+    "sample_rate": 48000,
+    "blocksize": 128
+  },
+  "clients": {
+    "ip_0": {
+      "address": "0:9",
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 1.0
+      },
+      "pans": {
+        "0": 0.0
+      },
+      "mutes": {
+        "0": false
+      },
+      "solos": [],
+      "pre_listen": null,
+      "master_gain": 1.0,
+      "client_type": "native"
+    },
+    "ip_7": {
+      "address": "7:7",
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 1.0
+      },
+      "pans": {
+        "0": 0.0
+      },
+      "mutes": {
+        "0": false
+      },
+      "solos": [],
+      "pre_listen": null,
+      "master_gain": 1.0,
+      "client_type": "native"
+    },
+    "ip_c": {
+      "address": "c:9",
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 1.0
+      },
+      "pans": {
+        "0": 0.0
+      },
+      "mutes": {
+        "0": false
+      },
+      "solos": [],
+      "pre_listen": null,
+      "master_gain": 1.0,
+      "client_type": "native"
+    },
+    "ip_8": {
+      "address": "8:f",
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 1.0
+      },
+      "pans": {
+        "0": 0.0
+      },
+      "mutes": {
+        "0": false
+      },
+      "solos": [],
+      "pre_listen": null,
+      "master_gain": 1.0,
+      "client_type": "native"
+    }
+  },
+  "server_settings": {
+    "sample_rate": 48000,
+    "blocksize": 128,
+    "num_channels": 8
+  }
+}

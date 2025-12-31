@@ -6,6 +6,8 @@ import logging
 
 import time
 
+from audio_server.websocket_server import app
+
 
 
 logger = logging.getLogger(__name__)
@@ -312,25 +314,27 @@ class ChannelManager:
 
             try:
 
-                self.socketio.emit('mix_updated', {
+                with app.app_context():
 
-                    'client_id': client_id,
+                    self.socketio.emit('mix_updated', {
 
-                    'channels': sub['channels'],
+                        'client_id': client_id,
 
-                    'gains': sub['gains'],
+                        'channels': sub['channels'],
 
-                    'pans': sub['pans'],
+                        'gains': sub['gains'],
 
-                    'mutes': sub['mutes'],
+                        'pans': sub['pans'],
 
-                    'solos': list(sub['solos']),
+                        'mutes': sub['mutes'],
 
-                    'pre_listen': sub['pre_listen'],
+                        'solos': list(sub['solos']),
 
-                    'master_gain': sub['master_gain']
+                        'pre_listen': sub['pre_listen'],
 
-                })  # ✅ SIN broadcast=True
+                        'master_gain': sub['master_gain']
+
+                    })  # ✅ SIN broadcast=True
 
             except Exception as e:
 
