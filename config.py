@@ -15,7 +15,7 @@ BLOCKSIZE = 128  # ✅ ~2.67ms latencia mínima
 USE_INT16_ENCODING = True   # ✅ True = -50% datos, False = Float32 original
 
 # ============================================================================
-# COLAS (MODO DIRECTO PARA RF)
+# COLAS (MaaDO DIRECTO PARA RF)
 # ============================================================================
 QUEUE_SIZE = 0
 NATIVE_QUEUE_SIZE = 0
