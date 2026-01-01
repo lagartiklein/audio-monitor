@@ -688,16 +688,7 @@ def get_server_stats():
 def broadcast_clients_update():
     """Optimización de la actualización de clientes."""
     try:
-        with web_clients_lock:
-            clients_info = [
-                {
-                    'id': client_id,
-                    'address': client_info['address'],
-                    'connected_at': client_info['connected_at'],
-                    'last_activity': client_info['last_activity']
-                }
-                for client_id, client_info in web_clients.items()
-            ]
+        clients_info = get_all_clients_info()
         socketio.emit('clients_update', {'clients': clients_info}, broadcast=True)
         logger.info(f"[WebSocket] 📡 Actualización enviada: {len(clients_info)} clientes")
     except Exception as e:

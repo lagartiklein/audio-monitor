@@ -194,6 +194,7 @@ class NativeClient:
 class NativeAudioServer:
     def __init__(self, channel_manager):
         self.channel_manager = channel_manager
+        self.channel_manager.native_server = self
         self.running = False
         self.server_socket = None
         self.clients = {}
@@ -326,6 +327,9 @@ class NativeAudioServer:
         if self.server_socket:
             self.server_socket.close()
         
+        if getattr(self.channel_manager, 'native_server', None) is self:
+            self.channel_manager.native_server = None
+
         stats = self.get_stats()
         uptime = time.time() - self.start_time
         logger.info("🛑 Servidor RF detenido")
