@@ -161,9 +161,12 @@ def not_found(e):
 # ============================================================================
 
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth=None):
     """Cliente web conectado"""
     client_id = request.sid
+
+    auth = auth or {}
+    web_device_uuid = auth.get('device_uuid')
     
     # ✅ Registrar cliente web
     with web_clients_lock:
@@ -171,7 +174,8 @@ def handle_connect():
             'connected_at': time.time(),
             'last_activity': time.time(),
             'address': request.remote_addr,
-            'user_agent': request.headers.get('User-Agent', 'Unknown')
+            'user_agent': request.headers.get('User-Agent', 'Unknown'),
+            'device_uuid': web_device_uuid
         }
     
     logger.info(f"[WebSocket] ✅ Cliente web conectado: {client_id[:8]} ({request.remote_addr})")
@@ -210,12 +214,24 @@ def handle_connect():
         
         logger.info(f"[WebSocket]    Info enviada: {len(clients_info)} clientes totales")
         
-        # ✅ Verificar estado persistente para auto-reconexión
-        persistent_id = f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
+        # ✅ Registrar dispositivo web en DeviceRegistry (si existe)
+        try:
+            if web_device_uuid and getattr(channel_manager, 'device_registry', None):
+                channel_manager.device_registry.register_device(web_device_uuid, {
+                    'type': 'web',
+                    'name': auth.get('device_name') or 'web-control',
+                    'primary_ip': request.remote_addr,
+                    'user_agent': request.headers.get('User-Agent', 'Unknown')
+                })
+        except Exception as e:
+            logger.debug(f"[WebSocket] DeviceRegistry register failed: {e}")
+
+        # ✅ Verificar estado persistente para auto-reconexión (por device_uuid)
+        persistent_id = web_device_uuid or f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
         with web_persistent_lock:
             if persistent_id in web_persistent_state:
                 saved_state = web_persistent_state[persistent_id]
-                logger.info(f"[WebSocket] 💾 Estado persistente encontrado para {persistent_id[:20]}")
+                logger.info(f"[WebSocket] 💾 Estado persistente encontrado para {str(persistent_id)[:20]}")
                 
                 # Resuscribir automáticamente
                 try:
@@ -224,7 +240,8 @@ def handle_connect():
                         saved_state.get('channels', []),
                         gains=saved_state.get('gains', {}),
                         pans=saved_state.get('pans', {}),
-                        client_type="web"
+                        client_type="web",
+                        device_uuid=web_device_uuid
                     )
                     logger.info(f"[WebSocket] ✅ Cliente resuscrito automáticamente: {len(saved_state.get('channels', []))} canales")
                     
@@ -249,7 +266,13 @@ def handle_disconnect():
     client_id = request.sid
     
     # ✅ Generar persistent_id y guardar estado antes de desuscribir
-    persistent_id = f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
+    # ✅ Usar el mismo persistent_id que en connect (preferir device_uuid)
+    web_device_uuid = None
+    with web_clients_lock:
+        if client_id in web_clients:
+            web_device_uuid = web_clients[client_id].get('device_uuid')
+
+    persistent_id = web_device_uuid or f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
     if channel_manager:
         subscription = channel_manager.get_client_subscription(client_id)
         if subscription:
@@ -264,7 +287,7 @@ def handle_disconnect():
                     'master_gain': subscription.get('master_gain', 1.0),
                     'saved_at': time.time()
                 }
-                logger.info(f"[WebSocket] 💾 Estado guardado para reconexión: {persistent_id[:20]}")
+                logger.info(f"[WebSocket] 💾 Estado guardado para reconexión: {str(persistent_id)[:20]}")
     
     # ✅ Remover de tracking
     with web_clients_lock:

@@ -1,0 +1,21 @@
+{
+  "test-device-uuid-for-cm": {
+    "uuid": "test-device-uuid-for-cm",
+    "type": "native",
+    "name": "native-test-dev",
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-test-dev",
+      "primary_ip": null
+    },
+    "first_seen": 1767383766.4135375,
+    "last_seen": 1767384616.4367256,
+    "reconnections": 1,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  }
+}

@@ -56,7 +56,7 @@ RF_AUTO_RECONNECT = True
 RF_RECONNECT_DELAY_MS = 1000
 RF_MAX_RECONNECT_DELAY_MS = 8000
 RF_RECONNECT_BACKOFF = 1.5
-RF_STATE_CACHE_TIMEOUT = 180  # ✅ REDUCIDO: 3 minutos (era 5 min)
+RF_STATE_CACHE_TIMEOUT = 0  # ✅ 0 = no expira (persiste hasta reiniciar servidor)
 RF_MAX_RECONNECT_ATTEMPTS = 10
 RF_MAX_PERSISTENT_STATES = 50  # ✅ NUEVO: Límite máximo de estados guardados
 

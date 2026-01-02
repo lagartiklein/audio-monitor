@@ -46,6 +46,9 @@ class ChannelManager:
         self.device_registry = None
         self.device_client_map = {}  # device_uuid -> client_id (mapeo activo)
 
+        # ✅ NUEVO: Session ID del servidor (cambia en cada arranque)
+        self.server_session_id = None
+
         print(f"[ChannelManager] ✅ Inicializado: {num_channels} canales")
 
     
@@ -62,6 +65,11 @@ class ChannelManager:
         """✅ NUEVO: Inyectar device registry"""
         self.device_registry = device_registry
         logger.info("[ChannelManager] ✅ Device Registry registrado")
+
+    def set_server_session_id(self, session_id: str):
+        """✅ NUEVO: Session ID del servidor (cambia en cada arranque)."""
+        self.server_session_id = session_id
+        logger.info(f"[ChannelManager] 🧷 Server session: {session_id[:12]}")
 
     
 
@@ -147,6 +155,17 @@ class ChannelManager:
         # ✅ NUEVO: Mapear device_uuid -> client_id si está disponible
         if device_uuid:
             self.device_client_map[device_uuid] = client_id
+
+            # ✅ Registrar/actualizar dispositivo en el registry
+            if self.device_registry:
+                try:
+                    self.device_registry.register_device(device_uuid, {
+                        'type': client_type,
+                        'name': f"{client_type}-{device_uuid[:8]}",
+                        'primary_ip': None
+                    })
+                except Exception as e:
+                    logger.debug(f"[ChannelManager] Device registry register failed: {e}")
 
         
 
@@ -307,6 +326,26 @@ class ChannelManager:
         
 
         sub['last_update'] = time.time()
+
+        # ✅ Persistir estado por dispositivo (si existe) para auto-restore
+        device_uuid = sub.get('device_uuid')
+        if device_uuid and self.device_registry:
+            try:
+                self.device_registry.update_configuration(
+                    device_uuid,
+                    {
+                        'channels': sub.get('channels', []),
+                        'gains': sub.get('gains', {}),
+                        'pans': sub.get('pans', {}),
+                        'mutes': sub.get('mutes', {}),
+                        'solos': list(sub.get('solos', set())),
+                        'pre_listen': sub.get('pre_listen'),
+                        'master_gain': sub.get('master_gain', 1.0)
+                    },
+                    session_id=self.server_session_id
+                )
+            except Exception as e:
+                logger.debug(f"[ChannelManager] Persist config failed: {e}")
 
         
 
@@ -509,6 +548,8 @@ class ChannelManager:
                 'id': client_id,
 
                 'type': client_type,
+
+                'device_uuid': sub.get('device_uuid'),
 
                 'channels': sub['channels'],
 

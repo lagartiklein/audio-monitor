@@ -391,7 +391,24 @@
                 this.clients = {};
                 this.selectedClientId = null;
                 this.deviceInfo = null;
+                this.webDeviceUuid = this.getOrCreateWebDeviceUuid();
                 this.init();
+            }
+
+            getOrCreateWebDeviceUuid() {
+                const key = 'fichatech_web_device_uuid';
+                let v = localStorage.getItem(key);
+                if (v) return v;
+
+                // crypto.randomUUID() está en la mayoría de navegadores modernos.
+                if (window.crypto && crypto.randomUUID) {
+                    v = crypto.randomUUID();
+                } else {
+                    // Fallback simple (suficiente para estabilidad local)
+                    v = 'web-' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+                }
+                localStorage.setItem(key, v);
+                return v;
             }
 
             async init() {
@@ -403,7 +420,11 @@
                 this.socket = io({
                     transports: ['websocket'],
                     upgrade: false,
-                    reconnection: true
+                    reconnection: true,
+                    auth: {
+                        device_uuid: this.webDeviceUuid,
+                        device_name: 'control-center'
+                    }
                 });
 
                 this.socket.on('connect', () => {
@@ -477,14 +498,14 @@
                     `;
 
                     item.addEventListener('click', () => {
-                        this.selectClient(client.id);
+                        this.selectClient(client.id, item);
                     });
 
                     container.appendChild(item);
                 });
             }
 
-            selectClient(clientId) {
+            selectClient(clientId, selectedElement) {
                 this.selectedClientId = clientId;
                 
                 // Update UI
@@ -492,7 +513,7 @@
                     item.classList.remove('selected');
                 });
                 
-                event.currentTarget?.classList.add('selected');
+                selectedElement?.classList.add('selected');
 
                 const client = this.clients[clientId];
                 if (!client) return;

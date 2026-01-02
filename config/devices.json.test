@@ -1,0 +1,36 @@
+{
+  "test-device-uuid-87654321": {
+    "uuid": "test-device-uuid-87654321",
+    "type": "android",
+    "name": "Test Device 2",
+    "mac_address": null,
+    "primary_ip": "192.168.1.100",
+    "device_info": {
+      "type": "android",
+      "name": "Test Device 2",
+      "primary_ip": "192.168.1.100",
+      "client_id": "test-client-id-2"
+    },
+    "first_seen": 1767383766.408458,
+    "last_seen": 1767384616.4148827,
+    "reconnections": 1,
+    "configuration": {
+      "channels": [
+        0,
+        1,
+        2
+      ],
+      "gains": {
+        "0": 1.0,
+        "1": 0.8
+      },
+      "pans": {
+        "0": 0.0,
+        "1": -0.5
+      }
+    },
+    "configuration_session_id": "test-session-002",
+    "tags": [],
+    "active": true
+  }
+}

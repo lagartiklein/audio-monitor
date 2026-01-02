@@ -266,15 +266,16 @@ class NativeAudioServer:
             try:
                 current_time = time.time()
                 
-                # ✅ 1. Limpiar estado persistente expirado
+                # ✅ 1. Limpiar estado persistente expirado (si timeout > 0)
                 with self.persistent_lock:
-                    expired = [
-                        pid for pid, state in self.persistent_state.items()
-                        if current_time - state.get('last_seen', 0) > self.STATE_CACHE_TIMEOUT
-                    ]
-                    for pid in expired:
-                        logger.info(f"🗑️ Limpiando estado expirado: {pid[:15]}")
-                        del self.persistent_state[pid]
+                    if self.STATE_CACHE_TIMEOUT and self.STATE_CACHE_TIMEOUT > 0:
+                        expired = [
+                            pid for pid, state in self.persistent_state.items()
+                            if current_time - state.get('last_seen', 0) > self.STATE_CACHE_TIMEOUT
+                        ]
+                        for pid in expired:
+                            logger.info(f"🗑️ Limpiando estado expirado: {pid[:15]}")
+                            del self.persistent_state[pid]
                     
                     # ✅ 2. Limitar cantidad de estados guardados
                     if len(self.persistent_state) > self.MAX_PERSISTENT_STATES:
@@ -446,11 +447,28 @@ class NativeAudioServer:
         msg_type = message.get('type', '')
 
         if msg_type == 'handshake':
-            persistent_id = message.get('client_id')
+            # ✅ Preferir device_uuid si viene; fallback a client_id
+            persistent_id = message.get('device_uuid') or message.get('client_id')
+            raw_client_id = message.get('client_id')
 
             if not persistent_id:
                 logger.error(f"❌ Handshake sin client_id UUID desde {client.address}")
                 return
+
+            # ✅ Registrar/actualizar dispositivo en DeviceRegistry (si existe)
+            try:
+                if getattr(self.channel_manager, 'device_registry', None):
+                    self.channel_manager.device_registry.register_device(persistent_id, {
+                        'type': 'android',
+                        'name': message.get('device_name') or message.get('name') or f"android-{persistent_id[:8]}",
+                        'primary_ip': client.address[0],
+                        'client_id': raw_client_id,
+                        'protocol_version': message.get('protocol_version'),
+                        'rf_mode': message.get('rf_mode', False),
+                        'user_agent': message.get('user_agent')
+                    })
+            except Exception as e:
+                logger.debug(f"DeviceRegistry register failed: {e}")
 
             # ✅ FIXED: Cerrar cliente viejo ANTES de sobrescribir
             is_reconnection = False
@@ -505,9 +523,23 @@ class NativeAudioServer:
                         logger.info(f"💾 Estado restaurado para: {persistent_id[:15]}")
                         self.persistent_state[persistent_id]['last_seen'] = time.time()
 
-                        if is_reconnection:
-                            client.reconnection_count = restored_state.get('reconnection_count', 0) + 1
-                            self.stats['clients_reconnected'] += 1
+            # ✅ Fallback: restaurar desde DeviceRegistry (misma sesión) si no hay cache en memoria
+            if restored_state is None and getattr(self.channel_manager, 'device_registry', None):
+                try:
+                    session_id = getattr(self.channel_manager, 'server_session_id', None)
+                    disk_state = self.channel_manager.device_registry.get_configuration(
+                        persistent_id,
+                        session_id=session_id
+                    )
+                    if disk_state:
+                        restored_state = disk_state
+                        logger.info(f"💾 Estado restaurado desde DeviceRegistry: {persistent_id[:15]}")
+                except Exception as e:
+                    logger.debug(f"DeviceRegistry restore failed: {e}")
+
+            if restored_state is not None and is_reconnection:
+                client.reconnection_count = restored_state.get('reconnection_count', 0) + 1
+                self.stats['clients_reconnected'] += 1
 
             # Registrar en channel_manager
             channels_to_subscribe = []
@@ -518,7 +550,8 @@ class NativeAudioServer:
             self.channel_manager.subscribe_client(
                 persistent_id,
                 channels_to_subscribe,
-                client_type="native"
+                client_type="native",
+                device_uuid=persistent_id
             )
 
             # Aplicar estado restaurado

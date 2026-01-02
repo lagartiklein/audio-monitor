@@ -1,4 +1,4 @@
-import sys, signal, threading, time, socket, os, webbrowser
+import sys, signal, threading, time, socket, os, webbrowser, uuid
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -65,6 +65,7 @@ class AudioServerApp:
         self.gui = None
 
         self.server_running = False
+        self.server_session_id = None
 
         
 
@@ -206,6 +207,13 @@ class AudioServerApp:
             device_registry = init_device_registry(
                 persistence_file=os.path.join(os.path.dirname(__file__), "config", "devices.json")
             )
+
+            # ✅ NUEVO: Session ID del servidor (cambia en cada arranque)
+            self.server_session_id = uuid.uuid4().hex
+            try:
+                device_registry.set_server_session(self.server_session_id)
+            except Exception:
+                pass
             
             # Inicializar gestor de canales
 
@@ -213,6 +221,12 @@ class AudioServerApp:
             
             # ✅ NUEVO: Inyectar device registry
             self.channel_manager.set_device_registry(device_registry)
+
+            # ✅ NUEVO: Inyectar session_id
+            try:
+                self.channel_manager.set_server_session_id(self.server_session_id)
+            except Exception:
+                pass
 
             
 

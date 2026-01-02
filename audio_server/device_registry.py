@@ -51,6 +51,8 @@ class DeviceRegistry:
         self.device_lock = threading.RLock()
         self.persistence_file = persistence_file
         self.persistence_lock = threading.Lock()
+        # ✅ Sesión actual del servidor (cambia en cada arranque)
+        self.server_session_id: Optional[str] = None
         self.cleanup_interval = 3600  # Limpiar cada hora
         self.max_devices = 500
         self.device_cache_timeout = 604800  # 7 días
@@ -63,6 +65,11 @@ class DeviceRegistry:
         
         # Iniciar thread de limpieza
         self._start_cleanup_thread()
+
+    def set_server_session(self, session_id: str):
+        """Fijar session_id del servidor para restauración por sesión."""
+        self.server_session_id = session_id
+        logger.info(f"[Device Registry] 🧷 Server session: {session_id[:12]}")
     
     # ========================================================================
     # OPERACIONES PRINCIPALES
@@ -176,7 +183,7 @@ class DeviceRegistry:
         
         return None
     
-    def update_configuration(self, device_uuid: str, config: dict) -> bool:
+    def update_configuration(self, device_uuid: str, config: dict, session_id: Optional[str] = None) -> bool:
         """
         Guardar/actualizar configuración de dispositivo.
         
@@ -197,6 +204,8 @@ class DeviceRegistry:
                 return False
             
             self.devices[device_uuid]['configuration'] = config
+            if session_id is not None:
+                self.devices[device_uuid]['configuration_session_id'] = session_id
             self.devices[device_uuid]['last_seen'] = time.time()
             
             self.save_to_disk()
@@ -204,12 +213,22 @@ class DeviceRegistry:
             
             return True
     
-    def get_configuration(self, device_uuid: str) -> dict:
-        """Obtener configuración guardada del dispositivo."""
+    def get_configuration(self, device_uuid: str, session_id: Optional[str] = None) -> dict:
+        """Obtener configuración guardada del dispositivo.
+
+        Si session_id se entrega, solo retorna config si coincide con la sesión
+        guardada (reinicio del servidor => session distinta => no restaura).
+        """
         device = self.get_device(device_uuid)
-        if device:
-            return device.get('configuration', {})
-        return {}
+        if not device:
+            return {}
+
+        if session_id is not None:
+            saved_session = device.get('configuration_session_id')
+            if saved_session and saved_session != session_id:
+                return {}
+
+        return device.get('configuration', {})
     
     def mark_inactive(self, device_uuid: str):
         """Marcar dispositivo como inactivo."""
@@ -292,6 +311,7 @@ class DeviceRegistry:
                             'last_seen': device.get('last_seen'),
                             'reconnections': device.get('reconnections', 0),
                             'configuration': device.get('configuration', {}),
+                            'configuration_session_id': device.get('configuration_session_id'),
                             'tags': device.get('tags', []),
                             'active': device.get('active', False)
                         }

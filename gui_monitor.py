@@ -31,7 +31,15 @@ class AudioMonitorGUI:
         self.main_app = main_app
         self.root = ctk.CTk()
         self.root.title("Fichatech Monitor")
-        self.root.geometry("1000x800")
+        # Centrar ventana en pantalla
+        width, height = 1000, 800
+        self.root.geometry(f"{width}x{height}")
+        self.root.update_idletasks()
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
         
         # Establecer icono de la ventana
         try:
