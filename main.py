@@ -42,6 +42,8 @@ from audio_server.native_server import NativeAudioServer
 
 from audio_server.websocket_server import app, socketio, init_server
 
+from audio_server.device_registry import init_device_registry
+
 import config
 
 from gui_monitor import AudioMonitorGUI
@@ -200,9 +202,17 @@ class AudioServerApp:
 
             
 
+            # ✅ NUEVO: Inicializar Device Registry
+            device_registry = init_device_registry(
+                persistence_file=os.path.join(os.path.dirname(__file__), "config", "devices.json")
+            )
+            
             # Inicializar gestor de canales
 
             self.channel_manager = ChannelManager(num_channels)
+            
+            # ✅ NUEVO: Inyectar device registry
+            self.channel_manager.set_device_registry(device_registry)
 
             
 
@@ -225,7 +235,6 @@ class AudioServerApp:
             )
 
             
-
             # Inicializar handler WebSocket OPTIMIZADO
 
             self.setup_web_handler_optimized()

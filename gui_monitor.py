@@ -118,7 +118,7 @@ class AudioMonitorGUI:
             logo_image = ctk.CTkImage(
                 light_image=Image.open(get_resource_path("assets/icon.png")), 
                 dark_image=Image.open(get_resource_path("assets/icon.png")),
-                size=(80,80)
+                size=(120,120)
             )
             logo_label = ctk.CTkLabel(header_frame,
                                       image=logo_image,
@@ -128,23 +128,23 @@ class AudioMonitorGUI:
             print(f"No se pudo cargar el logo: {e}")
             logo_label = ctk.CTkLabel(header_frame, text="📻", font=("Segoe UI Emoji", 48))
             
-        logo_label.grid(row=0, column=0, rowspan=2, padx=40, pady=40, sticky="w")
+        logo_label.grid(row=0, column=0, rowspan=2, padx=40, pady=10, sticky="w")
         
         # Título y subtítulo
         title_label = ctk.CTkLabel(header_frame,
-                                   text="FICHATECH MONITOR",
-                                   font=ctk.CTkFont(size=28, weight="bold"),
-                                   anchor="center")
-        title_label.grid(row=0, column=1, sticky="ew", pady=(20, 2))
-        
+                   text="FICHATECH MONITOR",
+                   font=ctk.CTkFont(size=38, weight="bold"),
+                   anchor="center")
+        title_label.grid(row=0, column=1, sticky="ew", pady=(20, 0))
+
         subtitle_button = ctk.CTkButton(header_frame,
-                                        text="Streaming de audio multicanal en tiempo real - www.cepalabs.cl/fichatech",
-                                        font=ctk.CTkFont(size=13),
-                                        fg_color="transparent",
-                                        hover_color="gray20",
-                                        text_color="gray70",
-                                        command=lambda: webbrowser.open("https://www.cepalabs.cl/fichatech"))
-        subtitle_button.grid(row=1, column=1, sticky="ew", pady=(0, 20))
+                text="Streaming de audio multicanal en tiempo real - www.cepalabs.cl/fichatech",
+                font=ctk.CTkFont(size=13),
+                fg_color="transparent",
+                hover_color="gray20",
+                text_color="gray70",
+                command=lambda: webbrowser.open("https://www.cepalabs.cl/fichatech"))
+        subtitle_button.grid(row=1, column=1, sticky="ew", pady=(0, 5))
         
         # Estado del servidor
         self.server_status_label = ctk.CTkLabel(header_frame,

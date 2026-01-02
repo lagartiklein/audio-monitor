@@ -25,6 +25,8 @@ class ChannelManager:
     - Solo/Mute
 
     - Ganancias y panoramas
+    
+    ✅ NUEVO: Integración con Device Registry para identificación persistente
 
     """
 
@@ -39,6 +41,10 @@ class ChannelManager:
         # ✅ socketio se inyecta desde websocket_server
 
         self.socketio = None
+        
+        # ✅ NUEVO: Device registry para ID persistente
+        self.device_registry = None
+        self.device_client_map = {}  # device_uuid -> client_id (mapeo activo)
 
         print(f"[ChannelManager] ✅ Inicializado: {num_channels} canales")
 
@@ -51,10 +57,15 @@ class ChannelManager:
         self.socketio = socketio_instance
 
         logger.info("[ChannelManager] ✅ SocketIO registrado")
+    
+    def set_device_registry(self, device_registry):
+        """✅ NUEVO: Inyectar device registry"""
+        self.device_registry = device_registry
+        logger.info("[ChannelManager] ✅ Device Registry registrado")
 
     
 
-    def subscribe_client(self, client_id, channels, gains=None, pans=None, client_type="web"):
+    def subscribe_client(self, client_id, channels, gains=None, pans=None, client_type="web", device_uuid=None):
 
         """
 
@@ -64,8 +75,8 @@ class ChannelManager:
 
         Args:
 
-            client_id: ID del cliente
-
+            client_id: ID del cliente (temporal o socket ID)
+            
             channels: Lista de canales (puede estar vacía para Android)
 
             gains: Dict {channel: gain_linear}
@@ -73,6 +84,8 @@ class ChannelManager:
             pans: Dict {channel: pan}
 
             client_type: "native" (Android) o "web"
+            
+            device_uuid: ✅ NUEVO - UUID único del dispositivo
 
         """
 
@@ -121,6 +134,7 @@ class ChannelManager:
             'master_gain': 1.0,
 
             'client_type': client_type,
+            'device_uuid': device_uuid,  # ✅ NUEVO
 
             'last_update': time.time()
 
@@ -129,12 +143,19 @@ class ChannelManager:
         
 
         self.client_types[client_id] = client_type
+        
+        # ✅ NUEVO: Mapear device_uuid -> client_id si está disponible
+        if device_uuid:
+            self.device_client_map[device_uuid] = client_id
 
         
 
         logger.info(f"[ChannelManager] 📡 Cliente {client_id[:8]} ({client_type}) suscrito:")
 
         logger.info(f"   Canales: {len(valid_channels)}")
+        
+        if device_uuid:
+            logger.info(f"   Device UUID: {device_uuid[:12]}")
 
     
 
@@ -147,12 +168,21 @@ class ChannelManager:
             channels_count = len(self.subscriptions[client_id]['channels'])
 
             client_type = self.client_types.get(client_id, "unknown")
+            
+            # ✅ NUEVO: Remover del mapeo de device_uuid
+            device_uuid = self.subscriptions[client_id].get('device_uuid')
+            if device_uuid and self.device_client_map.get(device_uuid) == client_id:
+                del self.device_client_map[device_uuid]
 
             del self.subscriptions[client_id]
 
             self.client_types.pop(client_id, None)
 
             logger.info(f"[ChannelManager] 📡 Cliente {client_id[:8]} ({client_type}) desuscrito ({channels_count} canales)")
+    
+    def get_client_by_device_uuid(self, device_uuid):
+        """✅ NUEVO: Buscar client_id por device_uuid"""
+        return self.device_client_map.get(device_uuid)
 
     
 

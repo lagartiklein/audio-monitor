@@ -7,7 +7,7 @@
 # ============================================================================
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
-BLOCKSIZE = 128  # ✅ ~2.67ms latencia mínima
+BLOCKSIZE = 64  # ✅ ~2.67ms latencia mínima
 
 # ============================================================================
 # ✅ FORMATO DE AUDIO
