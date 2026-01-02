@@ -20,6 +20,7 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 DEFAULT_SAMPLE_RATE = 48000  # Tasa de muestreo por defecto
+DEFAULT_BLOCKSIZE = 128
 
 # Configurar apariencia de CustomTkinter
 ctk.set_appearance_mode("dark")
@@ -29,7 +30,7 @@ class AudioMonitorGUI:
     def __init__(self, main_app):
         self.main_app = main_app
         self.root = ctk.CTk()
-        self.root.title("Fichatech Monitor Server")
+        self.root.title("Fichatech Monitor")
         self.root.geometry("1000x800")
         
         # Establecer icono de la ventana
@@ -42,6 +43,11 @@ class AudioMonitorGUI:
         self.running = True
         self.update_thread = None
         self.stats_queue = queue.Queue()
+        self.stats_line_count = 4
+        self.last_stats_snapshot = {
+            'timestamp': time.time(),
+            'packets_sent': 0
+        }
         
         # Variables de dispositivo
         devices = list(sd.query_devices())
@@ -126,7 +132,7 @@ class AudioMonitorGUI:
         
         # Título y subtítulo
         title_label = ctk.CTkLabel(header_frame,
-                                   text="FICHATECH MONITOR Server",
+                                   text="FICHATECH MONITOR",
                                    font=ctk.CTkFont(size=28, weight="bold"),
                                    anchor="center")
         title_label.grid(row=0, column=1, sticky="ew", pady=(20, 2))
@@ -359,10 +365,11 @@ class AudioMonitorGUI:
         
         # Textbox para logs
         self.log_text = ctk.CTkTextbox(logs_frame,
-                                      corner_radius=10,
-                                      font=ctk.CTkFont(family="Consolas", size=11),
-                                      wrap="word")
+                          corner_radius=10,
+                          font=ctk.CTkFont(family="Consolas", size=11),
+                          wrap="word")
         self.log_text.grid(row=1, column=0, padx=15, pady=(0, 15), sticky="nsew")
+        self.initialize_stats_banner()
     
     def setup_controls_frame(self, parent):
         """Frame de controles modernizado"""
@@ -490,11 +497,60 @@ class AudioMonitorGUI:
             except Exception as e:
                 pass
             
+            self.root.after(0, self.update_stats_banner, stats)
             time.sleep(0.5)  # Actualizar cada 500ms
     
     def queue_log_message(self, message, tag='INFO'):
         """Agregar mensaje al log desde otros threads"""
         self.stats_queue.put((message, tag))
+
+    def initialize_stats_banner(self):
+        # No hace falta reservar espacio arriba, el banner irá abajo
+        self.update_stats_banner({})
+
+    def update_stats_banner(self, stats):
+        """Actualizar los parámetros de audio en tiempo real al final del log"""
+        now = time.time()
+        last = self.last_stats_snapshot
+        interval = max(1e-3, now - last.get('timestamp', now))
+
+        packets_sent = stats.get('packets_sent', last.get('packets_sent', 0))
+        sent_delta = max(0, packets_sent - last.get('packets_sent', 0))
+        clients_rf = max(0, stats.get('clients_rf', 0))
+        clients_web = max(0, stats.get('clients_web', 0))
+        sample_rate = stats.get('sample_rate', DEFAULT_SAMPLE_RATE)
+        blocksize = stats.get('blocksize', DEFAULT_BLOCKSIZE)
+        packets_dropped = stats.get('packets_dropped', 0)
+        channels = stats.get('channels', 0)
+        position = stats.get('position', 0)
+
+        packets_per_second = sample_rate / max(1, blocksize)
+        expected_packets = clients_rf * packets_per_second * interval
+        load_pct = min(100.0, (sent_delta / expected_packets) * 100) if expected_packets > 0 else 0.0
+        total_clients = clients_rf + clients_web
+        latency_ms = (blocksize / max(1, sample_rate)) * 1000
+
+        line1 = f"📡 ESTADO AUDIO | Carga: {load_pct:.0f}% | Latencia: {latency_ms:.2f} ms | Clientes totales: {total_clients}"
+        line2 = f"   RF: {clients_rf} | Web: {clients_web} | Canales activos: {channels} | Posición: {position:,}"
+        line3 = f"   Paquetes RF: {packets_sent:,} sent • {packets_dropped:,} drop | Blocksize: {blocksize} | Sample Rate: {sample_rate} Hz"
+        stats_block = f"{line1}\n{line2}\n{line3}\n\n"
+
+        # Eliminar el banner anterior si existe (al final)
+        log_content = self.log_text.get("1.0", "end-1c")
+        lines = log_content.splitlines()
+        # Si el banner ya está al final, lo quitamos
+        if len(lines) >= 4 and lines[-4].startswith("📡 ESTADO AUDIO"):
+            # Borramos las últimas 4 líneas
+            self.log_text.delete(f"end-{self.stats_line_count + 1}l", "end-1c")
+
+        # Insertar el nuevo banner al final
+        self.log_text.insert("end", stats_block)
+        self.log_text.see("end")
+
+        self.last_stats_snapshot = {
+            'timestamp': now,
+            'packets_sent': packets_sent
+        }
     
     def on_closing(self):
         """Manejar cierre de la ventana"""
