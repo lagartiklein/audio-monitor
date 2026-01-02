@@ -42,6 +42,7 @@ dnspython>=2.4.2            # Resolución DNS (requerido por engineio)
 # UTILIDADES
 # ============================================================================
 packaging>=23.2             # Manejo de versiones y especificaciones
+customtkinter>=5.2.0        # GUI moderna con diseño material
 
 # ============================================================================
 # PYINSTALLER (para compilar a exe)

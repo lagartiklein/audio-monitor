@@ -1,21 +1,42 @@
-import tkinter as tk
-from tkinter import ttk, scrolledtext
+import customtkinter as ctk
 import threading
 import time
 import sounddevice as sd
 import queue
 from datetime import datetime
 import os
+import webbrowser
+import sys
+from PIL import Image
+
+def get_resource_path(relative_path):
+    """ Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller """
+    try:
+        # PyInstaller crea una carpeta temporal y guarda la ruta en _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 DEFAULT_SAMPLE_RATE = 48000  # Tasa de muestreo por defecto
+
+# Configurar apariencia de CustomTkinter
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
 class AudioMonitorGUI:
     def __init__(self, main_app):
         self.main_app = main_app
-        self.root = tk.Tk()
-        self.root.title("Fichatech Monitor - Audio RF Server")
-        self.root.geometry("900x750")
-        self.root.configure(bg='#1e1e2e')
+        self.root = ctk.CTk()
+        self.root.title("Fichatech Monitor Server")
+        self.root.geometry("1000x800")
+        
+        # Establecer icono de la ventana
+        try:
+            self.root.iconbitmap(get_resource_path("assets/icono.ico"))
+        except Exception as e:
+            print(f"No se pudo cargar el icono: {e}")
         
         # Variables de estado
         self.running = True
@@ -23,11 +44,22 @@ class AudioMonitorGUI:
         self.stats_queue = queue.Queue()
         
         # Variables de dispositivo
-        self.selected_device_id = -1
-        self.selected_device_name = tk.StringVar(value="No seleccionado")
+        devices = list(sd.query_devices())
+        input_devices = [(i, d) for i, d in enumerate(devices) if isinstance(d, dict) and d.get('max_input_channels', 0) > 0]
+        # Ordenar por número de canales y sample rate
+        input_devices.sort(key=lambda d: (d[1].get('max_input_channels', 0), d[1].get('default_samplerate', 0)), reverse=True)
+        if input_devices:
+            best_id, best_device = input_devices[0]
+            self.selected_device_id = best_id
+            self.selected_device_name = ctk.StringVar(value=best_device.get('name', 'Desconocido'))
+            self.device_var = ctk.IntVar(value=best_id)
+        else:
+            self.selected_device_id = -1
+            self.selected_device_name = ctk.StringVar(value="No seleccionado")
+            self.device_var = ctk.IntVar(value=-1)
         
-        # Configurar estilo
-        self.setup_styles()
+        # Configurar colores
+        self.setup_colors()
         
         # Inicializar interfaz
         self.setup_ui()
@@ -35,94 +67,30 @@ class AudioMonitorGUI:
         # Configurar cierre
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
-    def setup_styles(self):
-        """Configurar estilos tkinter"""
-        style = ttk.Style()
-        
-        # Colores
-        self.bg_color = '#1e1e2e'
-        self.fg_color = '#cdd6f4'
-        self.accent_color = '#89b4fa'
-        self.success_color = '#a6e3a1'
-        self.warning_color = '#f9e2af'
-        self.error_color = '#f38ba8'
-        self.panel_color = '#313244'
-        self.highlight_color = '#74c7ec'
-        
-        # Configurar temas
-        style.theme_use('clam')
-        
-        # Configurar colores
-        style.configure('Title.TLabel', 
-                       background=self.bg_color,
-                       foreground=self.accent_color,
-                       font=('Segoe UI', 18, 'bold'))
-        
-        style.configure('Subtitle.TLabel',
-                       background=self.bg_color,
-                       foreground=self.fg_color,
-                       font=('Segoe UI', 11))
-        
-        style.configure('Panel.TFrame',
-                       background=self.panel_color,
-                       relief='flat')
-        
-        style.configure('Stat.TLabel',
-                       background=self.panel_color,
-                       foreground=self.fg_color,
-                       font=('Segoe UI', 10))
-        
-        style.configure('Value.TLabel',
-                       background=self.panel_color,
-                       foreground=self.highlight_color,
-                       font=('Segoe UI', 10, 'bold'))
-        
-        style.configure('Device.TRadiobutton',
-                       background=self.panel_color,
-                       foreground=self.fg_color,
-                       font=('Segoe UI', 9))
-        
-        style.configure('Green.TButton',
-                       background=self.success_color,
-                       foreground='black',
-                       font=('Segoe UI', 10, 'bold'))
-        
-        style.configure('Red.TButton',
-                       background=self.error_color,
-                       foreground='black',
-                       font=('Segoe UI', 10, 'bold'))
-        
-        style.configure('Blue.TButton',
-                       background=self.accent_color,
-                       foreground='black',
-                       font=('Segoe UI', 10, 'bold'))
-        
-        # Estilo para dispositivo seleccionado
-        style.configure('Selected.TFrame',
-                       background='#45475a',
-                       relief='sunken')
+    def setup_colors(self):
+        """Configurar paleta de colores moderna"""
+        self.success_color = "#2ecc71"
+        self.error_color = "#e74c3c"
+        self.warning_color = "#f39c12"
+        self.info_color = "#3498db"
+        self.accent_color = "#9b59b6"
+        self.web_color = "#1abc9c"
     
     def setup_ui(self):
         """Configurar elementos de la interfaz"""
-        # Frame principal
-        main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # Frame principal con padding
+        main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Configurar expansión
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(1, weight=0)
-        main_frame.rowconfigure(3, weight=1)
+        # Configurar grid
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(2, weight=1)
         
         # Encabezado con logo y título
         self.setup_header(main_frame)
         
         # Frame de estado actual
         self.setup_status_frame(main_frame)
-        
-        # Frame de selección de dispositivo
-        self.setup_device_frame(main_frame)
         
         # Frame de logs
         self.setup_logs_frame(main_frame)
@@ -134,245 +102,238 @@ class AudioMonitorGUI:
         self.start_updates()
     
     def setup_header(self, parent):
-        """Configurar encabezado con logo"""
-        header_frame = ttk.Frame(parent, style='Panel.TFrame')
-        header_frame.grid(row=0, column=0, pady=(0, 20), sticky=(tk.W, tk.E))
-        header_frame.columnconfigure(1, weight=1)
+        """Configurar encabezado moderno"""
+        header_frame = ctk.CTkFrame(parent, corner_radius=15)
+        header_frame.grid(row=0, column=0, pady=(0, 15), sticky="ew")
+        header_frame.grid_columnconfigure(1, weight=1)
         
-        # Logo/Icono (usando emoji como placeholder)
-        logo_label = ttk.Label(header_frame,
-                              text="🎛️",
-                              font=('Segoe UI', 24),
-                              background=self.panel_color)
-        logo_label.grid(row=0, column=0, padx=(10, 15), pady=10, sticky=tk.W)
+        # Logo/Icono
+        try:
+            logo_image = ctk.CTkImage(
+                light_image=Image.open(get_resource_path("assets/icon.png")), 
+                dark_image=Image.open(get_resource_path("assets/icon.png")),
+                size=(80,80)
+            )
+            logo_label = ctk.CTkLabel(header_frame,
+                                      image=logo_image,
+                                      text="",
+                                      width=80, height=80)
+        except Exception as e:
+            print(f"No se pudo cargar el logo: {e}")
+            logo_label = ctk.CTkLabel(header_frame, text="📻", font=("Segoe UI Emoji", 48))
+            
+        logo_label.grid(row=0, column=0, rowspan=2, padx=40, pady=40, sticky="w")
         
-        # Título
-        title_frame = ttk.Frame(header_frame, style='Panel.TFrame')
-        title_frame.grid(row=0, column=1, sticky=tk.W)
+        # Título y subtítulo
+        title_label = ctk.CTkLabel(header_frame,
+                                   text="FICHATECH MONITOR Server",
+                                   font=ctk.CTkFont(size=28, weight="bold"),
+                                   anchor="center")
+        title_label.grid(row=0, column=1, sticky="ew", pady=(20, 2))
         
-        title_label = ttk.Label(title_frame,
-                               text="Fichatech Monitor",
-                               style='Title.TLabel')
-        title_label.pack(anchor=tk.W)
-        
-        subtitle_label = ttk.Label(title_frame,
-                                  text="Streaming de audio multicanal en tiempo real",
-                                  style='Subtitle.TLabel')
-        subtitle_label.pack(anchor=tk.W, pady=(0, 5))
+        subtitle_button = ctk.CTkButton(header_frame,
+                                        text="Streaming de audio multicanal en tiempo real - www.cepalabs.cl/fichatech",
+                                        font=ctk.CTkFont(size=13),
+                                        fg_color="transparent",
+                                        hover_color="gray20",
+                                        text_color="gray70",
+                                        command=lambda: webbrowser.open("https://www.cepalabs.cl/fichatech"))
+        subtitle_button.grid(row=1, column=1, sticky="ew", pady=(0, 20))
         
         # Estado del servidor
-        self.server_status_var = tk.StringVar(value="🔴 Servidor detenido")
-        status_label = ttk.Label(title_frame,
-                                textvariable=self.server_status_var,
-                                font=('Segoe UI', 10, 'bold'),
-                                foreground=self.error_color,
-                                background=self.panel_color)
-        status_label.pack(anchor=tk.W)
+        self.server_status_label = ctk.CTkLabel(header_frame,
+                                               text="● Servidor detenido",
+                                               font=ctk.CTkFont(size=14, weight="bold"),
+                                               text_color=self.error_color)
+        self.server_status_label.grid(row=0, column=2, rowspan=2, padx=20, pady=20)
     
     def setup_status_frame(self, parent):
-        """Frame de estado actual"""
-        status_frame = ttk.LabelFrame(parent,
-                                     text="📊 Estado Actual",
-                                     padding="15")
-        status_frame.grid(row=1, column=0, pady=(0, 15), sticky=(tk.W, tk.E))
+        """Frame de estado actual modernizado"""
+        status_frame = ctk.CTkFrame(parent, corner_radius=15)
+        status_frame.grid(row=1, column=0, pady=(0, 15), sticky="ew")
+        status_frame.grid_columnconfigure((0, 1), weight=1)
         
-        # Grid para estado
-        status_frame.columnconfigure(0, weight=1)
-        status_frame.columnconfigure(1, weight=1)
-        status_frame.columnconfigure(2, weight=1)
+        # Label de sección
+        section_label = ctk.CTkLabel(status_frame,
+                                     text="📊 DISPOSITIVO DE AUDIO",
+                                     font=ctk.CTkFont(size=12, weight="bold"),
+                                     text_color="gray60")
+        section_label.grid(row=0, column=0, columnspan=2, pady=(15, 10), padx=20, sticky="w")
         
-        # Dispositivo seleccionado
-        device_status_frame = ttk.Frame(status_frame, style='Panel.TFrame', padding="10")
-        device_status_frame.grid(row=0, column=0, padx=5, pady=5, sticky=(tk.W, tk.E))
+        # Frame de dispositivo seleccionado
+        device_info_frame = ctk.CTkFrame(status_frame, corner_radius=10)
+        device_info_frame.grid(row=1, column=0, padx=20, pady=(0, 15), sticky="ew")
         
-        device_label = ttk.Label(device_status_frame,
-                                text="🎙️ Dispositivo:",
-                                style='Stat.TLabel')
-        device_label.pack(anchor=tk.W)
+        # Icono y nombre del dispositivo
+        device_icon = ctk.CTkLabel(device_info_frame,
+                                   text="🎙️",
+                                   font=ctk.CTkFont(size=24))
+        device_icon.pack(side="left", padx=15, pady=15)
         
-        self.device_name_label = ttk.Label(device_status_frame,
-                                          textvariable=self.selected_device_name,
-                                          style='Value.TLabel')
-        self.device_name_label.pack(anchor=tk.W, pady=(5, 0))
+        device_details = ctk.CTkFrame(device_info_frame, fg_color="transparent")
+        device_details.pack(side="left", fill="both", expand=True, padx=(0, 15), pady=15)
         
-        # Información del dispositivo
-        self.device_info_var = tk.StringVar(value="Canales: -- | Sample Rate: -- Hz")
-        device_info_label = ttk.Label(device_status_frame,
-                                     textvariable=self.device_info_var,
-                                     style='Stat.TLabel')
-        device_info_label.pack(anchor=tk.W)
+        self.device_name_label = ctk.CTkLabel(device_details,
+                                             textvariable=self.selected_device_name,
+                                             font=ctk.CTkFont(size=14, weight="bold"),
+                                             anchor="w")
+        self.device_name_label.pack(anchor="w")
+        
+        self.device_info_var = ctk.StringVar(value="Canales: -- | Sample Rate: -- Hz")
+        device_specs_label = ctk.CTkLabel(device_details,
+                                         textvariable=self.device_info_var,
+                                         font=ctk.CTkFont(size=12),
+                                         text_color="gray70",
+                                         anchor="w")
+        device_specs_label.pack(anchor="w", pady=(5, 0))
         
         # Botón para cambiar dispositivo
-        change_btn = ttk.Button(device_status_frame,
-                               text="🔄 Cambiar",
-                               command=self.show_device_selector,
-                               style='Blue.TButton')
-        change_btn.pack(anchor=tk.W, pady=(10, 0))
-    
-    def setup_device_frame(self, parent):
-        """Frame de selección de dispositivo (oculto inicialmente)"""
-        self.device_selector_frame = ttk.LabelFrame(parent,
-                                                   text="🎙️ Seleccionar Interfaz de Audio",
-                                                   padding="15")
-        self.device_selector_frame.grid(row=2, column=0, pady=(0, 15), sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.device_selector_frame.grid_remove()  # Ocultar inicialmente
-        
-        # Variable para dispositivo seleccionado
-        self.device_var = tk.IntVar(value=-1)
-        
-        # Frame para lista de dispositivos con scrollbar
-        list_container = ttk.Frame(self.device_selector_frame)
-        list_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        list_container.columnconfigure(0, weight=1)
-        list_container.rowconfigure(0, weight=1)
-        
-        # Canvas y scrollbar
-        self.device_canvas = tk.Canvas(list_container, bg=self.panel_color, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=self.device_canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.device_canvas, style='Panel.TFrame')
-        
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.device_canvas.configure(scrollregion=self.device_canvas.bbox("all"))
-        )
-        
-        self.device_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.device_canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Empaquetar canvas y scrollbar
-        self.device_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        
-        # Botones de control
-        button_frame = ttk.Frame(self.device_selector_frame)
-        button_frame.grid(row=1, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
-        
-        select_btn = ttk.Button(button_frame,
-                               text="✅ Seleccionar",
-                               command=self.select_device,
-                               style='Green.TButton')
-        select_btn.pack(side=tk.LEFT, padx=(0, 10))
-        
-        cancel_btn = ttk.Button(button_frame,
-                               text="❌ Cancelar",
-                               command=self.hide_device_selector)
-        cancel_btn.pack(side=tk.LEFT)
-        
-        refresh_btn = ttk.Button(button_frame,
-                                text="🔄 Actualizar Lista",
-                                command=self.refresh_devices)
-        refresh_btn.pack(side=tk.RIGHT)
+        self.change_device_btn = ctk.CTkButton(status_frame,
+                                              text="🔄 Cambiar Dispositivo",
+                                              command=self.show_device_selector,
+                                              corner_radius=10,
+                                              height=40,
+                                              font=ctk.CTkFont(size=13, weight="bold"))
+        self.change_device_btn.grid(row=1, column=1, padx=20, pady=(0, 15), sticky="ew")
     
     def show_device_selector(self):
-        """Mostrar selector de dispositivos"""
-        if not hasattr(self, 'device_widgets'):
-            self.load_devices()
-        
-        self.device_selector_frame.grid()
-        self.root.update_idletasks()
-        
-        # Scroll al dispositivo seleccionado si hay uno
-        if self.selected_device_id != -1:
-            self.device_var.set(self.selected_device_id)
-            # Calcular posición para scroll
-            devices = sd.query_devices()
-            input_devices = [i for i, d in enumerate(devices) if d['max_input_channels'] > 0]
-            if self.selected_device_id in input_devices:
-                index = input_devices.index(self.selected_device_id)
-                total = len(input_devices)
-                if total > 0:
-                    self.device_canvas.yview_moveto(index / total)
-    
-    def hide_device_selector(self):
-        """Ocultar selector de dispositivos"""
-        self.device_selector_frame.grid_remove()
-    
-    def load_devices(self):
-        """Cargar lista de dispositivos"""
-        self.device_widgets = []
-        
-        # Limpiar frame si ya tiene widgets
-        for widget in self.scrollable_frame.winfo_children():
-            widget.destroy()
-        
-        devices = sd.query_devices()
-        input_devices = []
-        
-        for i, device in enumerate(devices):
-            if device['max_input_channels'] > 0:  # Solo dispositivos de entrada
-                input_devices.append((i, device))
-        
-        # Preseleccionar dispositivo con más de 2 canales
-        preselected_index = -1
+        """Mostrar selector de dispositivos en ventana modal"""
+        # Crear ventana modal
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Seleccionar Interfaz de Audio")
+        dialog.geometry("800x600")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Frame principal
+        main_container = ctk.CTkFrame(dialog, fg_color="transparent")
+        main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        main_container.grid_rowconfigure(1, weight=1)
+        main_container.grid_columnconfigure(0, weight=1)
+
+        # Título
+        title_label = ctk.CTkLabel(main_container,
+                                   text="🎙️ Seleccionar Interfaz de Audio",
+                                   font=ctk.CTkFont(size=20, weight="bold"))
+        title_label.grid(row=0, column=0, pady=(0, 15), sticky="w")
+
+        # Frame scrollable para dispositivos
+        scrollable_frame = ctk.CTkScrollableFrame(main_container, corner_radius=10)
+        scrollable_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 15))
+        scrollable_frame.grid_columnconfigure(0, weight=1)
+
+        # Cargar dispositivos y ordenarlos por calidad
+        devices = list(sd.query_devices())
+        input_devices = [
+            (i, device) for i, device in enumerate(devices) if isinstance(device, dict) and device.get('max_input_channels', 0) > 0
+        ]
+        # Ordenar por número de canales y sample rate
+        input_devices.sort(key=lambda d: (d[1].get('max_input_channels', 0), d[1].get('default_samplerate', 0)), reverse=True)
+
+        # Crear botones radio para cada dispositivo
         for i, (device_id, device) in enumerate(input_devices):
-            if device['max_input_channels'] > 2 and preselected_index == -1:
-                preselected_index = device_id
-        
-        for i, (device_id, device) in enumerate(input_devices):
-            # Crear frame para cada dispositivo
-            device_item = ttk.Frame(self.scrollable_frame, padding="10")
-            if device_id == self.selected_device_id:
-                device_item.config(style='Selected.TFrame')
-            device_item.pack(fill=tk.X, pady=2)
-            
+            device_frame = ctk.CTkFrame(scrollable_frame, corner_radius=10)
+            device_frame.grid(row=i, column=0, pady=5, padx=5, sticky="ew")
+            device_frame.grid_columnconfigure(1, weight=1)
+
             # Radio button
-            rb = ttk.Radiobutton(device_item,
-                                text=f"{device['name']}",
-                                variable=self.device_var,
-                                value=device_id,
-                                style='Device.TRadiobutton',
-                                command=lambda d=device_id: self.highlight_device(d))
-            rb.pack(anchor=tk.W)
-            
-            # Información adicional
-            channels = device['max_input_channels']
-            samplerate = int(device['default_samplerate']) if device['default_samplerate'] else DEFAULT_SAMPLE_RATE
-            
-            info_text = f"  Canales: {channels} | Sample Rate: {samplerate} Hz"
+            radio = ctk.CTkRadioButton(device_frame,
+                                      text="",
+                                      variable=self.device_var,
+                                      value=device_id)
+            radio.grid(row=0, column=0, padx=15, pady=15, sticky="w")
+
+            # Información del dispositivo
+            info_frame = ctk.CTkFrame(device_frame, fg_color="transparent")
+            info_frame.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=15)
+
+            # Nombre
+            name_label = ctk.CTkLabel(info_frame,
+                                     text=device.get('name', 'Desconocido'),
+                                     font=ctk.CTkFont(size=13, weight="bold"),
+                                     anchor="w")
+            name_label.pack(anchor="w")
+
+            # Especificaciones
+            channels = device.get('max_input_channels', 0)
+            samplerate = int(device.get('default_samplerate', DEFAULT_SAMPLE_RATE))
+
+            specs_text = f"Canales: {channels} | Sample Rate: {samplerate} Hz"
             if channels > 2:
-                info_text += " ⭐"
-            
-            info_label = ttk.Label(device_item,
-                                  text=info_text,
-                                  style='Stat.TLabel')
-            info_label.pack(anchor=tk.W, padx=(20, 0))
-            
-            self.device_widgets.append((device_id, device_item))
-        
-        # Configurar preselección
-        if preselected_index != -1 and self.selected_device_id == -1:
-            self.device_var.set(preselected_index)
-            self.update_device_display(preselected_index)
-    
-    def highlight_device(self, device_id):
-        """Resaltar dispositivo seleccionado"""
-        for d_id, widget in self.device_widgets:
-            if d_id == device_id:
-                widget.config(style='Selected.TFrame')
-            else:
-                widget.config(style='Panel.TFrame')
-    
-    def select_device(self):
-        """Seleccionar dispositivo de la lista"""
-        device_id = self.device_var.get()
-        
-        if device_id == -1:
-            self.log_message("❌ Por favor selecciona un dispositivo de la lista", 'ERROR')
-            return
-        
-        self.update_device_display(device_id)
-        self.hide_device_selector()
-        self.log_message(f"✅ Dispositivo seleccionado: {self.selected_device_name.get()}", 'SUCCESS')
+                specs_text += " ⭐"
+
+            specs_label = ctk.CTkLabel(info_frame,
+                                      text=specs_text,
+                                      font=ctk.CTkFont(size=11),
+                                      text_color="gray70",
+                                      anchor="w")
+            specs_label.pack(anchor="w", pady=(5, 0))
+
+        # Frame de botones
+        button_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        button_frame.grid(row=2, column=0, sticky="ew")
+
+        def on_select():
+            device_id = self.device_var.get()
+            if device_id == -1:
+                self.log_message("❌ Por favor selecciona un dispositivo de la lista", 'ERROR')
+                return
+
+            self.update_device_display(device_id)
+            self.log_message(f"✅ Dispositivo seleccionado: {self.selected_device_name.get()}", 'SUCCESS')
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        def on_refresh():
+            dialog.destroy()
+            self.show_device_selector()
+
+        select_btn = ctk.CTkButton(button_frame,
+                                  text="✅ Seleccionar",
+                                  command=on_select,
+                                  fg_color=self.success_color,
+                                  hover_color="#27ae60",
+                                  height=40,
+                                  font=ctk.CTkFont(size=13, weight="bold"))
+        select_btn.pack(side="left", padx=(0, 10))
+
+        refresh_btn = ctk.CTkButton(button_frame,
+                                   text="🔄 Actualizar",
+                                   command=on_refresh,
+                                   height=40,
+                                   font=ctk.CTkFont(size=13, weight="bold"))
+        refresh_btn.pack(side="left", padx=(0, 10))
+
+        cancel_btn = ctk.CTkButton(button_frame,
+                                  text="❌ Cancelar",
+                                  command=on_cancel,
+                                  fg_color="gray40",
+                                  hover_color="gray30",
+                                  height=40,
+                                  font=ctk.CTkFont(size=13, weight="bold"))
+        cancel_btn.pack(side="right")
+
+        # Centrar ventana
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
     
     def update_device_display(self, device_id):
         """Actualizar display con información del dispositivo"""
         try:
             device_info = sd.query_devices(device_id)
             self.selected_device_id = device_id
-            self.selected_device_name.set(device_info['name'])
-            
-            channels = device_info['max_input_channels']
-            samplerate = int(device_info['default_samplerate']) if device_info['default_samplerate'] else DEFAULT_SAMPLE_RATE
+            if isinstance(device_info, dict):
+                self.selected_device_name.set(device_info.get('name', 'Desconocido'))
+                channels = device_info.get('max_input_channels', 0)
+                samplerate = int(device_info.get('default_samplerate', DEFAULT_SAMPLE_RATE))
+            else:
+                self.selected_device_name.set(str(device_info))
+                channels = 0
+                samplerate = DEFAULT_SAMPLE_RATE
             self.device_info_var.set(f"Canales: {channels} | Sample Rate: {samplerate} Hz")
             
             # Actualizar estadísticas
@@ -382,72 +343,89 @@ class AudioMonitorGUI:
         except Exception as e:
             self.log_message(f"❌ Error al obtener información del dispositivo: {e}", 'ERROR')
     
-    def refresh_devices(self):
-        """Actualizar lista de dispositivos"""
-        self.load_devices()
-        self.log_message("🔄 Lista de dispositivos actualizada", 'INFO')
-    
     def setup_logs_frame(self, parent):
-        """Frame de logs del sistema"""
-        logs_frame = ttk.LabelFrame(parent,
-                                   text="📝 Logs del Sistema",
-                                   padding="10")
-        logs_frame.grid(row=3, column=0, pady=(0, 20), sticky=(tk.W, tk.E, tk.N, tk.S))
-        logs_frame.columnconfigure(0, weight=1)
-        logs_frame.rowconfigure(0, weight=1)
+        """Frame de logs modernizado"""
+        logs_frame = ctk.CTkFrame(parent, corner_radius=15)
+        logs_frame.grid(row=2, column=0, pady=(0, 15), sticky="nsew")
+        logs_frame.grid_rowconfigure(1, weight=1)
+        logs_frame.grid_columnconfigure(0, weight=1)
         
-        # Área de texto para logs
-        self.log_text = scrolledtext.ScrolledText(logs_frame,
-                                                 height=8,
-                                                 bg=self.panel_color,
-                                                 fg=self.fg_color,
-                                                 font=('Consolas', 9),
-                                                 insertbackground=self.accent_color)
-        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # Label de sección
+        section_label = ctk.CTkLabel(logs_frame,
+                                     text="📝 LOGS DEL SISTEMA",
+                                     font=ctk.CTkFont(size=12, weight="bold"),
+                                     text_color="gray60")
+        section_label.grid(row=0, column=0, pady=(15, 10), padx=20, sticky="w")
         
-        # Configurar tags para colores
-        self.log_text.tag_config('INFO', foreground=self.fg_color)
-        self.log_text.tag_config('SUCCESS', foreground=self.success_color)
-        self.log_text.tag_config('WARNING', foreground=self.warning_color)
-        self.log_text.tag_config('ERROR', foreground=self.error_color)
-        self.log_text.tag_config('RF', foreground='#cba6f7')
-        self.log_text.tag_config('WEB', foreground='#89dceb')
+        # Textbox para logs
+        self.log_text = ctk.CTkTextbox(logs_frame,
+                                      corner_radius=10,
+                                      font=ctk.CTkFont(family="Consolas", size=11),
+                                      wrap="word")
+        self.log_text.grid(row=1, column=0, padx=15, pady=(0, 15), sticky="nsew")
     
     def setup_controls_frame(self, parent):
-        """Frame de controles"""
-        controls_frame = ttk.Frame(parent)
-        controls_frame.grid(row=4, column=0, sticky=(tk.W, tk.E))
-        controls_frame.columnconfigure(0, weight=1)
+        """Frame de controles modernizado"""
+        controls_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        controls_frame.grid(row=3, column=0, sticky="ew")
+        controls_frame.grid_columnconfigure(1, weight=1)
         
         # Botón de inicio
-        self.start_btn = ttk.Button(controls_frame,
-                                   text="🚀 Iniciar Servidor",
-                                   style='Green.TButton',
-                                   command=self.start_server)
-        self.start_btn.pack(side=tk.LEFT, padx=5)
+        self.start_btn = ctk.CTkButton(controls_frame,
+                                      text="🚀 Iniciar Servidor",
+                                      command=self.start_server,
+                                      fg_color=self.success_color,
+                                      hover_color="#27ae60",
+                                      height=45,
+                                      font=ctk.CTkFont(size=14, weight="bold"),
+                                      corner_radius=10)
+        self.start_btn.grid(row=0, column=0, padx=(0, 10), sticky="ew")
         
         # Botón de detener
-        self.stop_btn = ttk.Button(controls_frame,
-                                  text="🛑 Detener Servidor",
-                                  style='Red.TButton',
-                                  command=self.stop_server,
-                                  state='disabled')
-        self.stop_btn.pack(side=tk.LEFT, padx=5)
+        self.stop_btn = ctk.CTkButton(controls_frame,
+                                     text="🛑 Detener Servidor",
+                                     command=self.stop_server,
+                                     fg_color=self.error_color,
+                                     hover_color="#c0392b",
+                                     height=45,
+                                     font=ctk.CTkFont(size=14, weight="bold"),
+                                     corner_radius=10,
+                                     state="disabled")
+        self.stop_btn.grid(row=0, column=1, padx=(0, 10), sticky="ew")
         
         # Botón de salir
-        exit_btn = ttk.Button(controls_frame,
-                             text="👋 Salir",
-                             command=self.on_closing)
-        exit_btn.pack(side=tk.RIGHT, padx=5)
+        exit_btn = ctk.CTkButton(controls_frame,
+                                text="👋 Salir",
+                                command=self.on_closing,
+                                fg_color="gray40",
+                                hover_color="gray30",
+                                height=45,
+                                font=ctk.CTkFont(size=14, weight="bold"),
+                                corner_radius=10)
+        exit_btn.grid(row=0, column=2, sticky="ew")
     
     def log_message(self, message, tag='INFO'):
-        """Agregar mensaje al log"""
+        """Agregar mensaje al log con colores"""
         timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        # Mapear tags a colores
+        color_map = {
+            'SUCCESS': self.success_color,
+            'ERROR': self.error_color,
+            'WARNING': self.warning_color,
+            'INFO': self.info_color,
+            'RF': self.accent_color,
+            'WEB': self.web_color
+        }
+        
+        color = color_map.get(tag, "gray70")
+        
+        # Formatear mensaje con timestamp
         log_entry = f"[{timestamp}] {message}\n"
         
-        self.log_text.insert(tk.END, log_entry, tag)
-        self.log_text.see(tk.END)
-        self.log_text.update()
+        # Insertar en el textbox
+        self.log_text.insert("end", log_entry)
+        self.log_text.see("end")
     
     def start_server(self):
         """Iniciar el servidor"""
@@ -457,17 +435,21 @@ class AudioMonitorGUI:
             return
         
         device_info = sd.query_devices(self.selected_device_id)
-        self.log_message(f"🎙️ Iniciando servidor con: {device_info['name']}", 'RF')
-        self.log_message(f"   Canales: {device_info['max_input_channels']}", 'RF')
+        if isinstance(device_info, dict):
+            self.log_message(f"🎙️ Iniciando servidor con: {device_info.get('name', 'Desconocido')}", 'RF')
+            self.log_message(f"   Canales: {device_info.get('max_input_channels', 0)}", 'RF')
+        else:
+            self.log_message(f"🎙️ Iniciando servidor con: {str(device_info)}", 'RF')
+            self.log_message(f"   Canales: 0", 'RF')
         
         # Enviar comando al servidor principal
         if hasattr(self.main_app, 'start_server_with_device'):
             self.main_app.start_server_with_device(self.selected_device_id)
         
         # Actualizar estado
-        self.start_btn.config(state='disabled')
-        self.stop_btn.config(state='normal')
-        self.server_status_var.set("🟢 Servidor ejecutándose")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.server_status_label.configure(text="● Servidor ejecutándose", text_color=self.success_color)
         
         self.log_message("✅ Servidor iniciado correctamente", 'SUCCESS')
     
@@ -478,9 +460,9 @@ class AudioMonitorGUI:
             self.main_app.stop_server()
         
         # Actualizar estado
-        self.start_btn.config(state='normal')
-        self.stop_btn.config(state='disabled')
-        self.server_status_var.set("🔴 Servidor detenido")
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        self.server_status_label.configure(text="● Servidor detenido", text_color=self.error_color)
         
         self.log_message("🛑 Servidor detenido", 'WARNING')
     

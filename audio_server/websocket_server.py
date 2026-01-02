@@ -689,7 +689,7 @@ def broadcast_clients_update():
     """Optimización de la actualización de clientes."""
     try:
         clients_info = get_all_clients_info()
-        socketio.emit('clients_update', {'clients': clients_info}, broadcast=True)
+        socketio.emit('clients_update', {'clients': clients_info})
         logger.info(f"[WebSocket] 📡 Actualización enviada: {len(clients_info)} clientes")
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en broadcast_clients_update: {e}")

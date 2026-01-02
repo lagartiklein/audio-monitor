@@ -670,7 +670,7 @@ class NativeAudioServer:
             websocket_server.socketio.emit('client_disconnected', {
                 'client_id': client_id,
                 'timestamp': int(time.time() * 1000)
-            }, broadcast=True)
+            })  # Eliminado broadcast=True
             logger.info(f"📢 Notificación de desconexión enviada: {client_id[:15]}")
         except Exception as e:
             if config.DEBUG:
