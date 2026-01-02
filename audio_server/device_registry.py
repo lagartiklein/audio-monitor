@@ -245,6 +245,26 @@ class DeviceRegistry:
                     tags.append(tag)
                     self.save_to_disk()
     
+    def set_custom_name(self, device_uuid: str, custom_name: str) -> bool:
+        """✅ NUEVO: Guardar nombre personalizado de dispositivo."""
+        with self.device_lock:
+            if device_uuid not in self.devices:
+                return False
+            
+            self.devices[device_uuid]['custom_name'] = custom_name
+            self.devices[device_uuid]['last_seen'] = time.time()
+            self.save_to_disk()
+            
+            logger.info(f"[Device Registry] 📝 Nombre personalizado guardado: {device_uuid[:12]} = {custom_name}")
+            return True
+    
+    def get_custom_name(self, device_uuid: str) -> Optional[str]:
+        """✅ NUEVO: Obtener nombre personalizado de dispositivo."""
+        device = self.get_device(device_uuid)
+        if device:
+            return device.get('custom_name')
+        return None
+    
     # ========================================================================
     # LISTADO Y ESTADÍSTICAS
     # ========================================================================

@@ -526,47 +526,63 @@ class ChannelManager:
     
 
     def get_all_clients_info(self):
-
         """
-
         ✅ NUEVO: Obtener info de todos los clientes
-
         """
-
         clients_info = []
 
-        
+        # Obtener clientes nativos conectados (si hay native_server)
+        connected_native_ids = set()
+        if hasattr(self, 'native_server') and self.native_server:
+            with self.native_server.client_lock:
+                connected_native_ids = set(self.native_server.clients.keys())
+
+        # Los clientes web activos se consideran conectados si están en subscriptions
+        connected_web_ids = set(
+            client_id for client_id, t in self.client_types.items() if t == 'web'
+        )
 
         for client_id, sub in self.subscriptions.items():
-
             client_type = self.client_types.get(client_id, "unknown")
+            device_uuid = sub.get('device_uuid')
 
-            
+            # ✅ Obtener device_model y custom_name desde device_registry
+            device_model = None
+            custom_name = None
+            device_name = None
+            if device_uuid and self.device_registry:
+                try:
+                    device_info = self.device_registry.get_device(device_uuid)
+                    if device_info:
+                        device_model = device_info.get('device_info', {}).get('model') or \
+                                      device_info.get('device_info', {}).get('device_model')
+                        custom_name = device_info.get('custom_name')
+                        device_name = device_info.get('name')
+                except Exception as e:
+                    logger.debug(f"[ChannelManager] Error getting device info: {e}")
+
+            # Determinar si está conectado
+            connected = False
+            if client_type == 'native':
+                connected = client_id in connected_native_ids
+            elif client_type == 'web':
+                connected = client_id in connected_web_ids
 
             clients_info.append({
-
                 'id': client_id,
-
                 'type': client_type,
-
-                'device_uuid': sub.get('device_uuid'),
-
+                'device_uuid': device_uuid,
+                'device_model': device_model,  # ✅ NUEVO
+                'custom_name': custom_name,  # ✅ NUEVO
+                'device_name': device_name,  # ✅ NUEVO
                 'channels': sub['channels'],
-
                 'active_channels': len(sub['channels']),
-
                 'has_solo': len(sub.get('solos', set())) > 0,
-
                 'pre_listen': sub.get('pre_listen'),
-
                 'master_gain': sub.get('master_gain', 1.0),
-
-                'last_update': sub.get('last_update', 0)
-
+                'last_update': sub.get('last_update', 0),
+                'connected': connected  # ✅ NUEVO
             })
-
-        
-
         return clients_info
 
     

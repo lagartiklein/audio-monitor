@@ -17,12 +17,22 @@
             background: #0a0a0a;
             color: #00ff00;
             overflow-x: hidden;
+            min-height: 100vh;
+            min-width: 100vw;
+            width: 100vw;
+            height: 100vh;
+            box-sizing: border-box;
         }
         
         .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            padding: 20px;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
         }
         
         header {
@@ -40,16 +50,43 @@
         }
         
         .main-layout {
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 20px;
+            display: flex;
+            flex: 1 1 auto;
+            height: 100%;
+            min-height: 0;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-layout {
+                flex-direction: column;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-layout {
+                flex-direction: column;
+            }
         }
         
         .sidebar {
             background: #111;
-            padding: 20px;
+            padding: 20px 10px 20px 10px;
             border-radius: 10px;
             border: 2px solid #222;
+            overflow-y: auto;
+            max-height: 100vh;
+            min-width: 220px;
+            width: 300px;
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                max-height: 40vh;
+                margin-bottom: 20px;
+                width: 100vw;
+                min-width: 0;
+            }
         }
         
         .sidebar h2 {
@@ -73,16 +110,85 @@
             border: 2px solid #333;
             cursor: pointer;
             transition: all 0.3s;
+            position: relative;
         }
         
         .client-item:hover {
             border-color: #00ff00;
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
         }
+
+        .client-menu-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: all 0.2s;
+            display: none;
+        }
+
+        .client-item:hover .client-menu-btn {
+            display: block;
+        }
+
+        .client-menu-btn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .client-menu {
+            position: absolute;
+            top: 35px;
+            right: 8px;
+            background: #1a1a1a;
+            border: 2px solid #00ff00;
+            border-radius: 4px;
+            min-width: 180px;
+            z-index: 1000;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            display: none;
+        }
+
+        .client-menu.active {
+            display: block;
+        }
+
+        .client-menu-item {
+            padding: 10px 15px;
+            color: #00ff00;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+
+        .client-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .client-menu-item:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        
         
         .client-item.selected {
             border-color: #00ff00;
             background: #222;
+        }
+
+        .client-item.disconnected {
+            opacity: 0.5;
+            filter: grayscale(0.7);
+            cursor: not-allowed;
+            background: #222 !important;
+            border-color: #555 !important;
         }
         
         .client-item.native {
@@ -108,6 +214,11 @@
             padding: 20px;
             border-radius: 10px;
             border: 2px solid #222;
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 0;
+            height: 100%;
+            overflow: auto;
         }
         
         .mixer-header {
@@ -152,9 +263,25 @@
         }
         
         .channel-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            display: flex;
+            flex-direction: row;
             gap: 15px;
+            overflow-x: auto;
+            width: 100%;
+            min-height: 420px;
+            padding-bottom: 10px;
+        }
+        
+        @media (max-width: 1024px) {
+            .channel-grid {
+                gap: 10px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .channel-grid {
+                gap: 6px;
+            }
         }
         
         .channel-strip {
@@ -414,6 +541,7 @@
             async init() {
                 this.connectWebSocket();
                 this.setupEventListeners();
+                this.startAutoRefreshClients();
             }
 
             connectWebSocket() {
@@ -478,6 +606,14 @@
                 }
 
                 clientsData.forEach(client => {
+                    // Cargar custom_name desde localStorage si no viene del servidor
+                    if (!client.custom_name) {
+                        const storageKey = `client_custom_name_${client.id}`;
+                        const savedName = localStorage.getItem(storageKey);
+                        if (savedName) {
+                            client.custom_name = savedName;
+                        }
+                    }
                     this.clients[client.id] = client;
 
                     const item = document.createElement('div');
@@ -485,24 +621,191 @@
                     if (this.selectedClientId === client.id) {
                         item.classList.add('selected');
                     }
+                    // Marcar desconectados
+                    if (client.connected === false) {
+                        item.classList.add('disconnected');
+                    }
 
                     const typeIcon = client.type === 'native' ? '📱' : '🌐';
                     const typeName = client.type === 'native' ? 'Android' : 'Web';
+                    let displayName = client.custom_name || client.device_name || typeName;
+                    const modelInfo = client.device_model ? `<div class="client-info" style="font-size: 0.8em; color: #0aa;">📱 ${client.device_model}</div>` : '';
 
-                    item.innerHTML = `
-                        <div class="client-name">${typeIcon} ${typeName}</div>
-                        <div class="client-info">ID: ${client.id.substring(0, 8)}...</div>
-                        <div class="client-info">Canales: ${client.active_channels}</div>
-                        ${client.has_solo ? '<div class="client-info" style="color: #ff0;">SOLO</div>' : ''}
-                        ${client.pre_listen !== null ? '<div class="client-info" style="color: #f0f;">PFL</div>' : ''}
-                    `;
+                    // --- Nombre del cliente ---
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'client-name';
+                    nameDiv.innerHTML = `${typeIcon} <span class="client-name-text">${displayName}</span>`;
+                    item.appendChild(nameDiv);
+
+                    // --- Botón de menú (engranaje) en la esquina superior derecha ---
+                    const menuBtn = document.createElement('button');
+                    menuBtn.className = 'client-menu-btn';
+                    menuBtn.innerHTML = '⚙️';
+                    menuBtn.title = 'Opciones del cliente';
+                    
+                    // --- Menú contextual ---
+                    const menu = document.createElement('div');
+                    menu.className = 'client-menu';
+                    
+                    const menuChangeNameItem = document.createElement('div');
+                    menuChangeNameItem.className = 'client-menu-item';
+                    menuChangeNameItem.innerHTML = '✏️ Cambiar nombre';
+                    menuChangeNameItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const newName = prompt('Nombre del cliente:', displayName);
+                        if (newName !== null && newName.trim()) {
+                            const trimmedName = newName.trim();
+                            // Guardar en localStorage
+                            const storageKey = `client_custom_name_${client.id}`;
+                            localStorage.setItem(storageKey, trimmedName);
+                            // Actualizar en cliente local
+                            if (this.clients[client.id]) {
+                                this.clients[client.id].custom_name = trimmedName;
+                            }
+                            // Notificar al servidor
+                            this.socket.emit('set_client_name', {
+                                client_id: client.id,
+                                custom_name: trimmedName
+                            });
+                            // Refrescar lista
+                            this.updateClientsList(Object.values(this.clients));
+                        }
+                        menu.classList.remove('active');
+                    });
+                    menu.appendChild(menuChangeNameItem);
+                    
+                    // --- Manejar click del botón de menú ---
+                    menuBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        menu.classList.toggle('active');
+                    });
+                    
+                    item.appendChild(menuBtn);
+                    item.appendChild(menu);
+
+                    // --- Resto de info del cliente ---
+                    if (modelInfo) {
+                        item.innerHTML += modelInfo;
+                    }
+                    item.innerHTML += `<div class="client-info">ID: ${client.id.substring(0, 8)}...</div>`;
+                    item.innerHTML += `<div class="client-info">Canales: ${client.active_channels}</div>`;
+                    if (client.has_solo) item.innerHTML += '<div class="client-info" style="color: #ff0;">SOLO</div>';
+                    if (client.pre_listen !== null) item.innerHTML += '<div class="client-info" style="color: #f0f;">PFL</div>';
 
                     item.addEventListener('click', () => {
                         this.selectClient(client.id, item);
                     });
-
+                    
+                    // Cerrar menú al hacer click fuera
+                    document.addEventListener('click', () => {
+                        menu.classList.remove('active');
+                    });
+                    
                     container.appendChild(item);
                 });
+            }
+
+            // Refrescar lista de clientes cada 3 segundos
+            startAutoRefreshClients() {
+                setInterval(() => {
+                    this.socket.emit('get_clients');
+                }, 3000);
+            }
+            // ✅ NUEVO: Función para editar nombre directamente en el DOM
+            enableClientNameEdit(nameDiv, client, currentName) {
+                const nameText = nameDiv.querySelector('.client-name-text');
+                if (!nameText) return;
+                
+                // Crear input para editar
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentName;
+                input.className = 'client-name-edit';
+                input.style.width = '85%';
+                input.style.fontSize = '1em';
+                input.style.background = '#222';
+                input.style.color = '#0f0';
+                input.style.border = '2px solid #0f0';
+                input.style.borderRadius = '4px';
+                input.style.padding = '4px 8px';
+                input.style.fontFamily = 'Courier New, monospace';
+                
+                // Reemplazar span por input
+                nameText.replaceWith(input);
+                input.focus();
+                input.select();
+                
+                const saveEdit = () => {
+                    const newName = input.value.trim();
+                    if (newName && newName !== currentName) {
+                        // Guardar en localStorage
+                        const storageKey = `client_custom_name_${client.id}`;
+                        localStorage.setItem(storageKey, newName);
+                        
+                        // Actualizar en cliente local
+                        if (this.clients[client.id]) {
+                            this.clients[client.id].custom_name = newName;
+                        }
+                        
+                        // Notificar al servidor
+                        this.socket.emit('set_client_name', {
+                            client_id: client.id,
+                            custom_name: newName
+                        });
+                        
+                        console.log(`[Client] Nombre actualizado: ${newName}`);
+                        
+                        // Refrescar lista
+                        this.updateClientsList(Object.values(this.clients));
+                    } else {
+                        // Restaurar si no hay cambio
+                        const newSpan = document.createElement('span');
+                        newSpan.className = 'client-name-text';
+                        newSpan.textContent = currentName;
+                        input.replaceWith(newSpan);
+                    }
+                };
+                
+                input.addEventListener('blur', saveEdit);
+                input.addEventListener('keydown', (e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                        input.blur();
+                    } else if (e.key === 'Escape') {
+                        const newSpan = document.createElement('span');
+                        newSpan.className = 'client-name-text';
+                        newSpan.textContent = currentName;
+                        input.replaceWith(newSpan);
+                    }
+                });
+            }
+
+            // ✅ NUEVO: Editar nombre personalizado de cliente web
+            editClientName(clientId, currentName) {
+                const newName = prompt('Nombre personalizado para este cliente:', currentName);
+                if (newName !== null && newName.trim()) {
+                    const trimmedName = newName.trim();
+                    
+                    // Guardar en localStorage
+                    const storageKey = `client_custom_name_${clientId}`;
+                    localStorage.setItem(storageKey, trimmedName);
+                    
+                    // Actualizar en cliente local
+                    if (this.clients[clientId]) {
+                        this.clients[clientId].custom_name = trimmedName;
+                    }
+                    
+                    // Notificar al servidor (opcional - para sincronización)
+                    this.socket.emit('set_client_name', {
+                        client_id: clientId,
+                        custom_name: trimmedName
+                    });
+                    
+                    // Actualizar UI
+                    this.updateClientsList(Object.values(this.clients));
+                    
+                    console.log(`[Client] Nombre guardado: ${trimmedName}`);
+                }
             }
 
             selectClient(clientId, selectedElement) {

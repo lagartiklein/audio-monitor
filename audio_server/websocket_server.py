@@ -203,17 +203,67 @@ def handle_connect(auth=None):
             }
         }
         emit('device_info', device_info)
-        
+
+        # --- Restaurar configuración persistente de canales si existe en device_registry ---
+        restored_from_registry = False
+        if web_device_uuid and getattr(channel_manager, 'device_registry', None):
+            registry = channel_manager.device_registry
+            config_prev = registry.get_configuration(web_device_uuid)
+            if config_prev and config_prev.get('channels'):
+                try:
+                    channel_manager.subscribe_client(
+                        client_id,
+                        config_prev.get('channels', []),
+                        gains=config_prev.get('gains', {}),
+                        pans=config_prev.get('pans', {}),
+                        client_type="web",
+                        device_uuid=web_device_uuid
+                    )
+                    logger.info(f"[WebSocket] 🔄 Cliente restaurado desde device_registry: {len(config_prev.get('channels', []))} canales")
+                    emit('auto_resubscribed', {
+                        'channels': config_prev.get('channels', []),
+                        'gains': config_prev.get('gains', {}),
+                        'pans': config_prev.get('pans', {})
+                    })
+                    restored_from_registry = True
+                except Exception as e:
+                    logger.error(f"[WebSocket] Error restaurando config de device_registry: {e}")
+
+        # Si no se restauró desde device_registry, intentar restaurar desde web_persistent_state (legacy)
+        if not restored_from_registry:
+            persistent_id = web_device_uuid or f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
+            with web_persistent_lock:
+                if persistent_id in web_persistent_state:
+                    saved_state = web_persistent_state[persistent_id]
+                    logger.info(f"[WebSocket] 💾 Estado persistente encontrado para {str(persistent_id)[:20]}")
+                    try:
+                        channel_manager.subscribe_client(
+                            client_id,
+                            saved_state.get('channels', []),
+                            gains=saved_state.get('gains', {}),
+                            pans=saved_state.get('pans', {}),
+                            client_type="web",
+                            device_uuid=web_device_uuid
+                        )
+                        logger.info(f"[WebSocket] ✅ Cliente resuscrito automáticamente: {len(saved_state.get('channels', []))} canales")
+                        emit('auto_resubscribed', {
+                            'channels': saved_state.get('channels', []),
+                            'gains': saved_state.get('gains', {}),
+                            'pans': saved_state.get('pans', {})
+                        })
+                    except Exception as e:
+                        logger.error(f"[WebSocket] Error resuscrbiendo: {e}")
+
         # ✅ Enviar lista de clientes conectados (nativos + web)
         clients_info = get_all_clients_info()
         emit('clients_update', {'clients': clients_info})
-        
+
         # ✅ Enviar estadísticas del servidor
         server_stats = get_server_stats()
         emit('server_stats', server_stats)
-        
+
         logger.info(f"[WebSocket]    Info enviada: {len(clients_info)} clientes totales")
-        
+
         # ✅ Registrar dispositivo web en DeviceRegistry (si existe)
         try:
             if web_device_uuid and getattr(channel_manager, 'device_registry', None):
@@ -226,34 +276,6 @@ def handle_connect(auth=None):
         except Exception as e:
             logger.debug(f"[WebSocket] DeviceRegistry register failed: {e}")
 
-        # ✅ Verificar estado persistente para auto-reconexión (por device_uuid)
-        persistent_id = web_device_uuid or f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
-        with web_persistent_lock:
-            if persistent_id in web_persistent_state:
-                saved_state = web_persistent_state[persistent_id]
-                logger.info(f"[WebSocket] 💾 Estado persistente encontrado para {str(persistent_id)[:20]}")
-                
-                # Resuscribir automáticamente
-                try:
-                    channel_manager.subscribe_client(
-                        client_id,
-                        saved_state.get('channels', []),
-                        gains=saved_state.get('gains', {}),
-                        pans=saved_state.get('pans', {}),
-                        client_type="web",
-                        device_uuid=web_device_uuid
-                    )
-                    logger.info(f"[WebSocket] ✅ Cliente resuscrito automáticamente: {len(saved_state.get('channels', []))} canales")
-                    
-                    # Notificar al cliente que se resuscrito
-                    emit('auto_resubscribed', {
-                        'channels': saved_state.get('channels', []),
-                        'gains': saved_state.get('gains', {}),
-                        'pans': saved_state.get('pans', {})
-                    })
-                except Exception as e:
-                    logger.error(f"[WebSocket] Error resuscrbiendo: {e}")
-        
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en connect: {e}")
         import traceback
@@ -430,6 +452,32 @@ def handle_update_client_mix(data):
             
             logger.info(f"[WebSocket] 🎛️ Mezcla actualizada para {target_client_id[:15]}")
             
+            # ✅ NUEVO: Guardar configuración en device_registry para persistencia
+            try:
+                subscription = channel_manager.get_client_subscription(target_client_id)
+                device_uuid = subscription.get('device_uuid') if subscription else None
+                
+                if device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+                    # Preparar configuración para guardar
+                    config_to_save = {
+                        'channels': subscription.get('channels', []),
+                        'gains': subscription.get('gains', {}),
+                        'pans': subscription.get('pans', {}),
+                        'mutes': subscription.get('mutes', {}),
+                        'solos': list(subscription.get('solos', set())),
+                        'pre_listen': subscription.get('pre_listen'),
+                        'master_gain': subscription.get('master_gain', 1.0),
+                        'timestamp': int(time.time() * 1000)
+                    }
+                    
+                    channel_manager.device_registry.update_configuration(
+                        device_uuid,
+                        config_to_save
+                    )
+                    logger.debug(f"[WebSocket] 💾 Configuración guardada en device_registry: {device_uuid[:12]}")
+            except Exception as e:
+                logger.debug(f"[WebSocket] Error guardando config en device_registry: {e}")
+            
             # ✅ Broadcast a todos (incluye el cambio)
             broadcast_clients_update()
             
@@ -457,6 +505,60 @@ def handle_get_clients():
         
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en get_clients: {e}")
+        emit('error', {'message': str(e)})
+
+
+@socketio.on('set_client_name')
+def handle_set_client_name(data):
+    """
+    ✅ NUEVO: Guardar nombre personalizado de cliente
+    data: {
+        'client_id': str,
+        'custom_name': str
+    }
+    """
+    update_client_activity(request.sid)
+    
+    try:
+        client_id = data.get('client_id')
+        custom_name = data.get('custom_name')
+        
+        if not client_id or not custom_name:
+            emit('error', {'message': 'client_id and custom_name required'})
+            return
+        
+        if not channel_manager:
+            emit('error', {'message': 'Channel manager not available'})
+            return
+        
+        # Obtener device_uuid del cliente
+        subscription = channel_manager.get_client_subscription(client_id)
+        if not subscription:
+            emit('error', {'message': f'Client {client_id} not found'})
+            return
+        
+        device_uuid = subscription.get('device_uuid')
+        
+        # Guardar nombre personalizado en device_registry
+        if device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            success = channel_manager.device_registry.set_custom_name(device_uuid, custom_name)
+            if success:
+                logger.info(f"[WebSocket] 📝 Nombre personalizado guardado: {client_id[:8]} = {custom_name}")
+                emit('client_name_saved', {
+                    'client_id': client_id,
+                    'custom_name': custom_name,
+                    'status': 'ok'
+                })
+                
+                # Notificar a todos los clientes de la actualización
+                broadcast_clients_update()
+            else:
+                emit('error', {'message': 'Failed to save custom name'})
+        else:
+            emit('error', {'message': 'Device registry not available or no device_uuid'})
+    
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en set_client_name: {e}")
         emit('error', {'message': str(e)})
 
 
@@ -488,6 +590,9 @@ def handle_update_gain(data):
             
             if config.DEBUG:
                 logger.debug(f"[WebSocket] 🎚️ {client_id[:8]} - Canal {channel}: {gain:.2f}")
+            
+            # ✅ NUEVO: Guardar en device_registry
+            _save_client_config_to_registry(client_id)
     
     except Exception as e:
         if config.DEBUG:
@@ -522,6 +627,9 @@ def handle_update_pan(data):
             
             if config.DEBUG:
                 logger.debug(f"[WebSocket] 🔊 {client_id[:8]} - Canal {channel} pan: {pan:.2f}")
+            
+            # ✅ NUEVO: Guardar en device_registry
+            _save_client_config_to_registry(client_id)
     
     except Exception as e:
         if config.DEBUG:
@@ -624,49 +732,114 @@ def update_client_activity(client_id):
             web_clients[client_id]['last_activity'] = time.time()
 
 
+def _save_client_config_to_registry(client_id):
+    """
+    ✅ NUEVO: Guardar configuración de cliente en device_registry de forma permanente
+    """
+    try:
+        if not channel_manager:
+            return
+        
+        subscription = channel_manager.get_client_subscription(client_id)
+        if not subscription:
+            return
+        
+        device_uuid = subscription.get('device_uuid')
+        
+        if device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            # Preparar configuración para guardar
+            config_to_save = {
+                'channels': subscription.get('channels', []),
+                'gains': subscription.get('gains', {}),
+                'pans': subscription.get('pans', {}),
+                'mutes': subscription.get('mutes', {}),
+                'solos': list(subscription.get('solos', set())),
+                'pre_listen': subscription.get('pre_listen'),
+                'master_gain': subscription.get('master_gain', 1.0),
+                'timestamp': int(time.time() * 1000)
+            }
+            
+            channel_manager.device_registry.update_configuration(
+                device_uuid,
+                config_to_save
+            )
+    except Exception as e:
+        logger.debug(f"[WebSocket] Error guardando config en device_registry: {e}")
+
+
 def get_all_clients_info():
     """
     ✅ Obtener información de TODOS los clientes (nativos + web)
     """
-    clients_info = []
-    
-    if not channel_manager:
-        return clients_info
-    
-    # ✅ Obtener clientes desde channel_manager
-    try:
-        clients_info = channel_manager.get_all_clients_info()
-        
-        # ✅ FILTRAR solo clientes realmente conectados
-        connected_client_ids = set()
-        
-        # Obtener clientes conectados del servidor nativo
-        if hasattr(channel_manager, 'native_server') and channel_manager.native_server:
-            with channel_manager.native_server.client_lock:
-                connected_client_ids = set(channel_manager.native_server.clients.keys())
-        
-        # Filtrar la lista
-        filtered_clients = [
-            client for client in clients_info 
-            if client['id'] in connected_client_ids or client.get('type') == 'web'
-        ]
-        
-        clients_info = filtered_clients
-        
-    except Exception as e:
-        logger.error(f"[WebSocket] Error obteniendo clientes: {e}")
-    
-    # ✅ Enriquecer con info de web_clients
+    # --- NUEVO: Mostrar todos los dispositivos conocidos (persistentes y activos) ---
+    all_devices = []
+    device_registry = getattr(channel_manager, 'device_registry', None)
+    if device_registry:
+        try:
+            all_devices = device_registry.get_all_devices(active_only=False)
+        except Exception as e:
+            logger.error(f"[WebSocket] Error obteniendo dispositivos de device_registry: {e}")
+
+    # Obtener clientes activos en memoria
+    active_clients = {}
+    if channel_manager:
+        try:
+            for c in channel_manager.get_all_clients_info():
+                # Indexar por device_uuid si existe, sino por id
+                key = c.get('device_uuid') or c.get('id')
+                active_clients[key] = c
+        except Exception as e:
+            logger.error(f"[WebSocket] Error obteniendo clientes activos: {e}")
+
+    # Unir info persistente y activa
+    merged_clients = []
+    seen_uuids = set()
+    for device in all_devices:
+        device_uuid = device.get('uuid')
+        client_info = {
+            'id': device_uuid,
+            'type': device.get('type', 'unknown'),
+            'device_uuid': device_uuid,
+            'device_model': device.get('device_info', {}).get('model') or device.get('device_info', {}).get('device_model'),
+            'custom_name': device.get('custom_name'),
+            'device_name': device.get('name'),
+            'channels': device.get('configuration', {}).get('channels', []),
+            'active_channels': len(device.get('configuration', {}).get('channels', [])),
+            'has_solo': bool(device.get('configuration', {}).get('solos')),
+            'pre_listen': device.get('configuration', {}).get('pre_listen'),
+            'master_gain': device.get('configuration', {}).get('master_gain', 1.0),
+            'last_update': device.get('last_seen', 0),
+            'connected': False,
+            'address': device.get('primary_ip'),
+            'connected_at': device.get('first_seen'),
+            'last_activity': device.get('last_seen'),
+        }
+        # Si está activo, sobreescribir info
+        active = active_clients.get(device_uuid)
+        if active:
+            client_info.update(active)
+            client_info['connected'] = True
+        merged_clients.append(client_info)
+        seen_uuids.add(device_uuid)
+
+    # Agregar clientes activos que no tengan device_uuid (ej: legacy o sin registro)
+    for key, active in active_clients.items():
+        if key and key not in seen_uuids:
+            merged_clients.append(active)
+
+    # Enriquecer con info de web_clients (address, last_activity)
     with web_clients_lock:
-        for client_info in clients_info:
+        for client_info in merged_clients:
             client_id = client_info.get('id')
             if client_id in web_clients:
                 web_info = web_clients[client_id]
                 client_info['address'] = web_info.get('address')
                 client_info['connected_at'] = web_info.get('connected_at')
                 client_info['last_activity'] = web_info.get('last_activity')
-    
-    return clients_info
+
+    # Ordenar: conectados primero, luego desconectados
+    merged_clients.sort(key=lambda c: (not c.get('connected', False), -(c.get('last_activity') or 0)))
+    return merged_clients
 
 
 def get_server_stats():
