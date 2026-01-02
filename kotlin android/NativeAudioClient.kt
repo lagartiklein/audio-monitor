@@ -24,7 +24,7 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
 
         private const val CONNECT_TIMEOUT = 5000
 
-        private const val READ_TIMEOUT = 30000 // ✅ Aumentado a 30s
+        private const val READ_TIMEOUT = 10000 // ✅ Timeout reducido para detectar fallas rápido
 
         private const val HEADER_SIZE = 16
 
@@ -48,9 +48,11 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
 
         // ✅ Socket optimizado
 
-        private const val SOCKET_SNDBUF = 8192
+        private const val SOCKET_SNDBUF = 65536
 
-        private const val SOCKET_RCVBUF = 4096
+        private const val SOCKET_RCVBUF = 131072
+
+        private const val TRAFFIC_CLASS_EF = 0xB8 // QoS Expedited Forwarding
 
         // ✅ NUEVO: Configuración de reconexión RF
 
@@ -79,7 +81,7 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
     // Evita copia extra de datos JVM → nativa
     // Preallocated para reutilización (menos GC)
     private val networkBuffer =
-            ByteBuffer.allocateDirect(8192).apply { order(ByteOrder.nativeOrder()) }
+        ByteBuffer.allocateDirect(8192).apply { order(ByteOrder.nativeOrder()) }
     private val floatNetworkBuffer = networkBuffer.asFloatBuffer()
 
     @Volatile private var shouldStop = false
@@ -132,68 +134,81 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
     }
 
     private suspend fun connectInternal(): Boolean =
-            withContext(Dispatchers.IO) {
-                try {
+        withContext(Dispatchers.IO) {
+            try {
 
-                    Log.d(TAG, "🔌 Conectando RF a $serverIp:$serverPort...")
+                Log.d(TAG, "🔌 Conectando RF a $serverIp:$serverPort...")
 
-                    socket =
-                            Socket().apply {
-                                soTimeout = READ_TIMEOUT
+                socket =
+                    Socket().apply {
+                        soTimeout = READ_TIMEOUT
 
-                                tcpNoDelay = true
+                        tcpNoDelay = true
 
-                                keepAlive = true
+                        keepAlive = true
 
-                                sendBufferSize = SOCKET_SNDBUF
+                        sendBufferSize = SOCKET_SNDBUF
 
-                                receiveBufferSize = SOCKET_RCVBUF
+                        receiveBufferSize = SOCKET_RCVBUF
 
-                                connect(InetSocketAddress(serverIp, serverPort), CONNECT_TIMEOUT)
-                            }
+                        try {
+                            trafficClass = TRAFFIC_CLASS_EF
+                            Log.d(TAG, "✅ Traffic class EF configurado")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "⚠️ No se pudo configurar traffic class: ${e.message}")
+                        }
 
-                    inputStream = DataInputStream(socket?.getInputStream()?.buffered(4096))
+                        setSoLinger(false, 0)
 
-                    outputStream = DataOutputStream(socket?.getOutputStream()?.buffered(4096))
-
-                    isConnected = true
-
-                    consecutiveMagicErrors = 0
-
-                    currentReconnectDelay = RECONNECT_DELAY_MS // ✅ Reset delay
-
-                    sendHandshake()
-
-                    startReaderThread()
-
-                    Log.d(TAG, "✅ Conectado RF (ID: ${clientId.take(8)})")
-
-                    withContext(Dispatchers.Main) {
-                        onConnectionStatus?.invoke(true, "🔴 ONLINE RF")
+                        connect(InetSocketAddress(serverIp, serverPort), CONNECT_TIMEOUT)
                     }
 
-                    // ✅ Re-suscribir canales INMEDIATAMENTE (sin delay)
+                inputStream = DataInputStream(
+                    socket?.getInputStream()?.buffered(SOCKET_RCVBUF)
+                )
 
-                    val channelsToResubscribe =
-                            synchronized(subscriptionLock) { persistentChannels.toList() }
+                outputStream = DataOutputStream(
+                    socket?.getOutputStream()?.buffered(SOCKET_SNDBUF)
+                )
 
-                    if (channelsToResubscribe.isNotEmpty()) {
+                isConnected = true
 
-                        Log.d(TAG, "🔄 Auto-restaurando canales: $channelsToResubscribe")
+                consecutiveMagicErrors = 0
 
-                        subscribe(channelsToResubscribe)
-                    }
+                currentReconnectDelay = RECONNECT_DELAY_MS // ✅ Reset delay
 
-                    true
-                } catch (e: Exception) {
+                sendHandshake()
 
-                    Log.e(TAG, "❌ Error conectando: ${e.message}")
+                startReaderThread()
 
-                    handleConnectionLost("Error: ${e.message}")
+                Log.d(TAG, "✅ Conectado RF (ID: ${clientId.take(8)})")
 
-                    false
+                withContext(Dispatchers.Main) {
+                    onConnectionStatus?.invoke(true, "🔴 ONLINE RF")
                 }
+
+                // ✅ Re-suscribir canales INMEDIATAMENTE (sin delay)
+
+                val channelsToResubscribe =
+                    synchronized(subscriptionLock) { persistentChannels.toList() }
+
+                if (channelsToResubscribe.isNotEmpty()) {
+
+                    Log.d(TAG, "🔄 Auto-restaurando canales: $channelsToResubscribe")
+
+                    subscribe(channelsToResubscribe)
+                }
+
+                true
+            } catch (e: Exception) {
+
+                Log.e(TAG, "❌ Error conectando: ${e.message}")
+
+                handleConnectionLost("Error: ${e.message}")
+
+                false
             }
+        }
 
     /**
      *
@@ -237,50 +252,50 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
         reconnectJob?.cancel()
 
         reconnectJob =
-                CoroutineScope(Dispatchers.IO).launch {
-                    var attempt = 1
+            CoroutineScope(Dispatchers.IO).launch {
+                var attempt = 1
 
-                    while (!shouldStop && !isConnected && rfMode) {
+                while (!shouldStop && !isConnected && rfMode) {
 
-                        Log.d(
-                                TAG,
-                                "🔄 Intento de reconexión RF #$attempt (delay: ${currentReconnectDelay}ms)"
-                        )
+                    Log.d(
+                        TAG,
+                        "🔄 Intento de reconexión RF #$attempt (delay: ${currentReconnectDelay}ms)"
+                    )
 
-                        delay(currentReconnectDelay)
+                    delay(currentReconnectDelay)
 
-                        try {
+                    try {
 
-                            val success = connectInternal()
+                        val success = connectInternal()
 
-                            if (success) {
+                        if (success) {
 
-                                Log.i(TAG, "✅ Reconexión RF exitosa después de $attempt intentos")
+                            Log.i(TAG, "✅ Reconexión RF exitosa después de $attempt intentos")
 
-                                currentReconnectDelay = RECONNECT_DELAY_MS // Reset
+                            currentReconnectDelay = RECONNECT_DELAY_MS // Reset
 
-                                return@launch
-                            }
-                        } catch (e: Exception) {
-
-                            Log.w(TAG, "❌ Intento #$attempt falló: ${e.message}")
+                            return@launch
                         }
+                    } catch (e: Exception) {
 
-                        // Backoff exponencial
-
-                        currentReconnectDelay =
-                                (currentReconnectDelay * RECONNECT_BACKOFF)
-                                        .toLong()
-                                        .coerceAtMost(MAX_RECONNECT_DELAY_MS)
-
-                        attempt++
+                        Log.w(TAG, "❌ Intento #$attempt falló: ${e.message}")
                     }
 
-                    if (shouldStop) {
+                    // Backoff exponencial
 
-                        Log.d(TAG, "🛑 Auto-reconexión cancelada (stop solicitado)")
-                    }
+                    currentReconnectDelay =
+                        (currentReconnectDelay * RECONNECT_BACKOFF)
+                            .toLong()
+                            .coerceAtMost(MAX_RECONNECT_DELAY_MS)
+
+                    attempt++
                 }
+
+                if (shouldStop) {
+
+                    Log.d(TAG, "🛑 Auto-reconexión cancelada (stop solicitado)")
+                }
+            }
     }
 
     /**
@@ -339,11 +354,11 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
 
             CoroutineScope(Dispatchers.IO).launch {
                 val subscribeData = mutableMapOf(
-                        "client_id" to clientId,
-                        "channels" to channels,
-                        "timestamp" to System.currentTimeMillis(),
-                        "rf_mode" to true,
-                        "persistent" to true
+                    "client_id" to clientId,
+                    "channels" to channels,
+                    "timestamp" to System.currentTimeMillis(),
+                    "rf_mode" to true,
+                    "persistent" to true
                 )
                 deviceUUID?.let { subscribeData["device_uuid"] = it }
                 sendControlMessage("subscribe", subscribeData)
@@ -356,14 +371,14 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
 
     private fun sendHandshake() {
         val payload = mutableMapOf<String, Any>(
-                "client_id" to clientId,
-                "client_type" to "android",
-                "protocol_version" to PROTOCOL_VERSION,
-                "timestamp" to System.currentTimeMillis(),
-                "rf_mode" to true,
-                "persistent" to true,
-                "auto_reconnect" to true,
-                "optimized" to true
+            "client_id" to clientId,
+            "client_type" to "android",
+            "protocol_version" to PROTOCOL_VERSION,
+            "timestamp" to System.currentTimeMillis(),
+            "rf_mode" to true,
+            "persistent" to true,
+            "auto_reconnect" to true,
+            "optimized" to true
         )
         deviceUUID?.let { payload["device_uuid"] = it }
         sendControlMessage("handshake", payload)
@@ -423,13 +438,13 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
                     consecutiveMagicErrors = 0
 
                     val maxPayload =
-                            if (header.msgType == MSG_TYPE_CONTROL) {
+                        if (header.msgType == MSG_TYPE_CONTROL) {
 
-                                MAX_CONTROL_PAYLOAD
-                            } else {
+                            MAX_CONTROL_PAYLOAD
+                        } else {
 
-                                MAX_AUDIO_PAYLOAD
-                            }
+                            MAX_AUDIO_PAYLOAD
+                        }
 
                     if (header.payloadLength < 0 || header.payloadLength > maxPayload) {
 
@@ -451,15 +466,10 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
                             val audioData = decodeAudioPayload(payload, header.flags)
 
                             if (audioData != null) {
-
-                                withContext(Dispatchers.Main) {
-                                    try {
-
-                                        onAudioData?.invoke(audioData)
-                                    } catch (e: Exception) {
-
-                                        Log.e(TAG, "Error callback audio: ${e.message}")
-                                    }
+                                try {
+                                    onAudioData?.invoke(audioData)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error callback audio: ${e.message}")
                                 }
                             }
                         }
@@ -524,14 +534,14 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
                 "handshake_response" -> {
 
                     val serverInfo =
-                            mapOf(
-                                    "server_version" to json.optString("server_version", "unknown"),
-                                    "protocol_version" to json.optInt("protocol_version", 0),
-                                    "sample_rate" to json.optInt("sample_rate", 48000),
-                                    "max_channels" to json.optInt("max_channels", 8),
-                                    "rf_mode" to json.optBoolean("rf_mode", false),
-                                    "latency_ms" to json.optDouble("latency_ms", 0.0)
-                            )
+                        mapOf(
+                            "server_version" to json.optString("server_version", "unknown"),
+                            "protocol_version" to json.optInt("protocol_version", 0),
+                            "sample_rate" to json.optInt("sample_rate", 48000),
+                            "max_channels" to json.optInt("max_channels", 8),
+                            "rf_mode" to json.optBoolean("rf_mode", false),
+                            "latency_ms" to json.optDouble("latency_ms", 0.0)
+                        )
 
                     Log.d(TAG, "✅ Server info: latency=${serverInfo["latency_ms"]}ms")
 
@@ -616,57 +626,57 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
             val isInt16 = (flags and FLAG_INT16) != 0
 
             val floatArray: FloatArray =
-                    if (isInt16) {
+                if (isInt16) {
 
-                        // ✅ Decodificar Int16 → Float32
+                    // ✅ Decodificar Int16 → Float32
 
-                        val shortCount = remainingBytes / 2
+                    val shortCount = remainingBytes / 2
 
-                        if (shortCount % activeChannels.size != 0) {
+                    if (shortCount % activeChannels.size != 0) {
 
-                            Log.e(
-                                    TAG,
-                                    "❌ Int16 count inválido: $shortCount shorts, ${activeChannels.size} canales"
-                            )
+                        Log.e(
+                            TAG,
+                            "❌ Int16 count inválido: $shortCount shorts, ${activeChannels.size} canales"
+                        )
 
-                            return null
-                        }
-
-                        val shortBuffer = buffer.asShortBuffer()
-
-                        val shortArray = ShortArray(shortCount)
-
-                        shortBuffer.get(shortArray)
-
-                        // Convertir Int16 [-32768, 32767] → Float32 [-1.0, 1.0]
-
-                        FloatArray(shortCount) { i ->
-                            shortArray[i].toFloat() / 32768.0f // ✅ CORREGIDO
-                        }
-                    } else {
-
-                        // Float32 original
-
-                        val floatCount = remainingBytes / 4
-
-                        if (floatCount % activeChannels.size != 0) {
-
-                            Log.e(
-                                    TAG,
-                                    "❌ Float count inválido: $floatCount floats, ${activeChannels.size} canales"
-                            )
-
-                            return null
-                        }
-
-                        val floatBuffer = buffer.asFloatBuffer()
-
-                        val floatArray = FloatArray(floatCount)
-
-                        floatBuffer.get(floatArray)
-
-                        floatArray
+                        return null
                     }
+
+                    val shortBuffer = buffer.asShortBuffer()
+
+                    val shortArray = ShortArray(shortCount)
+
+                    shortBuffer.get(shortArray)
+
+                    // Convertir Int16 [-32768, 32767] → Float32 [-1.0, 1.0]
+
+                    FloatArray(shortCount) { i ->
+                        shortArray[i].toFloat() / 32768.0f // ✅ CORREGIDO
+                    }
+                } else {
+
+                    // Float32 original
+
+                    val floatCount = remainingBytes / 4
+
+                    if (floatCount % activeChannels.size != 0) {
+
+                        Log.e(
+                            TAG,
+                            "❌ Float count inválido: $floatCount floats, ${activeChannels.size} canales"
+                        )
+
+                        return null
+                    }
+
+                    val floatBuffer = buffer.asFloatBuffer()
+
+                    val floatArray = FloatArray(floatCount)
+
+                    floatBuffer.get(floatArray)
+
+                    floatArray
+                }
 
             val samplesPerChannel = floatArray.size / activeChannels.size
 
@@ -757,13 +767,13 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
                         append("[")
 
                         append(
-                                value.joinToString(",") {
-                                    when (it) {
-                                        is Number -> it.toString()
-                                        is String -> "\"$it\""
-                                        else -> "null"
-                                    }
+                            value.joinToString(",") {
+                                when (it) {
+                                    is Number -> it.toString()
+                                    is String -> "\"$it\""
+                                    else -> "null"
                                 }
+                            }
                         )
 
                         append("]")
@@ -790,20 +800,20 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
     }
 
     data class PacketHeader(
-            val magic: Int,
-            val version: Int,
-            val msgType: Int,
-            val flags: Int,
-            val timestamp: Int,
-            val sequence: Int,
-            val payloadLength: Int
+        val magic: Int,
+        val version: Int,
+        val msgType: Int,
+        val flags: Int,
+        val timestamp: Int,
+        val sequence: Int,
+        val payloadLength: Int
     )
 
     data class FloatAudioData(
-            val samplePosition: Long,
-            val activeChannels: List<Int>,
-            val audioData: Array<FloatArray>,
-            val samplesPerChannel: Int
+        val samplePosition: Long,
+        val activeChannels: List<Int>,
+        val audioData: Array<FloatArray>,
+        val samplesPerChannel: Int
     ) {
 
         override fun equals(other: Any?): Boolean {

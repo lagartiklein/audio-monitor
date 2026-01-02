@@ -1,67 +1,32 @@
 package com.cepalabsfree.fichatech.audiostream
 
-
-
 import android.annotation.SuppressLint
-
-import android.content.ComponentName
-
-import android.content.Context
-
-import android.content.Intent
-
 import android.content.BroadcastReceiver
-
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import android.content.IntentFilter
-
 import android.media.AudioManager
-
 import android.os.Build
-
 import android.os.Bundle
-
 import android.os.Handler
-
 import android.os.IBinder
-
 import android.os.Looper
-
 import android.os.Process
-
 import android.util.Log
-
 import android.view.View
-import android.view.WindowManager
-
 import android.widget.*
-
 import androidx.activity.enableEdgeToEdge
-
 import androidx.appcompat.app.AppCompatActivity
-
-import androidx.core.view.WindowCompat
-
 import androidx.lifecycle.lifecycleScope
-
 import com.cepalabsfree.fichatech.R
-
 import kotlinx.coroutines.Dispatchers
-
 import kotlinx.coroutines.delay
-
 import kotlinx.coroutines.launch
-
 import kotlinx.coroutines.withContext
-
 import org.json.JSONObject
 
-import java.util.UUID
-
-
-
 class NativeAudioStreamActivity : AppCompatActivity() {
-
-
 
     companion object {
 
@@ -76,19 +41,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         private const val KEY_MASTER_VOLUME = "master_volume"
 
         private const val KEY_DEVICE_UUID = "device_uuid"
-
     }
 
-
-
-    // ✅ FASE 3: UDP en lugar de TCP para reducción de latencia 3-5ms
-    private lateinit var audioClient: UDPAudioClient
+    private lateinit var audioClient: NativeAudioClient
 
     private lateinit var audioRenderer: OboeAudioRenderer
 
     private lateinit var audioManager: AudioManager
-
-
 
     // UI Components
 
@@ -114,8 +73,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     private lateinit var infoText: TextView
 
-
-
     private var isConnected = false
 
     private var isConnecting = false
@@ -124,93 +81,70 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     private var masterVolumeDb = 0f
 
-
-
     // Foreground Service
 
     private var audioService: AudioStreamForegroundService? = null
 
     private var serviceBound = false
 
+    private val serviceConnection =
+            object : android.content.ServiceConnection {
 
+                override fun onServiceConnected(name: ComponentName, service: IBinder) {
 
-    private val serviceConnection = object : android.content.ServiceConnection {
+                    val binder = service as AudioStreamForegroundService.AudioStreamBinder
 
-        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                    audioService = binder.getService()
 
-            val binder = service as AudioStreamForegroundService.AudioStreamBinder
+                    serviceBound = true
 
-            audioService = binder.getService()
+                    audioService?.onDisconnectRequested = { lifecycleScope.launch { disconnect() } }
+                }
 
-            serviceBound = true
+                override fun onServiceDisconnected(name: android.content.ComponentName?) {
 
+                    audioService = null
 
-
-            audioService?.onDisconnectRequested = {
-
-                lifecycleScope.launch { disconnect() }
-
+                    serviceBound = false
+                }
             }
-
-        }
-
-
-
-        override fun onServiceDisconnected(name: android.content.ComponentName?) {
-
-            audioService = null
-
-            serviceBound = false
-
-        }
-
-    }
-
-
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
     private var metricsUpdateRunnable: Runnable? = null
 
+    private val channelViews: MutableMap<Int, ChannelView> =
+            mutableMapOf() // Asegúrate de poblar esto según tus canales
 
+    private val monitorReceiver =
+            object : BroadcastReceiver() {
 
-    private val channelViews: MutableMap<Int, ChannelView> = mutableMapOf() // Asegúrate de poblar esto según tus canales
+                override fun onReceive(context: Context?, intent: Intent?) {
 
+                    if (intent?.action == AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE
+                    ) {
 
+                        val jsonStr = intent.getStringExtra("channelStates") ?: return
 
-    private val monitorReceiver = object : BroadcastReceiver() {
+                        val json = JSONObject(jsonStr)
 
-        override fun onReceive(context: Context?, intent: Intent?) {
+                        for (key in json.keys()) {
 
-            if (intent?.action == AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE) {
+                            val channel = key.toIntOrNull() ?: continue
 
-                val jsonStr = intent.getStringExtra("channelStates") ?: return
+                            val state = json.getJSONObject(key)
 
-                val json = JSONObject(jsonStr)
+                            val rms = state.optDouble("rmsLevel", 0.0).toFloat()
 
-                for (key in json.keys()) {
+                            val peak = state.optDouble("peakLevel", 0.0).toFloat()
 
-                    val channel = key.toIntOrNull() ?: continue
+                            val isActive = state.optBoolean("isActive", false)
 
-                    val state = json.getJSONObject(key)
-
-                    val rms = state.optDouble("rmsLevel", 0.0).toFloat()
-
-                    val peak = state.optDouble("peakLevel", 0.0).toFloat()
-
-                    val isActive = state.optBoolean("isActive", false)
-
-                    channelViews[channel]?.updateMonitor(rms, peak, isActive)
-
+                            channelViews[channel]?.updateMonitor(rms, peak, isActive)
+                        }
+                    }
                 }
-
             }
-
-        }
-
-    }
-
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -228,10 +162,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_native_receiver)
 
+        // Eliminar ocultamiento automático de la barra de estado
+        // No llamar a hideSystemUI ni en onWindowFocusChanged
         setupEdgeToEdgeInsets()
-
-
-
 
         configureAudioSystemForLowLatency()
 
@@ -243,40 +176,20 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         startMetricsUpdates()
 
-
-
         // Solicitar permiso de notificaciones (Android 13+)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
 
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-
-                requestPermissions(
-
-                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-
-                    100
-
-                )
-
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
             }
-
         }
 
-
-
-        // Asegúrate de que la barra de estado sea visible
-        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-
-
         Log.d(TAG, "✅ Activity creada - RECEPTOR PURO (Control desde Web) - FIXED")
-
     }
-
-
 
     // Evita recreación de la actividad al cambiar de orientación
 
@@ -284,17 +197,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         super.onConfigurationChanged(newConfig)
 
-
-
-
+        // Reaplica UI inmersiva y edge-to-edge
 
         setupEdgeToEdgeInsets()
 
         // No se reinicia ni se desconecta nada
 
     }
-
-
 
     private fun configureAudioSystemForLowLatency() {
 
@@ -304,40 +213,27 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
-
-
             val sampleRateStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
 
-            val framesPerBufferStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
-
-
+            val framesPerBufferStr =
+                    audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
 
             val optimalSampleRate = sampleRateStr?.toIntOrNull() ?: 48000
 
             val optimalBufferSize = framesPerBufferStr?.toIntOrNull() ?: 128
-
-
 
             Log.d(TAG, "🎵 Sistema de audio configurado:")
 
             Log.d(TAG, "   Sample Rate óptimo: $optimalSampleRate Hz")
 
             Log.d(TAG, "   Buffer óptimo: $optimalBufferSize frames")
-
-
-
         } catch (e: Exception) {
 
             Log.e(TAG, "Error configurando sistema de audio: ${e.message}")
-
         }
-
     }
 
-
-
     @SuppressLint("SetTextI18n")
-
     private fun initializeViews() {
 
         statusText = findViewById(R.id.statusText)
@@ -362,23 +258,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         infoText = findViewById(R.id.infoText)
 
-
-
         connectButton.setOnClickListener {
-
             if (isConnected) {
 
                 disconnect()
-
             } else {
 
                 connectToServer()
-
             }
-
         }
-
-
 
         // Control de volumen master
 
@@ -386,133 +274,86 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         masterVolumeSeekBar.progress = 60 // 0dB por defecto
 
+        masterVolumeSeekBar.setOnSeekBarChangeListener(
+                object : SeekBar.OnSeekBarChangeListener {
 
+                    override fun onProgressChanged(
+                            seekBar: SeekBar?,
+                            progress: Int,
+                            fromUser: Boolean
+                    ) {
 
-        masterVolumeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                        masterVolumeDb = (progress - 60).toFloat()
 
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        masterVolumeText.text = String.format("%.0f dB", masterVolumeDb)
 
-                masterVolumeDb = (progress - 60).toFloat()
+                        audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
+                    }
 
-                masterVolumeText.text = String.format("%.0f dB", masterVolumeDb)
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
 
-                audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
 
-            }
+                        saveSessionPreferences()
+                    }
+                }
+        )
 
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-
-                saveSessionPreferences()
-
-            }
-
-        })
-
-
-
-        muteButton.setOnClickListener {
-
-            toggleMute()
-
-        }
-
-
+        muteButton.setOnClickListener { toggleMute() }
 
         // ✅ NUEVO: Listener para recrear streams (long press en latency)
 
         latencyText.setOnLongClickListener {
-
             if (isConnected) {
 
                 audioRenderer.recreateAllStreams()
 
                 showToast("🔄 Recreando streams de audio...")
-
             }
 
             true
-
         }
-
-
 
         statusText.text = "⭕ RECEPTOR RF - FIXED"
 
         connectButton.text = "Conectar"
 
         muteButton.text = "🔊 Audio ON"
-
     }
-
-
 
     private fun initializeAudioComponents() {
 
-        // ✅ FASE 3: UDP Audio Client - Baja latencia (3-5ms mejor que TCP)
-        audioClient = UDPAudioClient().apply {
+        val deviceUUID = getDeviceUUID()
+        audioClient =
+                NativeAudioClient(deviceUUID = deviceUUID).apply {
+                    onAudioData = { audioData -> handleAudioData(audioData) }
 
-            onAudioData = { audioData ->
-
-                handleAudioData(audioData)
-
-            }
-
-
-
-            onConnectionStatus = { connected, message ->
-
-                updateConnectionStatus(connected, message)
-
-            }
-
-
-
-            onServerInfo = { info ->
-
-                handleServerInfo(info)
-
-            }
-
-
-
-            onError = { error ->
-
-                lifecycleScope.launch {
-
-                    if (!isFinishing && !isDestroyed) {
-
-                        showError("Error: $error")
-
+                    onConnectionStatus = { connected, message ->
+                        updateConnectionStatus(connected, message)
                     }
 
+                    onServerInfo = { info -> handleServerInfo(info) }
+
+                    onError = { error ->
+                        lifecycleScope.launch {
+                            if (!isFinishing && !isDestroyed) {
+
+                                showError("Error: $error")
+                            }
+                        }
+                    }
                 }
-
-            }
-
-        }
-
-
 
         // ✅ FIXED: Sin Context - Auto-recreación en fallos
 
-        audioRenderer = OboeAudioRenderer().apply {
-
-            setMasterGain(masterVolumeDb)
-
-        }
-
+        audioRenderer = OboeAudioRenderer().apply { setMasterGain(masterVolumeDb) }
     }
-
-
 
     private fun saveSessionPreferences() {
 
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         prefs.edit().apply {
-
             putString(KEY_LAST_IP, ipEditText.text.toString())
 
             putString(KEY_LAST_PORT, portEditText.text.toString())
@@ -520,42 +361,30 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             putFloat(KEY_MASTER_VOLUME, masterVolumeDb)
 
             apply()
-
         }
 
         Log.d(TAG, "💾 Sesión guardada")
-
     }
-
-
 
     private fun loadSessionPreferences() {
 
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-
-
         val lastIp = prefs.getString(KEY_LAST_IP, "")
 
-        val lastPort = prefs.getString(KEY_LAST_PORT, "5102")  // ✅ Puerto UDP por defecto
+        val lastPort = prefs.getString(KEY_LAST_PORT, "5101")
 
         val savedVolume = prefs.getFloat(KEY_MASTER_VOLUME, 0f)
-
-
 
         if (!lastIp.isNullOrEmpty()) {
 
             ipEditText.setText(lastIp)
-
         }
 
         if (!lastPort.isNullOrEmpty()) {
 
             portEditText.setText(lastPort)
-
         }
-
-
 
         masterVolumeDb = savedVolume
 
@@ -563,105 +392,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         masterVolumeText.text = String.format("%.0f dB", savedVolume)
 
-
-
         Log.d(TAG, "📂 Sesión cargada")
-
     }
-
-
-
-    /**
-
-     * ✅ FASE 3: Obtiene o genera el UUID único del dispositivo
-
-     * Se almacena en SharedPreferences para persistencia entre sesiones
-
-     */
-
-    private fun getDeviceUUID(): String {
-
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-        var uuid = prefs.getString(KEY_DEVICE_UUID, null)
-
-        if (uuid == null) {
-
-            uuid = UUID.randomUUID().toString()
-
-            prefs.edit().putString(KEY_DEVICE_UUID, uuid).apply()
-
-            Log.d(TAG, "🆔 Nuevo UUID generado: $uuid")
-
-        } else {
-
-            Log.d(TAG, "🆔 UUID recuperado: $uuid")
-
-        }
-
-        return uuid
-
-    }
-
-
-
-    /**
-
-     * ✅ FASE 3: Construye el JSON de handshake para enviar al servidor
-
-     * Incluye UUID único, versión de app, y configuración inicial
-
-     */
-
-    private fun buildHandshakeJSON(deviceUUID: String): String {
-
-        return try {
-
-            val handshake = JSONObject().apply {
-
-                put("type", "handshake")
-
-                put("device_uuid", deviceUUID)
-
-                put("device_name", android.os.Build.MODEL)
-
-                put("app_version", "3.0-FASE3")
-
-                put("protocol_version", "1.0")
-
-                put("capabilities", JSONObject().apply {
-
-                    put("supports_udp", true)
-
-                    put("supports_stereo", true)
-
-                    put("low_latency_mode", true)
-
-                })
-
-                put("timestamp", System.currentTimeMillis())
-
-            }
-
-            handshake.toString()
-
-        } catch (e: Exception) {
-
-            Log.e(TAG, "❌ Error construyendo handshake: ${e.message}")
-
-            "{\"type\":\"handshake\",\"device_uuid\":\"$deviceUUID\"}"
-
-        }
-
-    }
-
-
 
     private fun toggleMute() {
 
         isMuted = !isMuted
-
-
 
         if (isMuted) {
 
@@ -670,7 +406,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             muteButton.text = "🔇 Audio OFF"
 
             muteButton.setBackgroundColor(getColor(android.R.color.holo_red_dark))
-
         } else {
 
             audioRenderer.setMasterGain(masterVolumeDb)
@@ -678,12 +413,8 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             muteButton.text = "🔊 Audio ON"
 
             muteButton.setBackgroundColor(getColor(android.R.color.holo_green_dark))
-
         }
-
     }
-
-
 
     private fun connectToServer() {
 
@@ -692,10 +423,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             showToast("⚠️ Ya se está conectando")
 
             return
-
         }
-
-
 
         val serverIp = ipEditText.text.toString().trim()
 
@@ -704,28 +432,11 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             showToast("⚠️ Ingresa una dirección IP")
 
             return
-
         }
 
-
-
-        val serverPort = portEditText.text.toString().toIntOrNull() ?: 5102  // ✅ Puerto UDP por defecto
-
-
+        val serverPort = portEditText.text.toString().toIntOrNull() ?: 5101
 
         Log.d(TAG, "🔌 Conectando RF a $serverIp:$serverPort...")
-
-
-
-        // ✅ FASE 3: Generar handshake JSON con UUID
-
-        val deviceUUID = getDeviceUUID()
-
-        val handshakeJson = buildHandshakeJSON(deviceUUID)
-
-        Log.d(TAG, "📤 Handshake: $handshakeJson")
-
-
 
         isConnecting = true
 
@@ -735,17 +446,10 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         statusText.text = "🔄 Buscando señal RF..."
 
-
-
         lifecycleScope.launch {
-
             try {
 
-                // ✅ NUEVO: Pasar handshake al cliente UDP
-
-                val success = audioClient.connect(serverIp, serverPort, handshakeJson)
-
-
+                val success = audioClient.connect(serverIp, serverPort)
 
                 if (success) {
 
@@ -755,65 +459,39 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
                     delay(500L)
 
-
-
                     withContext(Dispatchers.Main) {
-
                         showToast("✅ RF Online - Control desde Web - FIXED")
-
                     }
-
                 }
-
-
-
             } catch (e: Exception) {
 
                 Log.e(TAG, "❌ Error conectando: ${e.message}", e)
 
-                withContext(Dispatchers.Main) {
-
-                    showError("Error de conexión:\n${e.message}")
-
-                }
-
+                withContext(Dispatchers.Main) { showError("Error de conexión:\n${e.message}") }
             } finally {
 
                 withContext(Dispatchers.Main) {
-
                     isConnecting = false
 
                     connectButton.isEnabled = true
 
                     connectButton.text = if (isConnected) "🔴 Desconectar" else "⚫ Conectar"
-
                 }
-
             }
-
         }
-
     }
-
-
 
     private fun handleServerInfo(info: Map<String, Any>) {
 
         runOnUiThread {
-
             val webControlled = info["web_controlled"] as? Boolean ?: false
-
-
 
             if (webControlled) {
 
                 webControlText.text = "🌐 Control desde WEB ✅"
 
                 webControlText.setTextColor(getColor(android.R.color.holo_green_light))
-
             }
-
-
 
             // ✅ NUEVO: Mostrar versión del servidor
 
@@ -821,65 +499,33 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             if (serverVersion != null) {
 
-                infoText.text = "• Servidor: $serverVersion\n" +
-
-                        "• Canales gestionados desde WEB\n" +
-
-                        "• Auto-recreación de streams: HABILITADA\n" +
-
-                        "• Mantén presionado la latencia para recrear streams"
-
+                infoText.text =
+                        "• Servidor: $serverVersion\n" +
+                                "• Canales gestionados desde WEB\n" +
+                                "• Auto-recreación de streams: HABILITADA\n" +
+                                "• Mantén presionado la latencia para recrear streams"
             }
-
         }
-
     }
 
+    private fun handleAudioData(audioData: NativeAudioClient.FloatAudioData) {
 
+        audioData.activeChannels.forEachIndexed { channelIndex, channelNumber ->
+            val channelAudio = audioData.audioData[channelIndex]
 
-    // ✅ FASE 3: Agnóstico del cliente (NativeAudioClient o UDPAudioClient)
-    private fun handleAudioData(audioData: Any) {
-        // Compatible con ambos: NativeAudioClient.FloatAudioData y UDPAudioClient.FloatAudioData
-        try {
-            // Usar reflection para acceder a propiedades
-            val activeChannels = audioData.javaClass.getMethod("getActiveChannels").invoke(audioData) as? List<*>
-                ?: (audioData.javaClass.getField("activeChannels").get(audioData) as? List<*>)
-            val samplePosition = audioData.javaClass.getField("samplePosition").get(audioData) as? Long ?: 0L
-            val audioDataArray = audioData.javaClass.getField("audioData").get(audioData) as? Array<*>
+            if (channelAudio.isNotEmpty()) {
 
-            if (activeChannels != null && audioDataArray != null) {
-                activeChannels.forEachIndexed { channelIndex, channelNumber ->
-                    val num = when (channelNumber) {
-                        is Int -> channelNumber
-                        is Number -> channelNumber.toInt()
-                        else -> return@forEachIndexed
-                    }
-
-                    val channelAudio = audioDataArray.getOrNull(channelIndex) as? FloatArray
-                    if (channelAudio != null && channelAudio.isNotEmpty()) {
-                        audioRenderer.renderChannelRF(num, channelAudio, samplePosition)
-                    }
-                }
+                audioRenderer.renderChannelRF(channelNumber, channelAudio, audioData.samplePosition)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error procesando audio data: ${e.message}", e)
         }
-
     }
-
-
 
     private fun updateConnectionStatus(connected: Boolean, message: String) {
 
         isConnected = connected
 
-
-
         runOnUiThread {
-
             if (isFinishing || isDestroyed) return@runOnUiThread
-
-
 
             if (connected) {
 
@@ -892,9 +538,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 connectButton.setBackgroundColor(getColor(android.R.color.holo_green_dark))
 
                 updateServiceNotification("🔴 Recibiendo", "Audio RF en vivo")
-
-
-
             } else {
 
                 statusText.text = message
@@ -906,14 +549,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 connectButton.setBackgroundColor(getColor(android.R.color.holo_red_light))
 
                 updateServiceNotification("📡 Buscando señal", message)
-
             }
-
         }
-
     }
-
-
 
     private fun disconnect() {
 
@@ -921,59 +559,38 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         stopForegroundService()
 
-
-
         runOnUiThread {
-
             statusText.text = "⚫ OFFLINE"
 
             connectButton.text = "Conectar"
 
             saveSessionPreferences()
-
         }
-
     }
-
-
 
     private fun startForegroundService() {
 
         try {
 
-            val serviceIntent = Intent(this, AudioStreamForegroundService::class.java).apply {
-
-                action = AudioStreamForegroundService.ACTION_START
-
-            }
-
-
+            val serviceIntent =
+                    Intent(this, AudioStreamForegroundService::class.java).apply {
+                        action = AudioStreamForegroundService.ACTION_START
+                    }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
                 startForegroundService(serviceIntent)
-
             } else {
 
                 startService(serviceIntent)
-
             }
 
-
-
             bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
-
-
-
         } catch (e: Exception) {
 
             Log.e(TAG, "❌ Error iniciando foreground service: ${e.message}", e)
-
         }
-
     }
-
-
 
     private fun stopForegroundService() {
 
@@ -984,162 +601,121 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 unbindService(serviceConnection)
 
                 serviceBound = false
-
             }
-
-
 
             val serviceIntent = Intent(this, AudioStreamForegroundService::class.java)
 
             stopService(serviceIntent)
-
-
-
         } catch (e: Exception) {
 
             Log.e(TAG, "⚠️ Error deteniendo servicio: ${e.message}")
-
         }
-
     }
-
-
 
     private fun updateServiceNotification(status: String, details: String) {
 
         audioService?.updateNotification(status, details)
-
     }
-
-
 
     private fun startMetricsUpdates() {
 
-        metricsUpdateRunnable = object : Runnable {
+        metricsUpdateRunnable =
+                object : Runnable {
 
-            override fun run() {
+                    override fun run() {
 
-                runOnUiThread {
+                        runOnUiThread {
+                            if (isFinishing || isDestroyed) {
 
-                    if (isFinishing || isDestroyed) {
+                                stopMetricsUpdates()
 
-                        stopMetricsUpdates()
+                                return@runOnUiThread
+                            }
 
-                        return@runOnUiThread
+                            if (isConnected) {
 
-                    }
+                                val latency = audioRenderer.getLatencyMs()
 
+                                latencyText.text = "${latency.toInt()} ms"
 
+                                latencyText.setTextColor(
+                                        when {
+                                            latency < 15 ->
+                                                    getColor(android.R.color.holo_green_light)
+                                            latency < 30 ->
+                                                    getColor(android.R.color.holo_orange_light)
+                                            else -> getColor(android.R.color.holo_red_light)
+                                        }
+                                )
 
-                    if (isConnected) {
+                                rfStatusText.text = audioClient.getRFStatus()
 
-                        val latency = audioRenderer.getLatencyMs()
+                                // ✅ NUEVO: Detectar si hay streams con fallos
 
-                        latencyText.text = "${latency.toInt()} ms"
+                                val stats = audioRenderer.getRFStats()
 
+                                val totalFailures = stats["total_failures"] as? Int ?: 0
 
+                                if (totalFailures > 5) {
 
-                        latencyText.setTextColor(when {
+                                    statusText.text = "⚠️ Streams con errores (long press latencia)"
 
-                            latency < 15 -> getColor(android.R.color.holo_green_light)
+                                    statusText.setTextColor(
+                                            getColor(android.R.color.holo_orange_light)
+                                    )
+                                }
+                            } else {
 
-                            latency < 30 -> getColor(android.R.color.holo_orange_light)
+                                latencyText.text = "-- ms"
 
-                            else -> getColor(android.R.color.holo_red_light)
-
-                        })
-
-
-
-                        rfStatusText.text = audioClient.getRFStatus()
-
-
-
-                        // ✅ NUEVO: Detectar si hay streams con fallos
-
-                        val stats = audioRenderer.getRFStats()
-
-                        val totalFailures = stats["total_failures"] as? Int ?: 0
-
-
-
-                        if (totalFailures > 5) {
-
-                            statusText.text = "⚠️ Streams con errores (long press latencia)"
-
-                            statusText.setTextColor(getColor(android.R.color.holo_orange_light))
-
+                                rfStatusText.text = audioClient.getRFStatus()
+                            }
                         }
 
-                    } else {
-
-                        latencyText.text = "-- ms"
-
-                        rfStatusText.text = audioClient.getRFStatus()
-
+                        uiHandler.postDelayed(this, 100)
                     }
-
                 }
 
-                uiHandler.postDelayed(this, 100)
-
-            }
-
-        }
-
         uiHandler.post(metricsUpdateRunnable!!)
-
     }
-
-
 
     private fun stopMetricsUpdates() {
 
         metricsUpdateRunnable?.let {
-
             uiHandler.removeCallbacks(it)
 
             metricsUpdateRunnable = null
-
         }
-
     }
-
-
 
     private fun showError(message: String) {
 
         if (isFinishing || isDestroyed) return
 
-
-
-        runOnUiThread {
-
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-
-        }
-
+        runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
     }
 
-
+    private fun getDeviceUUID(): String {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        var uuid = prefs.getString(KEY_DEVICE_UUID, null)
+        if (uuid.isNullOrEmpty()) {
+            uuid = UUID.randomUUID().toString()
+            prefs.edit().putString(KEY_DEVICE_UUID, uuid).apply()
+            Log.d(TAG, "📦 Nuevo device_uuid generado: ${uuid.take(8)}...")
+        }
+        return uuid
+    }
 
     private fun showToast(message: String) {
 
         runOnUiThread {
-
             if (!isFinishing && !isDestroyed) {
 
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-
             }
-
         }
-
     }
 
-
-
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
 
         super.onResume()
@@ -1147,40 +723,25 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33) {
 
             registerReceiver(
-
-                monitorReceiver,
-
-                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
-
-                Context.RECEIVER_NOT_EXPORTED
-
+                    monitorReceiver,
+                    IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
+                    Context.RECEIVER_NOT_EXPORTED
             )
-
         } else {
 
             registerReceiver(
-
-                monitorReceiver,
-
-                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
-
+                    monitorReceiver,
+                    IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
             )
-
         }
-
     }
-
-
 
     override fun onPause() {
 
         super.onPause()
 
         unregisterReceiver(monitorReceiver)
-
     }
-
-
 
     override fun onDestroy() {
 
@@ -1193,64 +754,36 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         audioRenderer.release()
 
         saveSessionPreferences()
-
     }
 
-
-
     /**
-
+     *
      * Configura Edge-to-Edge y padding para status bar/notch igual que MainActivity
-
      */
-
     private fun setupEdgeToEdgeInsets() {
 
         val mainContainer = findViewById<View>(R.id.native_audio_root)
 
         if (mainContainer != null) {
 
-            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainContainer) { view, windowInsets ->
-
-                val sysBarInsets = windowInsets.getInsets(
-
-                    androidx.core.view.WindowInsetsCompat.Type.systemBars() or
-
-                            androidx.core.view.WindowInsetsCompat.Type.displayCutout()
-
-                )
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainContainer) {
+                    view,
+                    windowInsets ->
+                val sysBarInsets =
+                        windowInsets.getInsets(
+                                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                                        androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+                        )
 
                 view.setPadding(
-
-                    view.paddingLeft,
-
-                    sysBarInsets.top,
-
-                    view.paddingRight,
-
-                    view.paddingBottom
-
+                        view.paddingLeft,
+                        sysBarInsets.top,
+                        view.paddingRight,
+                        view.paddingBottom
                 )
 
                 windowInsets
-
             }
-
         }
-
     }
-
-
-
-
-
-
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-
-        super.onWindowFocusChanged(hasFocus)
-
-
-    }
-
 }

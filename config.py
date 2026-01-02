@@ -7,7 +7,7 @@
 # ============================================================================
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
-BLOCKSIZE = 64  # ✅ ~2.67ms latencia mínima
+BLOCKSIZE = 128  # ✅ ~2.67ms latencia mínima
 
 # ============================================================================
 # ✅ FORMATO DE AUDIO
@@ -28,7 +28,7 @@ WEB_PORT = 5100
 WEB_HOST = '0.0.0.0'
 NATIVE_PORT = 5101
 NATIVE_HOST = '0.0.0.0'
-NATIVE_MAX_CLIENTS = 5
+NATIVE_MAX_CLIENTS = 10
 
 # 🎚️ CONFIGURACIÓN VU METERS
 # ============================================================================

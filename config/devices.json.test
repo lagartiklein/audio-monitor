@@ -12,8 +12,8 @@
       "client_id": "test-client-id-2"
     },
     "first_seen": 1767383766.408458,
-    "last_seen": 1767384616.4148827,
-    "reconnections": 1,
+    "last_seen": 1767386467.8755503,
+    "reconnections": 2,
     "configuration": {
       "channels": [
         0,

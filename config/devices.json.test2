@@ -11,8 +11,8 @@
       "primary_ip": null
     },
     "first_seen": 1767383766.4135375,
-    "last_seen": 1767384616.4367256,
-    "reconnections": 1,
+    "last_seen": 1767386467.8935769,
+    "reconnections": 2,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],

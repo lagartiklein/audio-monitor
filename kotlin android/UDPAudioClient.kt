@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
+import kotlin.math.min
 
 class UDPAudioClient {
     companion object {
@@ -59,7 +60,7 @@ class UDPAudioClient {
     private var expectedSampleRate: Int = 48000
 
     // Jitter buffer
-    private val jitterBuffer = JitterBuffer(10) // 10 paquetes de buffer
+    private val jitterBuffer = AdaptiveJitterBuffer(minPackets = 3, maxPackets = 12)
 
     // Estadísticas
     data class NetworkStats(
@@ -858,61 +859,78 @@ class UDPAudioClient {
     // CLASES AUXILIARES
     // ============================================================================
 
-    class JitterBuffer(private val maxSize: Int) {
-        private val packets = ConcurrentHashMap<Int, FloatAudioData>()
-        private var expectedSequence = AtomicInteger(0)
-        private var bufferLock = Any()
+    class AdaptiveJitterBuffer(
+        private val minPackets: Int = 2,
+        private val maxPackets: Int = 10
+    ) {
+        private var targetSize = minPackets.coerceAtLeast(2)
+        private var currentJitterNs = 0f
+        private val packetArrivals = LongArray(32)
+        private var arrivalIndex = 0
+        private var arrivalCount = 0
+        private val buffer = TreeMap<Int, FloatAudioData>()
+        private var lastDeliveredSeq = -1
+        private val bufferLock = Any()
 
         fun addPacket(sequence: Int, audioData: FloatAudioData): FloatAudioData? {
+            val now = System.nanoTime()
             synchronized(bufferLock) {
-                packets[sequence] = audioData
-
-                // Mantener tamaño máximo
-                if (packets.size > maxSize) {
-                    val oldestKey = packets.keys.minOrNull()
-                    if (oldestKey != null) {
-                        packets.remove(oldestKey)
-                    }
+                packetArrivals[arrivalIndex] = now
+                arrivalIndex = (arrivalIndex + 1) % packetArrivals.size
+                arrivalCount = min(arrivalCount + 1, packetArrivals.size)
+                if (arrivalCount > 1) {
+                    val prevIndex = (arrivalIndex - 2 + packetArrivals.size) % packetArrivals.size
+                    val interval = now - packetArrivals[prevIndex]
+                    currentJitterNs += (interval - currentJitterNs) * 0.1f
+                    adjustTargetSize()
                 }
 
-                // Entregar en orden
-                return getNextPacket()
+                buffer[sequence] = audioData
+
+                while (buffer.size > maxPackets) {
+                    buffer.pollFirstEntry()
+                }
+
+                return deliverOrdered()
             }
         }
 
-        private fun getNextPacket(): FloatAudioData? {
-            synchronized(bufferLock) {
-                val nextSeq = expectedSequence.get()
-                val packet = packets.remove(nextSeq)
-
-                if (packet != null) {
-                    expectedSequence.incrementAndGet()
-                    return packet
-                }
-
-                // Buscar siguiente paquete disponible (hasta 5 saltos)
-                for (i in 1..5) {
-                    val seq = nextSeq + i
-                    val found = packets.remove(seq)
-                    if (found != null) {
-                        expectedSequence.set(seq + 1)
-                        Log.w(TAG, "⚠️ Paquete fuera de orden: $nextSeq -> $seq")
-                        return found
-                    }
-                }
-
-                return null
+        private fun adjustTargetSize() {
+            val jitterMs = currentJitterNs / 1_000_000f
+            targetSize = when {
+                jitterMs > 8f -> (targetSize + 1).coerceAtMost(maxPackets)
+                jitterMs < 3f -> (targetSize - 1).coerceAtLeast(minPackets)
+                else -> targetSize
             }
         }
 
-        fun getLastSequence(): Int = expectedSequence.get() - 1
+        private fun deliverOrdered(): FloatAudioData? {
+            val nextSeq = lastDeliveredSeq + 1
+            val nextPacket = buffer.remove(nextSeq)
+            if (nextPacket != null) {
+                lastDeliveredSeq = nextSeq
+                return nextPacket
+            }
 
-        fun size(): Int = synchronized(bufferLock) { packets.size }
+            if (buffer.size >= targetSize) {
+                val entry = buffer.pollFirstEntry()
+                if (entry != null) {
+                    lastDeliveredSeq = entry.key
+                    return entry.value
+                }
+            }
+
+            return null
+        }
+
+        fun getLastSequence(): Int = synchronized(bufferLock) { lastDeliveredSeq }
+        fun size(): Int = synchronized(bufferLock) { buffer.size }
 
         fun clear() {
             synchronized(bufferLock) {
-                packets.clear()
-                expectedSequence.set(0)
+                buffer.clear()
+                lastDeliveredSeq = -1
+                targetSize = minPackets.coerceAtLeast(2)
             }
         }
     }
