@@ -35,7 +35,7 @@ class AudioStreamForegroundService : Service() {
         private const val TAG = "AudioStreamService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "audio_stream_channel"
-        private const val CHANNEL_NAME = "Audio RF Streaming"
+        private const val CHANNEL_NAME = "Audio WF Streaming"
 
         // Actions para control desde notificación
         const val ACTION_START = "com.cepalabsfree.fichatech.START_STREAM"
@@ -190,18 +190,9 @@ class AudioStreamForegroundService : Service() {
             val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
             // ✅ FASE 2 OPT 1: WiFi optimization flags para baja latencia
-            // Reduce jitter en red 0.5-1ms
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    wifiManager.setWifiLockLatencyMs(WifiManager.WIFI_LOCK_MODE_FULL_LOW_LATENCY)
-                    Log.d(TAG, "✅ WiFi LOW_LATENCY mode activado")
-                } catch (e: Exception) {
-                    Log.w(TAG, "⚠️ WiFi LOW_LATENCY no disponible: ${e.message}")
-                }
-            }
-
+            // Solo usar el flag en createWifiLock, no existe setWifiLockLatencyMs
             wifiLock = wifiManager.createWifiLock(
-                WifiManager.WIFI_MODE_FULL_LOW_LATENCY ,
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY,
                 "FichaTech:AudioStreamRF"
             ).apply {
                 acquire()

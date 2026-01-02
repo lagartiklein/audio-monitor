@@ -19,9 +19,12 @@
 
 class AudioCallback : public oboe::AudioStreamDataCallback {
 private:
-    static constexpr int BUFFER_SIZE_FRAMES = 2048;      // ~42ms @ 48kHz
+    // ✅ FASE 3: Buffer reducido de 2048 → 256 frames para callback directo
+    // 2048 frames @ 48kHz = 42.7ms (demasiado para latencia baja)
+    // 256 frames @ 48kHz = 5.3ms (adecuado para callback directo de Oboe)
+    static constexpr int BUFFER_SIZE_FRAMES = 256;      // ~5.3ms @ 48kHz ⬇️
     static constexpr int TARGET_BUFFER_FRAMES = 128;     // ~2.7ms objetivo
-    static constexpr int DROP_THRESHOLD = 1536;          // 75% del buffer
+    static constexpr int DROP_THRESHOLD = 192;          // 75% del buffer (era 1536)
     static constexpr int SILENCE_TIMEOUT_MS = 5000;      // ✅ 5s antes de reset
     static constexpr int CORRUPTION_CHECK_INTERVAL = 100; // Cada 100 callbacks
 

@@ -31,6 +31,7 @@ import android.os.Process
 import android.util.Log
 
 import android.view.View
+import android.view.WindowManager
 
 import android.widget.*
 
@@ -54,6 +55,8 @@ import kotlinx.coroutines.withContext
 
 import org.json.JSONObject
 
+import java.util.UUID
+
 
 
 class NativeAudioStreamActivity : AppCompatActivity() {
@@ -72,11 +75,14 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         private const val KEY_MASTER_VOLUME = "master_volume"
 
+        private const val KEY_DEVICE_UUID = "device_uuid"
+
     }
 
 
 
-    private lateinit var audioClient: NativeAudioClient
+    // ✅ FASE 3: UDP en lugar de TCP para reducción de latencia 3-5ms
+    private lateinit var audioClient: UDPAudioClient
 
     private lateinit var audioRenderer: OboeAudioRenderer
 
@@ -261,6 +267,11 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
 
 
+        // Asegúrate de que la barra de estado sea visible
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+
+
         Log.d(TAG, "✅ Activity creada - RECEPTOR PURO (Control desde Web) - FIXED")
 
     }
@@ -273,9 +284,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         super.onConfigurationChanged(newConfig)
 
-        // Reaplica UI inmersiva y edge-to-edge
 
-        hideSystemUI()
+
+
 
         setupEdgeToEdgeInsets()
 
@@ -439,7 +450,8 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     private fun initializeAudioComponents() {
 
-        audioClient = NativeAudioClient().apply {
+        // ✅ FASE 3: UDP Audio Client - Baja latencia (3-5ms mejor que TCP)
+        audioClient = UDPAudioClient().apply {
 
             onAudioData = { audioData ->
 
@@ -525,7 +537,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         val lastIp = prefs.getString(KEY_LAST_IP, "")
 
-        val lastPort = prefs.getString(KEY_LAST_PORT, "5101")
+        val lastPort = prefs.getString(KEY_LAST_PORT, "5102")  // ✅ Puerto UDP por defecto
 
         val savedVolume = prefs.getFloat(KEY_MASTER_VOLUME, 0f)
 
@@ -554,6 +566,92 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
 
         Log.d(TAG, "📂 Sesión cargada")
+
+    }
+
+
+
+    /**
+
+     * ✅ FASE 3: Obtiene o genera el UUID único del dispositivo
+
+     * Se almacena en SharedPreferences para persistencia entre sesiones
+
+     */
+
+    private fun getDeviceUUID(): String {
+
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        var uuid = prefs.getString(KEY_DEVICE_UUID, null)
+
+        if (uuid == null) {
+
+            uuid = UUID.randomUUID().toString()
+
+            prefs.edit().putString(KEY_DEVICE_UUID, uuid).apply()
+
+            Log.d(TAG, "🆔 Nuevo UUID generado: $uuid")
+
+        } else {
+
+            Log.d(TAG, "🆔 UUID recuperado: $uuid")
+
+        }
+
+        return uuid
+
+    }
+
+
+
+    /**
+
+     * ✅ FASE 3: Construye el JSON de handshake para enviar al servidor
+
+     * Incluye UUID único, versión de app, y configuración inicial
+
+     */
+
+    private fun buildHandshakeJSON(deviceUUID: String): String {
+
+        return try {
+
+            val handshake = JSONObject().apply {
+
+                put("type", "handshake")
+
+                put("device_uuid", deviceUUID)
+
+                put("device_name", android.os.Build.MODEL)
+
+                put("app_version", "3.0-FASE3")
+
+                put("protocol_version", "1.0")
+
+                put("capabilities", JSONObject().apply {
+
+                    put("supports_udp", true)
+
+                    put("supports_stereo", true)
+
+                    put("low_latency_mode", true)
+
+                })
+
+                put("timestamp", System.currentTimeMillis())
+
+            }
+
+            handshake.toString()
+
+        } catch (e: Exception) {
+
+            Log.e(TAG, "❌ Error construyendo handshake: ${e.message}")
+
+            "{\"type\":\"handshake\",\"device_uuid\":\"$deviceUUID\"}"
+
+        }
 
     }
 
@@ -611,11 +709,21 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
 
 
-        val serverPort = portEditText.text.toString().toIntOrNull() ?: 5101
+        val serverPort = portEditText.text.toString().toIntOrNull() ?: 5102  // ✅ Puerto UDP por defecto
 
 
 
         Log.d(TAG, "🔌 Conectando RF a $serverIp:$serverPort...")
+
+
+
+        // ✅ FASE 3: Generar handshake JSON con UUID
+
+        val deviceUUID = getDeviceUUID()
+
+        val handshakeJson = buildHandshakeJSON(deviceUUID)
+
+        Log.d(TAG, "📤 Handshake: $handshakeJson")
 
 
 
@@ -633,7 +741,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             try {
 
-                val success = audioClient.connect(serverIp, serverPort)
+                // ✅ NUEVO: Pasar handshake al cliente UDP
+
+                val success = audioClient.connect(serverIp, serverPort, handshakeJson)
 
 
 
@@ -727,20 +837,32 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
 
 
-    private fun handleAudioData(audioData: NativeAudioClient.FloatAudioData) {
+    // ✅ FASE 3: Agnóstico del cliente (NativeAudioClient o UDPAudioClient)
+    private fun handleAudioData(audioData: Any) {
+        // Compatible con ambos: NativeAudioClient.FloatAudioData y UDPAudioClient.FloatAudioData
+        try {
+            // Usar reflection para acceder a propiedades
+            val activeChannels = audioData.javaClass.getMethod("getActiveChannels").invoke(audioData) as? List<*>
+                ?: (audioData.javaClass.getField("activeChannels").get(audioData) as? List<*>)
+            val samplePosition = audioData.javaClass.getField("samplePosition").get(audioData) as? Long ?: 0L
+            val audioDataArray = audioData.javaClass.getField("audioData").get(audioData) as? Array<*>
 
-        audioData.activeChannels.forEachIndexed { channelIndex, channelNumber ->
+            if (activeChannels != null && audioDataArray != null) {
+                activeChannels.forEachIndexed { channelIndex, channelNumber ->
+                    val num = when (channelNumber) {
+                        is Int -> channelNumber
+                        is Number -> channelNumber.toInt()
+                        else -> return@forEachIndexed
+                    }
 
-            val channelAudio = audioData.audioData[channelIndex]
-
-
-
-            if (channelAudio.isNotEmpty()) {
-
-                audioRenderer.renderChannelRF(channelNumber, channelAudio, audioData.samplePosition)
-
+                    val channelAudio = audioDataArray.getOrNull(channelIndex) as? FloatArray
+                    if (channelAudio != null && channelAudio.isNotEmpty()) {
+                        audioRenderer.renderChannelRF(num, channelAudio, samplePosition)
+                    }
+                }
             }
-
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error procesando audio data: ${e.message}", e)
         }
 
     }
@@ -1017,6 +1139,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
 
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
 
         super.onResume()
@@ -1119,41 +1242,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
 
 
-    private fun hideSystemUI() {
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-
-            window.setDecorFitsSystemWindows(false)
-
-            val controller = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
-
-            controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-
-            controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-        } else {
-
-            @Suppress("DEPRECATION")
-
-            window.decorView.systemUiVisibility = (
-
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-
-                            View.SYSTEM_UI_FLAG_FULLSCREEN or
-
-                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-
-                            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-
-                            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-
-                            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-
-                    )
-
-        }
-
-    }
 
 
 
@@ -1161,7 +1250,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         super.onWindowFocusChanged(hasFocus)
 
-        if (hasFocus) hideSystemUI()
 
     }
 

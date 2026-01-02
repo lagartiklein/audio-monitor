@@ -93,7 +93,8 @@ class UDPAudioClient {
      */
     suspend fun connect(
         serverIp: String,
-        port: Int = 5101,
+        port: Int = 5102,  // ✅ Puerto UDP por defecto (separado de TCP 5101)
+        handshakeJson: String? = null,
         channels: List<Int> = emptyList()
     ): Boolean {
         return withContext(Dispatchers.IO) {
@@ -126,7 +127,7 @@ class UDPAudioClient {
                 Log.d(TAG, "✅ isRunning = TRUE")
 
                 // 2. Enviar handshake ANTES de iniciar threads
-                sendHandshake(localPort, channels)
+                sendHandshake(localPort, channels, handshakeJson)
                 Log.d(TAG, "✅ Handshake enviado")
 
                 // 3. Esperar respuesta (pequeño delay)
@@ -171,22 +172,42 @@ class UDPAudioClient {
     /**
      * Enviar handshake al servidor
      */
-    private fun sendHandshake(localPort: Int, channels: List<Int>) {
+    private fun sendHandshake(localPort: Int, channels: List<Int>, customHandshakeJson: String? = null) {
         try {
-            val handshakeData = mapOf(
-                "type" to "handshake",
-                "client_id" to clientId,
-                "protocol_version" to PROTOCOL_VERSION,
-                "local_port" to localPort,
-                "channels" to channels,
-                "client_type" to "android",
-                "timestamp" to System.currentTimeMillis(),
-                "features" to mapOf(
-                    "int16_support" to true,
-                    "compression_support" to true,
-                    "jitter_buffer" to true
+            val handshakeData = if (customHandshakeJson != null) {
+                // ✅ FASE 3: Usar handshake personalizado con UUID del dispositivo
+                Log.d(TAG, "🆔 Usando handshake personalizado con UUID del dispositivo")
+                // Parsear el JSON personalizado
+                val json = org.json.JSONObject(customHandshakeJson)
+                mapOf(
+                    "type" to json.getString("type"),
+                    "device_uuid" to json.getString("device_uuid"),
+                    "device_name" to json.optString("device_name", ""),
+                    "app_version" to json.optString("app_version", ""),
+                    "protocol_version" to json.optString("protocol_version", "1.0"),
+                    "client_id" to clientId,
+                    "local_port" to localPort,
+                    "channels" to channels,
+                    "capabilities" to json.optJSONObject("capabilities"),
+                    "timestamp" to json.optLong("timestamp", System.currentTimeMillis())
                 )
-            )
+            } else {
+                // Fallback: usar formato por defecto
+                mapOf(
+                    "type" to "handshake",
+                    "client_id" to clientId,
+                    "protocol_version" to PROTOCOL_VERSION,
+                    "local_port" to localPort,
+                    "channels" to channels,
+                    "client_type" to "android",
+                    "timestamp" to System.currentTimeMillis(),
+                    "features" to mapOf(
+                        "int16_support" to true,
+                        "compression_support" to true,
+                        "jitter_buffer" to true
+                    )
+                )
+            }
 
             val success = sendControlPacket(PACKET_TYPE_CONTROL, handshakeData)
 
@@ -804,6 +825,15 @@ class UDPAudioClient {
     }
 
     fun isConnected(): Boolean = isRunning.get() && udpSocket != null
+
+    // ✅ FASE 3: Compatible con NativeAudioClient.getRFStatus()
+    fun getRFStatus(): String {
+        return when {
+            isRunning.get() && udpSocket != null -> "🔴 ONLINE"
+            isRunning.get() -> "🔄 BUSCANDO..."
+            else -> "⚫ OFFLINE"
+        }
+    }
 
     fun getNetworkStats(): Map<String, Any> = synchronized(statsLock) {
         return mapOf(
