@@ -172,7 +172,10 @@ RF_AUTO_RECONNECT = True         # Auto-reconexión RF
 
 ### Compilar la App
 
-1. **Copiar archivos Kotlin** de `kotlin android/` a tu proyecto Android
+1. **Copiar archivos Kotlin** de `kotlin android/` a tu proyecto Android en la estructura:
+   - `NativeAudioClient.kt`, `OboeAudioRenderer.kt`, `AudioStreamForegroundService.kt`, `ChannelView.kt`, `NativeAudioStreamActivity.kt` → `app/src/main/java/tu/paquete/`
+   - `audio_callback.h`, `audio_callback.mm`, `native_audio_engine.cpp` → `app/src/main/cpp/`
+   - `CMakeLists.txt` → `app/src/main/cpp/`
 2. **Agregar dependencias** en `build.gradle`:
 
 ```gradle
@@ -317,7 +320,7 @@ audio-monitor/
 
 ## 🐛 Problemas Conocidos
 
-1. **UDP Server no implementado**: El cliente Android tiene soporte UDP completo, pero el servidor Python solo implementa TCP. UDP podría ofrecer latencia aún menor (2-8ms vs 5-15ms).
+1. **UDP Server no implementado**: El cliente Android tiene soporte UDP completo, pero el servidor Python solo implementa TCP. UDP podría ofrecer latencia aún menor (2-8ms con UDP vs 5-15ms con TCP).
 
 2. **Limitación WiFi**: La latencia de red puede variar significativamente según la calidad de la conexión WiFi.
 
