@@ -554,17 +554,14 @@ class NativeAudioServer:
                         logger.info(f"💾 Estado restaurado para: {persistent_id[:15]}")
                         self.persistent_state[persistent_id]['last_seen'] = time.time()
 
-            # ✅ Fallback: restaurar desde DeviceRegistry (misma sesión) si no hay cache en memoria
+            # ✅ MEJORADO: restaurar desde DeviceRegistry SIN restricción de session_id (persistencia permanente)
             if restored_state is None and getattr(self.channel_manager, 'device_registry', None):
                 try:
-                    session_id = getattr(self.channel_manager, 'server_session_id', None)
-                    disk_state = self.channel_manager.device_registry.get_configuration(
-                        persistent_id,
-                        session_id=session_id
-                    )
+                    # ✅ Obtener configuración sin restricción de sesión para persistencia permanente
+                    disk_state = self.channel_manager.device_registry.get_configuration(persistent_id)
                     if disk_state:
                         restored_state = disk_state
-                        logger.info(f"💾 Estado restaurado desde DeviceRegistry: {persistent_id[:15]}")
+                        logger.info(f"💾 ✅ Estado restaurado PERMANENTEMENTE desde DeviceRegistry: {persistent_id[:15]} - {len(disk_state.get('channels', []))} canales")
                 except Exception as e:
                     logger.debug(f"DeviceRegistry restore failed: {e}")
 

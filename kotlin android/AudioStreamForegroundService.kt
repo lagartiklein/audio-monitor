@@ -35,7 +35,7 @@ class AudioStreamForegroundService : Service() {
         private const val TAG = "AudioStreamService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "audio_stream_channel"
-        private const val CHANNEL_NAME = "Audio WF Streaming"
+        private const val CHANNEL_NAME = "Audio RF Streaming"
 
         // Actions para control desde notificación
         const val ACTION_START = "com.cepalabsfree.fichatech.START_STREAM"
@@ -188,15 +188,12 @@ class AudioStreamForegroundService : Service() {
         try {
             // ✅ WifiLock - Mantiene WiFi en full performance (sin timeout directo, renovado manualmente)
             val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-
-            // ✅ FASE 2 OPT 1: WiFi optimization flags para baja latencia
-            // Solo usar el flag en createWifiLock, no existe setWifiLockLatencyMs
             wifiLock = wifiManager.createWifiLock(
-                WifiManager.WIFI_MODE_FULL_LOW_LATENCY,
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY ,
                 "FichaTech:AudioStreamRF"
             ).apply {
                 acquire()
-                Log.d(TAG, "🔒 WifiLock adquirido con LOW_LATENCY")
+                Log.d(TAG, "🔒 WifiLock adquirido")
             }
 
             // ✅ WakeLock - Mantiene CPU activa (con timeout)

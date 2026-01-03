@@ -16,10 +16,9 @@ import org.json.JSONObject
  *
  * ✅ MODO RF: Auto-reconexión + Estado persistente
  */
-class NativeAudioClient(private val deviceUUID: String? = null) {
+class NativeAudioClient private constructor(val deviceUUID: String = "") {
 
     companion object {
-
         private const val TAG = "NativeAudioClient"
 
         private const val CONNECT_TIMEOUT = 5000
@@ -63,6 +62,13 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
         private const val MAX_RECONNECT_DELAY_MS = 8000L // Máximo 8 segundos
 
         private const val RECONNECT_BACKOFF = 1.5 // Backoff exponencial
+
+        @Volatile private var instance: NativeAudioClient? = null
+        fun getInstance(deviceUUID: String): NativeAudioClient {
+            return instance ?: synchronized(this) {
+                instance ?: NativeAudioClient(deviceUUID).also { instance = it }
+            }
+        }
     }
 
     private var socket: Socket? = null
@@ -184,7 +190,7 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
                 Log.d(TAG, "✅ Conectado RF (ID: ${clientId.take(8)})")
 
                 withContext(Dispatchers.Main) {
-                    onConnectionStatus?.invoke(true, "🔴 ONLINE RF")
+                    onConnectionStatus?.invoke(true, "ONLINE")
                 }
 
                 // ✅ Re-suscribir canales INMEDIATAMENTE (sin delay)
@@ -793,9 +799,9 @@ class NativeAudioClient(private val deviceUUID: String? = null) {
     fun getRFStatus(): String {
 
         return when {
-            isConnected -> "🔴 ONLINE"
+            isConnected -> "ONLINE"
             reconnectJob?.isActive == true -> "🔄 BUSCANDO..."
-            else -> "⚫ OFFLINE"
+            else -> "OFFLINE"
         }
     }
 

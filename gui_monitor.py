@@ -23,7 +23,7 @@ DEFAULT_SAMPLE_RATE = 48000  # Tasa de muestreo por defecto
 DEFAULT_BLOCKSIZE = 128
 
 # Configurar apariencia de CustomTkinter
-ctk.set_appearance_mode("dark")
+ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
 class AudioMonitorGUI:
@@ -117,7 +117,7 @@ class AudioMonitorGUI:
     
     def setup_header(self, parent):
         """Configurar encabezado moderno"""
-        header_frame = ctk.CTkFrame(parent, corner_radius=15)
+        header_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#ffffff")
         header_frame.grid(row=0, column=0, pady=(0, 15), sticky="ew")
         header_frame.grid_columnconfigure(1, weight=1)
         
@@ -163,7 +163,7 @@ class AudioMonitorGUI:
     
     def setup_status_frame(self, parent):
         """Frame de estado actual modernizado"""
-        status_frame = ctk.CTkFrame(parent, corner_radius=15)
+        status_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#ffffff")
         status_frame.grid(row=1, column=0, pady=(0, 15), sticky="ew")
         status_frame.grid_columnconfigure((0, 1), weight=1)
         
@@ -359,7 +359,7 @@ class AudioMonitorGUI:
     
     def setup_logs_frame(self, parent):
         """Frame de logs modernizado"""
-        logs_frame = ctk.CTkFrame(parent, corner_radius=15)
+        logs_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#ffffff")
         logs_frame.grid(row=2, column=0, pady=(0, 15), sticky="nsew")
         logs_frame.grid_rowconfigure(1, weight=1)
         logs_frame.grid_columnconfigure(0, weight=1)
@@ -381,7 +381,7 @@ class AudioMonitorGUI:
     
     def setup_controls_frame(self, parent):
         """Frame de controles modernizado"""
-        controls_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        controls_frame = ctk.CTkFrame(parent, fg_color="#ffffff")
         controls_frame.grid(row=3, column=0, sticky="ew")
         controls_frame.grid_columnconfigure(1, weight=1)
         

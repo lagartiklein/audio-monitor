@@ -74,21 +74,6 @@ class OboeAudioRenderer(private val context: Context? = null) {
     private val bufferPool = ArrayDeque<FloatArray>()
     private val MAX_POOLED_BUFFERS = 2  // Mínimo para no desperdiciar memoria
 
-    // ✅ FASE 2 OPT 2: Lookup table para soft clipping ultra-rápido
-    // Reemplaza condicionales con acceso a array (más rápido en loops)
-    // LUT: valores precomputados de softClip para índices 0-4095
-    private val clipLUT = FloatArray(4096) { i ->
-        val x = (i - 2048) / 2048f
-        // tanh aproximado: 2/π * atan(x)
-        (2f / Math.PI.toFloat()) * kotlin.math.atan(x)
-    }
-
-    // ✅ FASE 2 OPT 2b: Soft clipping rápido alternativo sin LUT (si memoria es crítica)
-    private fun softClipTanh(sample: Float): Float {
-        // tanh(x) ≈ 2/π * atan(x) - más rápido que condicionales
-        return (2f / Math.PI.toFloat()) * kotlin.math.atan(sample)
-    }
-
     private var deviceSupportsMMAP = false
     private var deviceFramesPerBurst = 0
 
@@ -373,11 +358,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 }
 
                 if (dropped > 100) {
-                    // ✅ FASE 2 OPT 4: Logging condicional en hotpath
-                    // Solo loguear en modo verbose (reduciendo overhead en producción)
-                    if (com.cepalabsfree.fichatech.BuildConfig.ENABLE_VERBOSE_AUDIO_LOGS) {
-                        Log.d(TAG, "🗑️ RF Drop: $dropped frames en canal $channel")
-                    }
+                    Log.d(TAG, "🗑️ RF Drop: $dropped frames en canal $channel")
                 }
             } else {
                 if (streamState != null) {
@@ -423,14 +404,18 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
     }
 
-    // ✅ FASE 2 OPT 2: Soft clipping optimizado con LUT
-    // Antes: Condicionales en loop (1-2 ciclos de CPU por sample)
-    // Después: Acceso a array (1 ciclo de CPU por sample)
-    // Ganancia: 0.05-0.2ms por frame
     private fun softClip(sample: Float): Float {
-        // Usar LUT para máxima velocidad
-        val idx = ((sample.coerceIn(-1f, 1f) + 1f) * 2048f).toInt().coerceIn(0, 4095)
-        return clipLUT[idx]
+        return when {
+            sample > 1f -> {
+                val excess = sample - 1f
+                1f - (1f / (1f + excess))
+            }
+            sample < -1f -> {
+                val excess = -sample - 1f
+                -1f + (1f / (1f + excess))
+            }
+            else -> sample
+        }
     }
 
     private fun destroyStream(channel: Int) {

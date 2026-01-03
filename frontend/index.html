@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <link rel="icon" type="image/png" href="assets/icon.png">
+    <link rel="icon" type="image/png" href="../assets/icon.png">
+    <link rel="shortcut icon" href="../assets/icon.png" type="image/png">
+    <meta name="description" content="Fichatech Server - Monitoriza y gestiona audio profesional en tiempo real.">
+    <meta name="author" content="Fichatech">
+    <meta name="keywords" content="audio, monitor, fichatech, mixer, control, canales, servidor">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fichatech - Audio Control</title>
@@ -126,8 +130,36 @@
             padding: 12px;
             margin-bottom: 8px;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: none;
             position: relative;
+            user-select: none;
+            cursor: grab;
+        }
+
+        .client-item:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.2);
+        }
+
+        .client-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.4);
+        }
+
+        .client-item.drag-over-top {
+            border-top: 3px solid var(--accent);
+            padding-top: 9px;
+        }
+
+        .client-item.drag-over-bottom {
+            border-bottom: 3px solid var(--accent);
+            padding-bottom: 9px;
+        }
+
+        .client-item.inactive {
+            opacity: 0.4;
+            pointer-events: none;
         }
 
         .client-item:hover {
@@ -610,7 +642,7 @@
     <div class="container">
         <header>
             <div class="logo">
-                <h1>🎛️ Fichatech Audio</h1>
+                <h1>FICHATECH SERVER</h1>
             </div>
             <span class="status-badge" id="connection-status">Conectando...</span>
         </header>
@@ -627,7 +659,9 @@
 
             <div class="mixer-area">
                 <div class="mixer-header">
-                    <div class="mixer-title" id="mixer-title">Selecciona un cliente</div>
+                    <div class="mixer-title" id="mixer-title">
+                        <span id="mixer-title-text">Selecciona un cliente</span>
+                    </div>
                     <div class="mixer-controls">
                         <button class="btn" id="btn-select-all">Todos ON</button>
                         <button class="btn" id="btn-select-none">Todos OFF</button>
@@ -655,6 +689,11 @@
                 this.webDeviceUuid = this.getOrCreateWebDeviceUuid();
                 this.pflChannel = {}; // Track PFL per client
                 this.soloChannels = {}; // Track SOLO per client
+                this.clientOrder = []; // Track order for drag/drop
+                this.draggedElement = null;
+                this.draggedClientId = null;
+                this.inactivityTimeouts = {}; // Track timeouts per client
+                this.inactivityThreshold = 5 * 60 * 1000; // 5 minutes
                 this.init();
             }
 
@@ -771,13 +810,90 @@
 
             updateClientsList(clientsData) {
                 const container = document.getElementById('client-list');
-                container.innerHTML = '';
 
                 if (!clientsData || clientsData.length === 0) {
                     container.innerHTML = '<div class="no-clients">Sin clientes conectados</div>';
+                    this.clientOrder = [];
                     return;
                 }
 
+                // First time setup - initialize order
+                if (this.clientOrder.length === 0) {
+                    this.clientOrder = clientsData.map(c => c.id);
+                    localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                }
+
+                // Check for new clients and add them to the end
+                const newClients = clientsData.filter(c => !this.clientOrder.includes(c.id));
+                if (newClients.length > 0) {
+                    newClients.forEach(client => {
+                        this.clientOrder.push(client.id);
+                    });
+                    localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                }
+
+                // Remove disconnected clients from order
+                this.clientOrder = this.clientOrder.filter(id => 
+                    clientsData.some(c => c.id === id)
+                );
+
+                // If container is empty, rebuild it (first render or after clearing)
+                if (container.innerHTML === '' || container.innerHTML.includes('no-clients')) {
+                    container.innerHTML = '';
+                    this.renderClientsList(clientsData, container);
+                } else {
+                    // Update existing clients data without changing DOM order
+                    clientsData.forEach(client => {
+                        const storageKey = `client_custom_name_${client.id}`;
+                        const savedName = localStorage.getItem(storageKey);
+                        if (savedName) {
+                            client.custom_name = savedName;
+                        }
+                        this.clients[client.id] = client;
+
+                        // Update the existing card's info if it exists
+                        const existingItem = document.querySelector(`.client-item[data-client-id="${client.id}"]`);
+                        if (existingItem) {
+                            this.updateClientItemUI(existingItem, client);
+                        }
+                    });
+                }
+            }
+
+            updateClientItemUI(itemElement, client) {
+                const displayName = client.custom_name || client.device_name || 
+                    (client.type === 'native' ? 'Android' : 'Web Client');
+
+                // Update info and badges only
+                const infoEl = itemElement.querySelector('.client-info');
+                const badgesEl = itemElement.querySelector('.client-badges');
+                const nameTextEl = itemElement.querySelector('.client-name-text');
+
+                if (infoEl) {
+                    infoEl.textContent = `${client.active_channels || 0} canales activos`;
+                }
+
+                if (nameTextEl) {
+                    nameTextEl.textContent = displayName;
+                    nameTextEl.title = displayName;
+                }
+
+                if (badgesEl) {
+                    badgesEl.innerHTML = `
+                        ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
+                        ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
+                    `;
+                }
+
+                // Update connection state
+                if (client.connected === false) {
+                    itemElement.classList.add('disconnected');
+                } else {
+                    itemElement.classList.remove('disconnected');
+                }
+            }
+
+            renderClientsList(clientsData, container) {
                 clientsData.forEach(client => {
                     // Load custom name from localStorage
                     const storageKey = `client_custom_name_${client.id}`;
@@ -822,6 +938,7 @@
                     item.addEventListener('click', (e) => {
                         if (!e.target.classList.contains('edit-name-btn')) {
                             this.selectClient(client.id);
+                            this.resetClientInactivityTimer(client.id);
                         }
                     });
 
@@ -830,7 +947,86 @@
                     editBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         this.editClientName(client.id, displayName, item);
+                        this.resetClientInactivityTimer(client.id);
                     });
+
+                    // Drag and drop events
+                    item.draggable = true;
+                    item.dataset.clientId = client.id;
+
+                    item.addEventListener('dragstart', (e) => {
+                        this.draggedElement = item;
+                        this.draggedClientId = client.id;
+                        item.classList.add('dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+
+                    item.addEventListener('dragend', (e) => {
+                        document.querySelectorAll('.client-item').forEach(el => {
+                            el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
+                        });
+                        this.draggedElement = null;
+                        this.draggedClientId = null;
+                    });
+
+                    item.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        if (item === this.draggedElement) return;
+
+                        const rect = item.getBoundingClientRect();
+                        const midpoint = rect.top + rect.height / 2;
+                        
+                        document.querySelectorAll('.client-item').forEach(el => {
+                            el.classList.remove('drag-over-top', 'drag-over-bottom');
+                        });
+
+                        if (e.clientY < midpoint) {
+                            item.classList.add('drag-over-top');
+                        } else {
+                            item.classList.add('drag-over-bottom');
+                        }
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+
+                    item.addEventListener('dragleave', (e) => {
+                        item.classList.remove('drag-over-top', 'drag-over-bottom');
+                    });
+
+                    item.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        if (item === this.draggedElement) return;
+
+                        const draggedIndex = this.clientOrder.indexOf(this.draggedClientId);
+                        const targetIndex = this.clientOrder.indexOf(client.id);
+
+                        if (draggedIndex !== -1 && targetIndex !== -1) {
+                            [this.clientOrder[draggedIndex], this.clientOrder[targetIndex]] = 
+                            [this.clientOrder[targetIndex], this.clientOrder[draggedIndex]];
+                            
+                            // Save order to localStorage
+                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                            
+                            // Get the container
+                            const container = document.getElementById('client-list');
+                            
+                            // Get both items
+                            const draggedItem = this.draggedElement;
+                            const targetItem = item;
+                            
+                            // Swap DOM nodes directly
+                            const draggedParent = draggedItem.parentNode;
+                            const targetParent = targetItem.parentNode;
+                            
+                            const temp = document.createTextNode('');
+                            draggedParent.insertBefore(temp, draggedItem);
+                            targetParent.insertBefore(draggedItem, targetItem);
+                            draggedParent.insertBefore(targetItem, temp);
+                            temp.parentNode.removeChild(temp);
+                        }
+                    });
+
+                    // Start inactivity timer
+                    this.resetClientInactivityTimer(client.id);
 
                     container.appendChild(item);
                 });
@@ -1216,6 +1412,40 @@
                         vuFill.style.height = `${Math.min(100, rmsPercent)}%`;
                     }
                 }
+            }
+
+            resetClientInactivityTimer(clientId) {
+                // Clear existing timer if any
+                if (this.inactivityTimeouts[clientId]) {
+                    clearTimeout(this.inactivityTimeouts[clientId]);
+                }
+
+                // Set new timer
+                this.inactivityTimeouts[clientId] = setTimeout(() => {
+                    this.deactivateClient(clientId);
+                }, this.inactivityThreshold);
+
+                // Remove inactive class if present
+                const clientItem = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
+                if (clientItem) {
+                    clientItem.classList.remove('inactive');
+                }
+            }
+
+            deactivateClient(clientId) {
+                const clientItem = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
+                if (clientItem) {
+                    clientItem.classList.add('inactive');
+                    console.log(`Cliente ${clientId} desactivado por inactividad`);
+                }
+            }
+
+            reactivateClient(clientId) {
+                const clientItem = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
+                if (clientItem) {
+                    clientItem.classList.remove('inactive');
+                }
+                this.resetClientInactivityTimer(clientId);
             }
         }
 

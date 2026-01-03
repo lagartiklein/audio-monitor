@@ -393,13 +393,32 @@ def handle_subscribe(data):
             except:
                 pass
         
+        # ✅ Obtener device_uuid del cliente web si existe
+        web_device_uuid = None
+        with web_clients_lock:
+            if client_id in web_clients:
+                web_device_uuid = web_clients[client_id].get('device_uuid')
+        
+        # ✅ Si no hay canales y hay device_uuid, intentar restaurar de device_registry
+        if not channels and web_device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            try:
+                saved_config = channel_manager.device_registry.get_configuration(web_device_uuid)
+                if saved_config and saved_config.get('channels'):
+                    channels = saved_config.get('channels', [])
+                    gains_int = saved_config.get('gains', {})
+                    pans_int = saved_config.get('pans', {})
+                    logger.info(f"[WebSocket] 📂 Configuración restaurada desde device_registry: {len(channels)} canales")
+            except Exception as e:
+                logger.debug(f"[WebSocket] Error restaurando de device_registry: {e}")
+        
         # ✅ Suscribir cliente
         channel_manager.subscribe_client(
             client_id, 
             channels, 
             gains_int,
             pans_int,
-            client_type="web"
+            client_type="web",
+            device_uuid=web_device_uuid  # ✅ Pasar device_uuid
         )
         
         emit('subscribed', {
@@ -409,6 +428,20 @@ def handle_subscribe(data):
         })
         
         logger.info(f"[WebSocket] 📡 {client_id[:8]} suscrito: {len(channels)} canales")
+        
+        # ✅ Guardar en device_registry inmediatamente
+        if web_device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            try:
+                config_to_save = {
+                    'channels': channels,
+                    'gains': gains_int,
+                    'pans': pans_int,
+                    'timestamp': int(time.time() * 1000)
+                }
+                channel_manager.device_registry.update_configuration(web_device_uuid, config_to_save)
+                logger.debug(f"[WebSocket] 💾 Configuración guardada en device_registry")
+            except Exception as e:
+                logger.debug(f"[WebSocket] Error guardando en device_registry: {e}")
         
         # ✅ Notificar a otros clientes
         broadcast_clients_update()

@@ -465,7 +465,7 @@ class ChannelManager:
 
         sub['last_update'] = time.time()
 
-        # ✅ Persistir estado por dispositivo (si existe) para auto-restore
+        # ✅ MEJORADO: Persistir estado por dispositivo (sin restricción de sesión para persistencia permanente)
         device_uuid = sub.get('device_uuid')
         if device_uuid and self.device_registry:
             try:
@@ -478,10 +478,12 @@ class ChannelManager:
                         'mutes': sub.get('mutes', {}),
                         'solos': list(sub.get('solos', set())),
                         'pre_listen': sub.get('pre_listen'),
-                        'master_gain': sub.get('master_gain', 1.0)
-                    },
-                    session_id=self.server_session_id
+                        'master_gain': sub.get('master_gain', 1.0),
+                        'timestamp': int(time.time() * 1000)
+                    }
+                    # ✅ Sin session_id - persistencia permanente aunque servidor reinicie
                 )
+                logger.debug(f"[ChannelManager] 💾 Config persistida para {device_uuid[:12]}")
             except Exception as e:
                 logger.debug(f"[ChannelManager] Persist config failed: {e}")
 
