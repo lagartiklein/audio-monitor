@@ -203,6 +203,11 @@ class AudioServerApp:
 
             
 
+            # ✅ NUEVO: Forzar mínimo DEFAULT_NUM_CHANNELS (48) incluso si el dispositivo tiene menos
+            num_channels = max(num_channels, config.DEFAULT_NUM_CHANNELS)
+
+            
+
             # ✅ NUEVO: Inicializar Device Registry
             device_registry = init_device_registry(
                 persistence_file=os.path.join(os.path.dirname(__file__), "config", "devices.json")
@@ -227,12 +232,25 @@ class AudioServerApp:
                 self.channel_manager.set_server_session_id(self.server_session_id)
             except Exception:
                 pass
+            
+            # ✅ NUEVO: Mapear dispositivo físico a canales lógicos
+            try:
+                self.channel_manager.register_device_to_channels(
+                    "audio-server-device",
+                    self.audio_capture.physical_channels
+                )
+            except Exception as e:
+                if self.gui:
+                    self.gui.queue_log_message(f"⚠️ Error mapeo de canales: {e}", 'WARNING')
 
             
 
             # Inicializar servidor nativo
 
             self.native_server = NativeAudioServer(self.channel_manager)
+            
+            # ✅ NUEVO: Pasar información del dispositivo físico
+            self.native_server.set_physical_channels(self.audio_capture.physical_channels)
 
             self.native_server.start()
 
@@ -258,6 +276,10 @@ class AudioServerApp:
             # Inicializar servidor WebSocket
 
             init_server(self.channel_manager)
+            
+            # ✅ NUEVO: Configurar callback de VU levels
+            from audio_server.websocket_server import broadcast_audio_levels
+            self.audio_capture.vu_callback = broadcast_audio_levels
 
             
 

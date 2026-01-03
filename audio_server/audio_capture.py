@@ -28,6 +28,8 @@ class AudioCapture:
 
         self.actual_channels = 0
 
+        self.physical_channels = 0  # ✅ NUEVO: Guardar canales reales del dispositivo
+
         self.callback_lock = threading.Lock()
 
         self.rt_priority_set = False
@@ -438,25 +440,29 @@ class AudioCapture:
 
         self.actual_channels = channels
 
+        self.physical_channels = channels  # ✅ NUEVO: Guardar canales reales
+
         self.running = True
 
         self.stream.start()
 
         
 
-        print(f"[RF] ✅ Captura RF DIRECTA iniciada: {channels} canales")
+        print(f"[RF] ✅ Captura RF DIRECTA iniciada: {channels} canales (rellenado a {config.DEFAULT_NUM_CHANNELS})")
 
         print(f"{'='*70}\n")
 
         
 
-        return channels
+        # ✅ NUEVO: Retornar siempre DEFAULT_NUM_CHANNELS (48) aunque el dispositivo tenga menos
+
+        return config.DEFAULT_NUM_CHANNELS
 
     
 
     def _audio_callback(self, indata, frames, time_info, status):
 
-        """✅ Callback optimizado - usa memoryview sin copias + VU meters"""
+        """✅ Callback optimizado - usa memoryview sin copias + VU meters + relleno de canales"""
 
         if status:
 
@@ -480,6 +486,17 @@ class AudioCapture:
 
         
 
+        # ✅ NUEVO: Rellenar audio con ceros si hay menos canales que DEFAULT_NUM_CHANNELS (ahora 32)
+        audio_to_send = indata
+        if self.physical_channels < config.DEFAULT_NUM_CHANNELS:
+            # Crear array con 32 canales rellenados con ceros
+            padded_audio = np.zeros((frames, config.DEFAULT_NUM_CHANNELS), dtype=np.float32)
+            # Copiar los canales reales
+            padded_audio[:, :self.physical_channels] = indata[:, :self.physical_channels]
+            audio_to_send = padded_audio
+
+        
+
         # PROCESAR CALLBACKS DE AUDIO
 
         with self.callback_lock:
@@ -496,7 +513,7 @@ class AudioCapture:
 
                 # Pasar como memoryview (zero-copy)
 
-                audio_view = memoryview(indata)
+                audio_view = memoryview(audio_to_send)
 
                 
 
@@ -520,7 +537,7 @@ class AudioCapture:
 
                     try:
 
-                        callback(indata.copy())
+                        callback(audio_to_send.copy())
 
                     except Exception as e:
 

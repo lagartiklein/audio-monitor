@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <link rel="icon" type="image/png" href="assets/icon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control Center - Audio RF</title>
@@ -72,7 +73,7 @@
             background: #111;
             padding: 20px 10px 20px 10px;
             border-radius: 10px;
-            border: 2px solid #222;
+            border: 2px solid #070404;
             overflow-y: auto;
             max-height: 100vh;
             min-width: 220px;
@@ -370,6 +371,23 @@
             border-color: #ff00ff;
         }
         
+        /* ✅ NUEVO: Estilos para canales operacionales */
+        .channel-strip.operational {
+            border-left: 4px solid #00ff00;
+            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.1);
+        }
+        
+        .channel-strip.operational .channel-number {
+            color: #00ff00;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            font-weight: bold;
+        }
+        
+        .channel-strip:not(.operational) .channel-number {
+            color: #666;
+            opacity: 0.6;
+        }
+        
         .vu-meter {
             width: 30px;
             height: 180px;
@@ -477,9 +495,9 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎛️ CONTROL CENTER</h1>
+            <h1>🎛️ FICHATECH SERVER</h1>
             <div style="color: #0a0; font-size: 0.9em; margin-top: 10px;">
-                RF Audio Streaming Control
+                Monitor de audio en tiempo real
             </div>
         </header>
 
@@ -563,6 +581,22 @@
                 this.socket.on('device_info', (info) => {
                     this.deviceInfo = info;
                     console.log('[Device]', info);
+                });
+                
+                // ✅ NUEVO: Escuchar actualizaciones de canales operacionales
+                this.socket.on('operational_channels_updated', (data) => {
+                    if (this.deviceInfo) {
+                        this.deviceInfo.operational_channels = data.operational_channels;
+                        console.log('[Operational Channels Updated]', data.operational_channels);
+                        // Redibujar mixer si está visible
+                        if (this.selectedClientId) {
+                            this.renderMixer(this.selectedClientId);
+                        }
+                    }
+                });
+
+                this.socket.on('audio_levels', (data) => {
+                    this.updateAudioLevels(data.levels);
                 });
 
                 this.socket.on('clients_update', (data) => {
@@ -837,14 +871,27 @@
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                const numChannels = this.deviceInfo.channels;
+                // Limitar a máximo 32 canales
+                const numChannels = Math.min(32, this.deviceInfo.channels);
+                // ✅ NUEVO: Obtener canales operacionales desde deviceInfo
+                const operationalChannels = this.deviceInfo.operational_channels || [];
+                
+                // ✅ NUEVO: Obtener gains del cliente
+                const gains = client.gains || {};
+                const pans = client.pans || {};
 
                 for (let i = 0; i < numChannels; i++) {
                     const isActive = client.channels.includes(i);
+                    const isOperational = operationalChannels.includes(i);  // ✅ NUEVO
+                    
+                    // ✅ NUEVO: Obtener gain en dB para este canal
+                    const gainLinear = gains[i] || 1.0;
+                    const gainDB = this.gainToDb(gainLinear);
                     
                     const strip = document.createElement('div');
                     strip.className = 'channel-strip';
                     if (isActive) strip.classList.add('active');
+                    if (isOperational) strip.classList.add('operational');  // ✅ NUEVO
 
                     strip.innerHTML = `
                         <div class="channel-number">CH ${i + 1}</div>
@@ -861,8 +908,8 @@
 
                         <div class="fader-section">
                             <input type="range" class="fader" data-channel="${i}" 
-                                   min="-60" max="12" value="0" step="0.5" orient="vertical">
-                            <div class="db-display" data-channel="${i}">0.0dB</div>
+                                   min="-60" max="12" value="${gainDB}" step="0.5" orient="vertical">
+                            <div class="db-display" data-channel="${i}">${gainDB >= 0 ? '+' : ''}${gainDB.toFixed(1)}dB</div>
                         </div>
 
                         <div class="pan-control">
@@ -927,8 +974,14 @@
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                // TODO: Implementar lógica de solo
-                console.log('[Solo]', clientId, channel);
+                // SOLO = Pre-listen (solo de escucha)
+                // Enviar al servidor para que solo este canal sea audible
+                this.socket.emit('update_client_mix', {
+                    target_client_id: clientId,
+                    pre_listen: channel  // Activar solo
+                });
+
+                console.log('[Solo Activated]', clientId, channel);
             }
 
             setPFL(clientId, channel) {
@@ -961,7 +1014,8 @@
             selectAllChannels() {
                 if (!this.selectedClientId) return;
                 
-                const channels = Array.from({length: this.deviceInfo.channels}, (_, i) => i);
+                // Limitar a máximo 32 canales
+                const channels = Array.from({length: Math.min(32, this.deviceInfo.channels)}, (_, i) => i);
                 
                 this.socket.emit('update_client_mix', {
                     target_client_id: this.selectedClientId,
@@ -1006,6 +1060,26 @@
 
             dbToGain(db) {
                 return Math.pow(10, db / 20);
+            }
+
+            gainToDb(gain) {
+                // Convertir gain lineal a dB
+                // 1.0 = 0dB, 0.5 = -6dB, 2.0 = 6dB
+                if (gain <= 0) return -60;
+                return Math.log10(gain) * 20;
+            }
+
+            updateAudioLevels(levels) {
+                // ✅ NUEVO: Actualizar las barras de VU con los niveles de audio
+                for (const channel in levels) {
+                    const level = levels[channel];
+                    const rmsPercent = level.rms_percent || 0;
+                    
+                    const vuFill = document.querySelector(`.vu-fill[data-channel="${channel}"]`);
+                    if (vuFill) {
+                        vuFill.style.height = `${rmsPercent}%`;
+                    }
+                }
             }
         }
 

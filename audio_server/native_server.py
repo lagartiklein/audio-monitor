@@ -210,6 +210,9 @@ class NativeAudioServer:
         self.sample_position_lock = threading.Lock()
         self.sample_position = 0
         
+        # ✅ NUEVO: Información del dispositivo de audio
+        self.physical_channels = 0  # Canales reales del dispositivo
+        
         self.stats = {
             'packets_sent': 0,
             'packets_dropped': 0,
@@ -223,6 +226,11 @@ class NativeAudioServer:
         }
         self.start_time = time.time()
         self.stats_lock = threading.Lock()
+    
+    def set_physical_channels(self, num_channels: int):
+        """✅ NUEVO: Establecer número de canales reales del dispositivo"""
+        self.physical_channels = num_channels
+        logger.info(f"[NativeServer] 📊 Canales físicos del dispositivo: {num_channels}")
     
     def start(self):
         if self.running: 
@@ -454,6 +462,12 @@ class NativeAudioServer:
             if not persistent_id:
                 logger.error(f"❌ Handshake sin client_id UUID desde {client.address}")
                 return
+            
+            # ✅ Detectar si es reconexión TEMPRANO para usarlo en lógica de mapeo
+            is_reconnection = False
+            with self.client_lock:
+                if persistent_id in self.clients:
+                    is_reconnection = True
 
             # ✅ Registrar/actualizar dispositivo en DeviceRegistry (si existe)
             try:
@@ -469,16 +483,33 @@ class NativeAudioServer:
                     })
             except Exception as e:
                 logger.debug(f"DeviceRegistry register failed: {e}")
+            
+            # ✅ NUEVO: Mapear dispositivo a canales lógicos automáticamente
+            # Si es la primera conexión (no es reconexión), asignar canales automáticamente
+            try:
+                num_physical_channels = message.get('num_channels', 0)
+                if num_physical_channels > 0 and not is_reconnection:
+                    device_mapping = self.channel_manager.register_device_to_channels(
+                        persistent_id,
+                        num_physical_channels
+                    )
+                    if device_mapping.get('operacional'):
+                        logger.info(
+                            f"[NativeServer] 🔗 Dispositivo {persistent_id[:12]} mapeado: "
+                            f"{num_physical_channels} canales físicos -> "
+                            f"Canales lógicos {device_mapping['start_channel']}-"
+                            f"{device_mapping['start_channel'] + device_mapping['num_channels'] - 1}"
+                        )
+            except Exception as e:
+                logger.debug(f"Device channel mapping failed: {e}")
 
             # ✅ FIXED: Cerrar cliente viejo ANTES de sobrescribir
-            is_reconnection = False
             old_temp_id = client.id
 
             with self.client_lock:
                 # ✅ Si ya existe, CERRAR el socket viejo
                 if persistent_id in self.clients:
                     old_client = self.clients[persistent_id]
-                    is_reconnection = True
                     
                     logger.info(f"🔄 Reconexión detectada: {persistent_id[:15]}")
                     logger.info(f"   Cerrando conexión anterior...")

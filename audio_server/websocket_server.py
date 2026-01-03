@@ -71,6 +71,20 @@ web_persistent_lock = __import__('threading').Lock()
 WEB_STATE_CACHE_TIMEOUT = 604800  # 7 días (1 semana)
 WEB_MAX_PERSISTENT_STATES = 200  # Máximo 200 estados (más para músicos recurrentes)
 
+# ✅ NUEVO: Callback para VU Levels
+def broadcast_audio_levels(levels):
+    """
+    ✅ NUEVO: Emitir niveles de audio a todos los clientes conectados
+    levels: dict con {channel: {'rms_percent': 0-100, 'peak_percent': 0-100, ...}}
+    """
+    try:
+        socketio.emit('audio_levels', {
+            'levels': levels,
+            'timestamp': int(time.time() * 1000)
+        }, broadcast=True, namespace='/')
+    except Exception as e:
+        logger.debug(f"[WebSocket] Error broadcasting audio levels: {e}")
+
 def cleanup_expired_web_states():
     """Limpiar estados persistentes expirados para web clients"""
     current_time = time.time()
@@ -195,6 +209,7 @@ def handle_connect(auth=None):
             'latency_ms': config.BLOCKSIZE / config.SAMPLE_RATE * 1000,
             'mode': 'control_center',
             'version': '2.5.0-FIXED',
+            'operational_channels': list(channel_manager.get_operational_channels()),  # ✅ NUEVO
             'features': {
                 'zombie_detection': True,
                 'device_change_detection': True,

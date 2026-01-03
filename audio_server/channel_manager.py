@@ -27,12 +27,14 @@ class ChannelManager:
     - Ganancias y panoramas
     
     ✅ NUEVO: Integración con Device Registry para identificación persistente
+    
+    ✅ NUEVO: Mapeo automático de interfaces físicas a canales lógicos
 
     """
 
     def __init__(self, num_channels):
-
-        self.num_channels = num_channels
+        # Limitar a máximo 32 canales
+        self.num_channels = min(32, num_channels)
 
         self.subscriptions = {}  # client_id -> subscription_data
 
@@ -48,6 +50,10 @@ class ChannelManager:
 
         # ✅ NUEVO: Session ID del servidor (cambia en cada arranque)
         self.server_session_id = None
+        
+        # ✅ NUEVO: Mapeo de interfaces físicas a canales lógicos
+        self.device_channel_map = {}  # device_uuid -> {'start_channel': int, 'num_channels': int, 'physical_channels': int}
+        self.next_available_channel = 0  # Próximo canal disponible para asignar
 
         print(f"[ChannelManager] ✅ Inicializado: {num_channels} canales")
 
@@ -70,6 +76,99 @@ class ChannelManager:
         """✅ NUEVO: Session ID del servidor (cambia en cada arranque)."""
         self.server_session_id = session_id
         logger.info(f"[ChannelManager] 🧷 Server session: {session_id[:12]}")
+    
+    def register_device_to_channels(self, device_uuid: str, physical_channels: int) -> dict:
+        """
+        ✅ NUEVO: Mapear dispositivo físico a canales lógicos automáticamente
+        
+        Si una interfaz tiene 8 canales y es la primera, se asigna a canales 0-7
+        Si otra interfaz tiene 16 canales, se asigna a canales 8-23, etc
+        
+        Args:
+            device_uuid: UUID único del dispositivo
+            physical_channels: Número de canales del dispositivo físico
+            
+        Returns:
+            {
+                'start_channel': int,      # Canal inicial asignado
+                'num_channels': int,       # Número de canales asignados
+                'physical_channels': int,  # Canales del dispositivo físico
+                'operacional': bool        # Si hay canales dentro del rango 0-47
+            }
+        """
+        if device_uuid in self.device_channel_map:
+            # Ya está mapeado, retornar mapeo existente
+            return self.device_channel_map[device_uuid]
+        
+        # Calcular canales disponibles
+        # Limitar a máximo 32 canales
+        channels_needed = min(physical_channels, self.num_channels - self.next_available_channel, 32 - self.next_available_channel)
+        
+        if channels_needed <= 0:
+            logger.warning(f"[ChannelManager] ⚠️ No hay canales disponibles para {device_uuid[:12]}")
+            return {
+                'start_channel': -1,
+                'num_channels': 0,
+                'physical_channels': physical_channels,
+                'operacional': False
+            }
+        
+        # Mapear este dispositivo
+        mapping = {
+            'start_channel': self.next_available_channel,
+            'num_channels': channels_needed,
+            'physical_channels': physical_channels,
+            'operacional': True
+        }
+        
+        self.device_channel_map[device_uuid] = mapping
+        self.next_available_channel += channels_needed
+        
+        logger.info(
+            f"[ChannelManager] 🔗 Dispositivo mapeado: {device_uuid[:12]} "
+            f"({physical_channels} canales físicos) -> "
+            f"Canales lógicos {mapping['start_channel']}-{mapping['start_channel'] + channels_needed - 1}"
+        )
+        
+        # ✅ NUEVO: Notificar al socketio sobre cambio de canales operacionales
+        if self.socketio:
+            try:
+                self.socketio.emit(
+                    'operational_channels_updated',
+                    {
+                        'operational_channels': list(self.get_operational_channels()),
+                        'device_uuid': device_uuid,
+                        'mapping': mapping
+                    },
+                    broadcast=True
+                )
+                logger.debug(f"[ChannelManager] 📢 Notificado cambio de canales operacionales")
+            except Exception as e:
+                logger.debug(f"[ChannelManager] ⚠️ Error notificando: {e}")
+        
+        return mapping
+    
+    def get_device_channel_map(self, device_uuid: str) -> dict:
+        """Obtener mapeo de canales para un dispositivo"""
+        return self.device_channel_map.get(device_uuid, {
+            'start_channel': -1,
+            'num_channels': 0,
+            'physical_channels': 0,
+            'operacional': False
+        })
+    
+    def get_operational_channels(self) -> set:
+        """
+        ✅ NUEVO: Obtener conjunto de canales que tienen dispositivos físicos asignados
+        Útil para marcar canales operacionales en la UI
+        """
+        operational = set()
+        for mapping in self.device_channel_map.values():
+            if mapping.get('operacional'):
+                start = mapping['start_channel']
+                num = mapping['num_channels']
+                operational.update(range(start, start + num))
+        return operational
 
     
 
@@ -97,6 +196,12 @@ class ChannelManager:
 
         """
 
+        # ✅ NUEVO: Convertir canales a int si vienen como strings
+        try:
+            channels = [int(ch) for ch in channels]
+        except (ValueError, TypeError):
+            channels = []
+        
         # ✅ VALIDAR canales dentro del rango permitido
 
         valid_channels = [ch for ch in channels if 0 <= ch < self.num_channels]
@@ -231,6 +336,12 @@ class ChannelManager:
 
         if channels is not None:
 
+            # ✅ NUEVO: Convertir a int si vienen como strings
+            try:
+                channels = [int(ch) for ch in channels]
+            except (ValueError, TypeError):
+                channels = []
+            
             # Filtrar canales válidos
 
             valid_channels = [ch for ch in channels if 0 <= ch < self.num_channels]
@@ -261,11 +372,16 @@ class ChannelManager:
 
         if gains is not None:
 
-            for ch, gain in gains.items():
+            # ✅ NUEVO: Convertir claves a int y valores a float
+            for ch_raw, gain in gains.items():
 
-                if 0 <= ch < self.num_channels:
+                try:
+                    ch = int(ch_raw)
+                    if 0 <= ch < self.num_channels:
 
-                    sub['gains'][ch] = max(0.0, min(float(gain), 10.0))
+                        sub['gains'][ch] = max(0.0, min(float(gain), 10.0))
+                except (ValueError, TypeError):
+                    pass
 
         
 
@@ -273,11 +389,16 @@ class ChannelManager:
 
         if pans is not None:
 
-            for ch, pan in pans.items():
+            # ✅ NUEVO: Convertir claves a int y valores a float
+            for ch_raw, pan in pans.items():
 
-                if 0 <= ch < self.num_channels:
+                try:
+                    ch = int(ch_raw)
+                    if 0 <= ch < self.num_channels:
 
-                    sub['pans'][ch] = max(-1.0, min(float(pan), 1.0))
+                        sub['pans'][ch] = max(-1.0, min(float(pan), 1.0))
+                except (ValueError, TypeError):
+                    pass
 
         
 
@@ -285,11 +406,16 @@ class ChannelManager:
 
         if mutes is not None:
 
-            for ch, mute in mutes.items():
+            # ✅ NUEVO: Convertir claves a int
+            for ch_raw, mute in mutes.items():
 
-                if 0 <= ch < self.num_channels:
+                try:
+                    ch = int(ch_raw)
+                    if 0 <= ch < self.num_channels:
 
-                    sub['mutes'][ch] = bool(mute)
+                        sub['mutes'][ch] = bool(mute)
+                except (ValueError, TypeError):
+                    pass
 
         
 
@@ -297,6 +423,12 @@ class ChannelManager:
 
         if solos is not None:
 
+            # ✅ NUEVO: Convertir a int si vienen como strings
+            try:
+                solos = [int(ch) for ch in solos]
+            except (ValueError, TypeError):
+                solos = []
+            
             valid_solos = [ch for ch in solos if 0 <= ch < self.num_channels]
 
             sub['solos'] = set(valid_solos)
@@ -307,6 +439,12 @@ class ChannelManager:
 
         if pre_listen is not None:
 
+            # ✅ NUEVO: Convertir a int si viene como string
+            try:
+                pre_listen = int(pre_listen)
+            except (ValueError, TypeError):
+                pre_listen = -1
+            
             if pre_listen == -1 or (0 <= pre_listen < self.num_channels):
 
                 sub['pre_listen'] = pre_listen
@@ -576,6 +714,8 @@ class ChannelManager:
                 'custom_name': custom_name,  # ✅ NUEVO
                 'device_name': device_name,  # ✅ NUEVO
                 'channels': sub['channels'],
+                'gains': sub['gains'],  # ✅ NUEVO: Incluir gains
+                'pans': sub['pans'],  # ✅ NUEVO: Incluir pans
                 'active_channels': len(sub['channels']),
                 'has_solo': len(sub.get('solos', set())) > 0,
                 'pre_listen': sub.get('pre_listen'),
