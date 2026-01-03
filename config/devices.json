@@ -75,8 +75,8 @@
       "user_agent": null
     },
     "first_seen": 1767396786.752031,
-    "last_seen": 1767447758.237095,
-    "reconnections": 301,
+    "last_seen": 1767448230.7693617,
+    "reconnections": 303,
     "configuration": {
       "channels": [
         1,
@@ -217,7 +217,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767447758237
+      "timestamp": 1767448230769
     },
     "configuration_session_id": "f57717282ffb470188b8cfb91c6610be",
     "tags": [],
@@ -239,8 +239,8 @@
       "user_agent": null
     },
     "first_seen": 1767396786.9770272,
-    "last_seen": 1767447734.612082,
-    "reconnections": 225,
+    "last_seen": 1767448232.2080824,
+    "reconnections": 227,
     "configuration": {
       "channels": [
         1,
@@ -381,7 +381,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767447734612
+      "timestamp": 1767448232208
     },
     "configuration_session_id": "f57717282ffb470188b8cfb91c6610be",
     "tags": [],
@@ -823,8 +823,8 @@
       "user_agent": null
     },
     "first_seen": 1767442886.0863066,
-    "last_seen": 1767447733.3936415,
-    "reconnections": 31,
+    "last_seen": 1767448228.8383787,
+    "reconnections": 33,
     "configuration": {
       "channels": [
         1,
@@ -965,7 +965,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767447733393
+      "timestamp": 1767448228838
     },
     "configuration_session_id": null,
     "tags": [],
@@ -1004,8 +1004,8 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767445623.9318948,
-    "last_seen": 1767447735.3495872,
-    "reconnections": 6,
+    "last_seen": 1767448232.0130212,
+    "reconnections": 7,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1024,8 +1024,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767445920.1892118,
-    "last_seen": 1767447734.3582044,
-    "reconnections": 5,
+    "last_seen": 1767448229.9808242,
+    "reconnections": 6,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
