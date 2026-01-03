@@ -16,11 +16,11 @@
 
 struct AudioStreamWrapper {
     std::shared_ptr<oboe::AudioStream> stream;
-    std::shared_ptr<LockFreeAudioCallback> callback;
+    std::shared_ptr<AudioCallback> callback;
     int channelId;
 
-        AudioStreamWrapper(std::shared_ptr<oboe::AudioStream> s,
-            std::shared_ptr<LockFreeAudioCallback> c,
+    AudioStreamWrapper(std::shared_ptr<oboe::AudioStream> s,
+            std::shared_ptr<AudioCallback> c,
             int id)
             : stream(std::move(s)), callback(std::move(c)), channelId(id) {}
 };
@@ -84,7 +84,7 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeCreateStream
 
     try {
         // ✅ Callback con buffer optimizado (512 frames)
-        auto callback = std::make_shared<LockFreeAudioCallback>(engine->channels);
+        auto callback = std::make_shared<AudioCallback>(engine->channels);
 
         oboe::AudioStreamBuilder builder;
 

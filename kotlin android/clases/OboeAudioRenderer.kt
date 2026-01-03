@@ -6,18 +6,20 @@ import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
 
-/**
- * ✅ VERSIÓN CORREGIDA - Ultra Low Latency
- *
- * CORRECCIONES:
- * 1. Context puede ser null (evita crash si se llama sin context)
- * 2. Métodos nativos corregidos (firma consistente)
- * 3. Validación de AudioManager antes de usar
- */
 class OboeAudioRenderer(private val context: Context? = null) {
 
     companion object {
         private const val TAG = "OboeAudioRenderer"
+
+        // ✅ SINGLETON: Una sola instancia compartida por toda la app
+        @Volatile
+        private var instance: OboeAudioRenderer? = null
+
+        fun getInstance(context: Context? = null): OboeAudioRenderer {
+            return instance ?: synchronized(this) {
+                instance ?: OboeAudioRenderer(context).also { instance = it }
+            }
+        }
 
         // ✅ Variables mutables con valores por defecto seguros
         private var OPTIMAL_SAMPLE_RATE = 48000

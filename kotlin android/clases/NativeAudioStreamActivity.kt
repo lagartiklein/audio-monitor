@@ -53,26 +53,18 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private var wasMutedByHeadphoneLoss = false
 
     // UI Components
+    private var statusText: TextView? = null
+    private var ipEditText: EditText? = null
+    private var portEditText: EditText? = null
+    private var connectButton: Button? = null
+    private var masterVolumeSeekBar: SeekBar? = null
+    private var masterVolumeText: TextView? = null
+    private var muteButton: Button? = null
+    private var latencyText: TextView? = null
+    private var webControlText: TextView? = null
+    private var infoText: TextView? = null
 
-    private lateinit var statusText: TextView
-
-    private lateinit var ipEditText: EditText
-
-    private lateinit var portEditText: EditText
-
-    private lateinit var connectButton: Button
-
-    private lateinit var masterVolumeSeekBar: SeekBar
-
-    private lateinit var masterVolumeText: TextView
-
-    private lateinit var muteButton: Button
-
-    private lateinit var latencyText: TextView
-
-    private lateinit var webControlText: TextView
-
-    private lateinit var infoText: TextView
+    private var channelStripContainer: LinearLayout? = null
 
     private var isConnected = false
 
@@ -89,90 +81,90 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private var serviceBound = false
 
     private val serviceConnection =
-            object : android.content.ServiceConnection {
+        object : android.content.ServiceConnection {
 
-                override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
 
-                    val binder = service as AudioStreamForegroundService.AudioStreamBinder
+                val binder = service as AudioStreamForegroundService.AudioStreamBinder
 
-                    audioService = binder.getService()
+                audioService = binder.getService()
 
-                    serviceBound = true
+                serviceBound = true
 
-                    audioService?.onDisconnectRequested = { lifecycleScope.launch { disconnect() } }
-                }
-
-                override fun onServiceDisconnected(name: android.content.ComponentName?) {
-
-                    audioService = null
-
-                    serviceBound = false
-                }
+                audioService?.onDisconnectRequested = { lifecycleScope.launch { disconnect() } }
             }
+
+            override fun onServiceDisconnected(name: android.content.ComponentName?) {
+
+                audioService = null
+
+                serviceBound = false
+            }
+        }
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
     private var metricsUpdateRunnable: Runnable? = null
 
     private val channelViews: MutableMap<Int, ChannelView> =
-            mutableMapOf() // Asegúrate de poblar esto según tus canales
-
-    private lateinit var channelStripContainer: LinearLayout
+        mutableMapOf() // Asegúrate de poblar esto según tus canales
 
     private val activeChannelsLocal: MutableSet<Int> = mutableSetOf()
 
     private val monitorReceiver =
-            object : BroadcastReceiver() {
+        object : BroadcastReceiver() {
 
-                override fun onReceive(context: Context?, intent: Intent?) {
+            override fun onReceive(context: Context?, intent: Intent?) {
 
-                    if (intent?.action == AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE
-                    ) {
+                if (intent?.action == AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE
+                ) {
 
-                        val jsonStr = intent.getStringExtra("channelStates") ?: return
+                    val jsonStr = intent.getStringExtra("channelStates") ?: return
 
-                        val json = JSONObject(jsonStr)
+                    val json = JSONObject(jsonStr)
 
-                        for (key in json.keys()) {
+                    for (key in json.keys()) {
 
-                            val channel = key.toIntOrNull() ?: continue
+                        val channel = key.toIntOrNull() ?: continue
 
-                            val state = json.getJSONObject(key)
+                        val state = json.getJSONObject(key)
 
-                            val rms = state.optDouble("rmsLevel", 0.0).toFloat()
+                        val rms = state.optDouble("rmsLevel", 0.0).toFloat()
 
-                            val peak = state.optDouble("peakLevel", 0.0).toFloat()
+                        val peak = state.optDouble("peakLevel", 0.0).toFloat()
 
-                            val isActive = state.optBoolean("isActive", false)
+                        val isActive = state.optBoolean("isActive", false)
 
-                            channelViews[channel]?.updateMonitor(rms, peak, isActive)
-                        }
+                        channelViews[channel]?.updateMonitor(rms, peak, isActive)
                     }
                 }
             }
+        }
 
     private val headphoneReceiver =
-            object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    when (intent?.action) {
-                        AudioManager.ACTION_AUDIO_BECOMING_NOISY -> handleHeadsetConnection(false)
-                        Intent.ACTION_HEADSET_PLUG -> {
-                            val state = intent.getIntExtra("state", -1)
-                            if (state != -1) handleHeadsetConnection(state == 1)
-                        }
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    AudioManager.ACTION_AUDIO_BECOMING_NOISY -> handleHeadsetConnection(false)
+                    Intent.ACTION_HEADSET_PLUG -> {
+                        val state = intent.getIntExtra("state", -1)
+                        if (state != -1) handleHeadsetConnection(state == 1)
                     }
                 }
             }
+        }
 
     private val audioDeviceCallback =
-            object : AudioDeviceCallback() {
-                override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-                    handleHeadsetConnection(isHeadphonesConnected())
-                }
-                override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-                    handleHeadsetConnection(isHeadphonesConnected())
-                }
+        object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                handleHeadsetConnection(isHeadphonesConnected())
             }
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                handleHeadsetConnection(isHeadphonesConnected())
+            }
+        }
+
+    private var lastKnownMaxChannels = 8
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -211,7 +203,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                android.content.pm.PackageManager.PERMISSION_GRANTED
             ) {
 
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
@@ -220,24 +212,24 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         // ✅ Configurar el manejador de botón atrás moderno (OnBackPressedDispatcher)
         onBackPressedDispatcher.addCallback(
-                this,
-                object : androidx.activity.OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        if (isConnected && serviceBound) {
-                            Log.d(
-                                    TAG,
-                                    "📱 Usuario presionó atrás - Minimizando con transmisión activa"
-                            )
-                            showToast(
-                                    "Transmisión activa en background. Toca la notificación para volver."
-                            )
-                            finish()
-                        } else {
-                            Log.d(TAG, "📱 Usuario presionó atrás - Sin conexión activa")
-                            finish()
-                        }
+            this,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (isConnected && serviceBound) {
+                        Log.d(
+                            TAG,
+                            "📱 Usuario presionó atrás - Minimizando con transmisión activa"
+                        )
+                        showToast(
+                            "Transmisión activa en background. Toca la notificación para volver."
+                        )
+                        finish()
+                    } else {
+                        Log.d(TAG, "📱 Usuario presionó atrás - Sin conexión activa")
+                        finish()
                     }
                 }
+            }
         )
 
         Log.d(TAG, "✅ Activity creada - Fichatech Monitor")
@@ -249,11 +241,35 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         super.onConfigurationChanged(newConfig)
 
-        // Reaplica UI inmersiva y edge-to-edge
+        val isLandscape = newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+        Log.d(TAG, "🔁 onConfigurationChanged - isLandscape=$isLandscape")
+
+        // Reemplazamos el layout para forzar que Android use la variante correcta
+        // (si existe `layout-land/activity_native_receiver.xml`, se cargará automáticamente)
+        setContentView(R.layout.activity_native_receiver)
+
+        // Reaplica Edge-to-Edge y vuelve a ligar las vistas del nuevo layout
         setupEdgeToEdgeInsets()
 
-        // No se reinicia ni se desconecta nada
+        if (isLandscape) {
+            // 🌄 LANDSCAPE: Solo mostrar consola de canales
+            Log.d(TAG, "📱 Rotación a LANDSCAPE - Inicializando consola de canales")
+            initializeViewsLandscape()
+            try {
+                ensureChannelConsole(lastKnownMaxChannels)
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Error poblando consola en landscape: ${e.message}")
+            }
+        } else {
+            // 📱 PORTRAIT: Mostrar controles de conexión y volumen
+            Log.d(TAG, "📱 Rotación a PORTRAIT - Inicializando controles")
+            initializeViews()
+            // Restaurar el estado visual (valores de sesión, texto del volumen, etc.)
+            loadSessionPreferences()
+            // Reconfigurar listener del seekbar
+            setupVolumeSeekBarListener()
+        }
 
     }
 
@@ -263,7 +279,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
             val sampleRateStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
             val framesPerBufferStr =
-                    audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+                audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
             val optimalSampleRate = sampleRateStr?.toIntOrNull() ?: 48000
             val optimalBufferSize = framesPerBufferStr?.toIntOrNull() ?: 128
             Log.d(TAG, "🎵 Sistema de audio configurado:")
@@ -289,7 +305,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         channelStripContainer = findViewById(R.id.channelStripContainer)
 
-        connectButton.setOnClickListener {
+        connectButton?.setOnClickListener {
             if (isConnected) {
 
                 disconnect()
@@ -300,16 +316,16 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         }
 
         // Control de volumen master
-        masterVolumeSeekBar.max = 72 // -60dB a +12dB
+        masterVolumeSeekBar?.max = 72 // -60dB a +12dB
 
         // NO establecer progress aquí, se hará en loadSessionPreferences() después de cargar el
         // valor guardado
 
-        muteButton.setOnClickListener { toggleMute() }
+        muteButton?.setOnClickListener { toggleMute() }
 
         // ✅ NUEVO: Listener para recrear streams (long press en latency)
 
-        latencyText.setOnLongClickListener {
+        latencyText?.setOnLongClickListener {
             if (isConnected) {
 
                 audioRenderer.recreateAllStreams()
@@ -320,42 +336,57 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             true
         }
 
-        statusText.text = "FICHATECH MONITOR"
+        statusText?.text = "FICHATECH MONITOR"
 
-        connectButton.text = "Conectar"
+        connectButton?.text = "Conectar"
 
-        muteButton.text = "🔊 Audio ON"
+        muteButton?.text = "🔊 Audio ON"
     }
 
     // Configurar el listener del SeekBar DESPUÉS de cargar preferencias
     private fun setupVolumeSeekBarListener() {
-        masterVolumeSeekBar.setOnSeekBarChangeListener(
-                object : SeekBar.OnSeekBarChangeListener {
+        masterVolumeSeekBar?.setOnSeekBarChangeListener(
+            object : SeekBar.OnSeekBarChangeListener {
 
-                    override fun onProgressChanged(
-                            seekBar: SeekBar?,
-                            progress: Int,
-                            fromUser: Boolean
-                    ) {
-                        if (fromUser) { // Solo procesar cambios del usuario, no de código
-                            masterVolumeDb = (progress - 60).toFloat()
-                            masterVolumeText.text = String.format("%.0f dB", masterVolumeDb)
-                            audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
-                        }
-                    }
-
-                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-
-                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                        saveSessionPreferences()
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean
+                ) {
+                    if (fromUser) { // Solo procesar cambios del usuario, no de código
+                        masterVolumeDb = (progress - 60).toFloat()
+                        masterVolumeText?.text = String.format("%.0f dB", masterVolumeDb)
+                        audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
                     }
                 }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                    saveSessionPreferences()
+                }
+            }
         )
     }
 
+    // Landscape mode: solo mostrar el contenedor de canales
+    private fun initializeViewsLandscape() {
+        channelStripContainer = findViewById(R.id.channelStripContainer)
+        Log.d(TAG, "🌄 Landscape: channelStripContainer inicializado")
+
+        // Limpiar las vistas existentes para reconstruirlas en el nuevo contenedor
+        if (channelViews.isNotEmpty()) {
+            channelStripContainer?.removeAllViews()
+            channelViews.clear()
+            Log.d(TAG, "🔄 Vistas de canales limpias, listas para recrearse")
+        }
+    }
+
     private fun initializeAudioComponents() {
-        // Usar instancia singleton para evitar bucle de reconexión
+        // Usar instancia singleton con UUID del dispositivo
         audioClient = NativeAudioClient.getInstance(getDeviceUUID())
+        
+        // Configurar callbacks
         audioClient.onAudioData = { audioData -> handleAudioData(audioData) }
         audioClient.onConnectionStatus = { connected, message ->
             updateConnectionStatus(connected, message)
@@ -369,35 +400,71 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 }
             }
         }
+        
+        // ✅ NUEVO: Callback para sincronización de controles desde servidor/web
+        audioClient.onControlSync = { update ->
+            handleControlSync(update)
+        }
+        
         // Solo conectar si no está conectado
         if (!audioClient.isConnected()) {
             connectToServer()
         } else {
-            // Si ya está conectado, solo actualiza la UI
             updateConnectionStatus(true, "ONLINE")
         }
 
-        // ✅ Crear renderer con el volumen correcto cargado desde preferencias
-        audioRenderer =
-                OboeAudioRenderer().apply {
-                    setMasterGain(masterVolumeDb)
-                    Log.d(TAG, "🔊 AudioRenderer inicializado con ganancia: $masterVolumeDb dB")
-                }
+        // Crear renderer con el volumen cargado desde preferencias
+        audioRenderer = OboeAudioRenderer.getInstance(this).apply {
+            setMasterGain(masterVolumeDb)
+            Log.d(TAG, "🔊 AudioRenderer inicializado con ganancia: $masterVolumeDb dB")
+        }
 
-        // Ahora sí, seguro llamar a handleHeadsetConnection
+        // Verificar estado de auriculares
         handleHeadsetConnection(isHeadphonesConnected())
+    }
+    
+    /**
+     * ✅ NUEVO: Manejar sincronización de controles desde servidor/web
+     * Actualiza UI sin disparar callbacks al servidor (evita loops)
+     */
+    private fun handleControlSync(update: NativeAudioClient.ControlUpdate) {
+        runOnUiThread {
+            val channel = update.channel
+            if (channel < 0) return@runOnUiThread
+            
+            val view = channelViews[channel] ?: return@runOnUiThread
+            
+            // Actualizar desde servidor (fromServer=true evita loops)
+            update.active?.let { active ->
+                view.activateChannel(active, fromServer = true)
+                audioRenderer.setChannelActive(channel, active)
+                if (active) activeChannelsLocal.add(channel) else activeChannelsLocal.remove(channel)
+            }
+            
+            update.gain?.let { gain ->
+                val gainDb = (20f * kotlin.math.log10(gain.coerceAtLeast(0.0001f))).coerceIn(-60f, 12f)
+                view.setGainDb(gainDb, fromServer = true)
+                audioRenderer.updateChannelGain(channel, gainDb)
+            }
+            
+            update.pan?.let { pan ->
+                view.setPanValue(pan, fromServer = true)
+                audioRenderer.updateChannelPan(channel, pan)
+            }
+            
+            Log.d(TAG, "🔄 Control sync: ch=$channel, source=${update.source}")
+        }
     }
 
     private fun applyMixState(mixState: NativeAudioClient.MixState) {
         try {
-            // Activación de canales: apagar los que no estén en la lista
             val activeSet = mixState.channels.toSet()
 
-            // Mantener copia local (para cuando el usuario toque ON/OFF)
+            // Actualizar copia local
             activeChannelsLocal.clear()
             activeChannelsLocal.addAll(activeSet)
 
-            // Por seguridad, aplicamos a un rango razonable (0..31)
+            // Aplicar a renderer
             for (ch in 0 until 32) {
                 audioRenderer.setChannelActive(ch, activeSet.contains(ch))
             }
@@ -414,32 +481,34 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 audioRenderer.updateChannelPan(ch, pan.coerceIn(-1f, 1f))
             }
 
-            // Mute: si está muteado, forzamos ganancia mínima
+            // Mute
             mixState.mutes.forEach { (ch, muted) ->
                 if (muted) {
                     audioRenderer.updateChannelGain(ch, -60f)
                 }
             }
 
-            // UI: reflejar estado en la consola si existe
+            // ✅ UI: reflejar estado en la consola (fromServer=true evita loops)
             runOnUiThread {
                 channelViews.forEach { (ch, view) ->
                     val isOn = activeSet.contains(ch)
-                    view.activateChannel(isOn)
+                    view.activateChannel(isOn, fromServer = true)
 
                     val linear = mixState.gains[ch]
                     if (linear != null) {
                         val safe = if (linear <= 0f) 0.0001f else linear
                         val gainDb = (20f * kotlin.math.log10(safe)).coerceIn(-60f, 12f)
-                        view.setGainDb(gainDb)
+                        view.setGainDb(gainDb, fromServer = true)
                     }
 
                     val pan = mixState.pans[ch]
                     if (pan != null) {
-                        view.setPanValue(pan.coerceIn(-1f, 1f))
+                        view.setPanValue(pan.coerceIn(-1f, 1f), fromServer = true)
                     }
                 }
             }
+            
+            Log.d(TAG, "✅ MixState aplicado: ${activeSet.size} canales activos")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error aplicando mix_state: ${e.message}")
         }
@@ -450,9 +519,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         prefs.edit().apply {
-            putString(KEY_LAST_IP, ipEditText.text.toString())
+            putString(KEY_LAST_IP, ipEditText?.text.toString())
 
-            putString(KEY_LAST_PORT, portEditText.text.toString())
+            putString(KEY_LAST_PORT, portEditText?.text.toString())
 
             putFloat(KEY_MASTER_VOLUME, masterVolumeDb)
 
@@ -474,12 +543,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         if (!lastIp.isNullOrEmpty()) {
 
-            ipEditText.setText(lastIp)
+            ipEditText?.setText(lastIp)
         }
 
         if (!lastPort.isNullOrEmpty()) {
 
-            portEditText.setText(lastPort)
+            portEditText?.setText(lastPort)
         }
 
         // Establecer masterVolumeDb primero (sin listener configurado aún)
@@ -487,13 +556,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         // Actualizar SeekBar sin disparar el listener (se configura después en
         // setupVolumeSeekBarListener)
-        masterVolumeSeekBar.setProgress(
-                (savedVolume + 60).toInt(),
-                false
+        masterVolumeSeekBar?.setProgress(
+            (savedVolume + 60).toInt(),
+            false
         ) // false = no dispara listener
 
         // Actualizar el texto de volumen
-        masterVolumeText.text = String.format("%.0f dB", savedVolume)
+        masterVolumeText?.text = String.format("%.0f dB", savedVolume)
 
         Log.d(TAG, "📂 Sesión cargada - Volumen: $savedVolume dB")
     }
@@ -506,16 +575,16 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             audioRenderer.setMasterGain(-60f)
 
-            muteButton.text = "🔇 Audio OFF"
+            muteButton?.text = "🔇 Audio OFF"
 
-            muteButton.setBackgroundColor(getColor(android.R.color.holo_red_dark))
+            muteButton?.setBackgroundColor(getColor(android.R.color.holo_red_dark))
         } else {
 
             audioRenderer.setMasterGain(masterVolumeDb)
 
-            muteButton.text = "🔊 Audio ON"
+            muteButton?.text = "🔊 Audio ON"
 
-            muteButton.setBackgroundColor(getColor(android.R.color.holo_green_dark))
+            muteButton?.setBackgroundColor(getColor(android.R.color.holo_green_dark))
         }
         if (!isMuted) {
             wasMutedByHeadphoneLoss = false
@@ -531,7 +600,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             return
         }
 
-        val serverIp = ipEditText.text.toString().trim()
+        val serverIp = ipEditText?.text.toString().trim()
 
         if (serverIp.isEmpty()) {
 
@@ -540,17 +609,17 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             return
         }
 
-        val serverPort = portEditText.text.toString().toIntOrNull() ?: 5101
+        val serverPort = portEditText?.text.toString().toIntOrNull() ?: 5101
 
         Log.d(TAG, "🔌 Conectando a $serverIp:$serverPort...")
 
         isConnecting = true
 
-        connectButton.isEnabled = false
+        connectButton?.isEnabled = false
 
-        connectButton.text = "🔄 Conectando..."
+        connectButton?.text = "🔄 Conectando..."
 
-        statusText.text = "🔄 Buscando señal..."
+        statusText?.text = "🔄 Buscando señal..."
 
         lifecycleScope.launch {
             try {
@@ -575,9 +644,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     isConnecting = false
 
-                    connectButton.isEnabled = true
+                    connectButton?.isEnabled = true
 
-                    connectButton.text = if (isConnected) "🔴 Desconectar" else "⚫ Conectar"
+                    connectButton?.text = if (isConnected) "🔴 Desconectar" else "⚫ Conectar"
                 }
             }
         }
@@ -590,9 +659,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             if (webControlled) {
 
-                webControlText.text = "🌐 Control desde WEB ✅"
+                webControlText?.text = "🌐 Control desde WEB ✅"
 
-                webControlText.setTextColor(getColor(android.R.color.holo_green_light))
+                webControlText?.setTextColor(getColor(android.R.color.holo_green_light))
             }
 
             // ✅ NUEVO: Mostrar versión del servidor
@@ -601,26 +670,30 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             if (serverVersion != null) {
 
-                infoText.text =
-                        "• Servidor: $serverVersion\n" +
-                                "• Canales gestionados desde WEB\n" +
-                                "• Auto-recreación de streams: HABILITADA\n" +
-                                "• Mantén presionado la latencia para recrear streams"
+                infoText?.text =
+                    "• Servidor: $serverVersion\n" +
+                            "• Canales gestionados desde WEB\n" +
+                            "• Auto-recreación de streams: HABILITADA\n" +
+                            "• Mantén presionado la latencia para recrear streams"
             }
 
             val maxChannels =
-                    when (val v = info["max_channels"]) {
-                        is Number -> v.toInt()
-                        is String -> v.toIntOrNull()
-                        else -> null
-                    }
-                            ?: 8
+                when (val v = info["max_channels"]) {
+                    is Number -> v.toInt()
+                    is String -> v.toIntOrNull()
+                    else -> null
+                }
+                    ?: 8
+
+            // Guardar el último valor conocido para poder poblar la consola al rotar
+            lastKnownMaxChannels = maxChannels
+
             ensureChannelConsole(maxChannels)
         }
     }
 
     private fun ensureChannelConsole(maxChannels: Int) {
-        if (!::channelStripContainer.isInitialized) return
+        if (channelStripContainer == null) return
 
         val count = maxChannels.coerceIn(1, 32)
 
@@ -628,7 +701,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             return
         }
 
-        channelStripContainer.removeAllViews()
+        channelStripContainer?.removeAllViews()
         channelViews.clear()
 
         val density = resources.displayMetrics.density
@@ -701,7 +774,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             lp.marginEnd = gapPx
             view.layoutParams = lp
 
-            channelStripContainer.addView(view)
+            channelStripContainer?.addView(view)
             channelViews[ch] = view
         }
     }
@@ -758,24 +831,24 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             if (connected) {
 
-                statusText.text = "🔴 $message"
+                statusText?.text = "🔴 $message"
 
-                statusText.setTextColor(getColor(android.R.color.holo_green_light))
+                statusText?.setTextColor(getColor(android.R.color.holo_green_light))
 
-                connectButton.text = "🔴 Desconectar"
+                connectButton?.text = "🔴 Desconectar"
 
-                connectButton.setBackgroundColor(getColor(android.R.color.holo_green_dark))
+                connectButton?.setBackgroundColor(getColor(android.R.color.holo_green_dark))
 
                 updateServiceNotification("📡 Fichatech Server", "Monitor de audio: transmitiendo")
             } else {
 
-                statusText.text = message
+                statusText?.text = message
 
-                statusText.setTextColor(getColor(android.R.color.holo_orange_light))
+                statusText?.setTextColor(getColor(android.R.color.holo_orange_light))
 
-                connectButton.text = "⚫ Conectar"
+                connectButton?.text = "⚫ Conectar"
 
-                connectButton.setBackgroundColor(getColor(android.R.color.holo_red_light))
+                connectButton?.setBackgroundColor(getColor(android.R.color.holo_red_light))
 
                 updateServiceNotification("Buscando señal", message)
             }
@@ -789,9 +862,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         stopForegroundService()
 
         runOnUiThread {
-            statusText.text = "⚫ OFFLINE"
+            statusText?.text = "⚫ OFFLINE"
 
-            connectButton.text = "Conectar"
+            connectButton?.text = "Conectar"
 
             saveSessionPreferences()
         }
@@ -802,9 +875,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         try {
 
             val serviceIntent =
-                    Intent(this, AudioStreamForegroundService::class.java).apply {
-                        action = AudioStreamForegroundService.ACTION_START
-                    }
+                Intent(this, AudioStreamForegroundService::class.java).apply {
+                    action = AudioStreamForegroundService.ACTION_START
+                }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
@@ -849,61 +922,61 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun startMetricsUpdates() {
 
         metricsUpdateRunnable =
-                object : Runnable {
+            object : Runnable {
 
-                    override fun run() {
+                override fun run() {
 
-                        runOnUiThread {
-                            if (isFinishing || isDestroyed) {
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) {
 
-                                stopMetricsUpdates()
+                            stopMetricsUpdates()
 
-                                return@runOnUiThread
-                            }
-
-                            if (isConnected) {
-
-                                val latency = audioRenderer.getLatencyMs()
-
-                                latencyText.text = "${latency.toInt()} ms"
-
-                                latencyText.setTextColor(
-                                        when {
-                                            latency < 15 ->
-                                                    getColor(android.R.color.holo_green_light)
-                                            latency < 30 ->
-                                                    getColor(android.R.color.holo_orange_light)
-                                            else -> getColor(android.R.color.holo_red_light)
-                                        }
-                                )
-
-                                // rfStatusText.text = audioClient.getRFStatus() // eliminado
-
-                                // ✅ NUEVO: Detectar si hay streams con fallos
-
-                                val stats = audioRenderer.getRFStats()
-
-                                val totalFailures = stats["total_failures"] as? Int ?: 0
-
-                                if (totalFailures > 5) {
-
-                                    statusText.text = "⚠️ Streams con errores (long press latencia)"
-
-                                    statusText.setTextColor(
-                                            getColor(android.R.color.holo_orange_light)
-                                    )
-                                }
-                            } else {
-
-                                latencyText.text = "-- ms"
-
-                                // rfStatusText.text = audioClient.getRFStatus() // eliminado
-                            }
+                            return@runOnUiThread
                         }
 
-                        uiHandler.postDelayed(this, 100)
+                        if (isConnected) {
+
+                            val latency = audioRenderer.getLatencyMs()
+
+                            latencyText?.text = "${latency.toInt()} ms"
+
+                            latencyText?.setTextColor(
+                                when {
+                                    latency < 15 ->
+                                        getColor(android.R.color.holo_green_light)
+                                    latency < 30 ->
+                                        getColor(android.R.color.holo_orange_light)
+                                    else -> getColor(android.R.color.holo_red_light)
+                                }
+                            )
+
+                            // rfStatusText.text = audioClient.getRFStatus() // eliminado
+
+                            // ✅ NUEVO: Detectar si hay streams con fallos
+
+                            val stats = audioRenderer.getRFStats()
+
+                            val totalFailures = stats["total_failures"] as? Int ?: 0
+
+                            if (totalFailures > 5) {
+
+                                statusText?.text = "⚠️ Streams con errores (long press latencia)"
+
+                                statusText?.setTextColor(
+                                    getColor(android.R.color.holo_orange_light)
+                                )
+                            }
+                        } else {
+
+                            latencyText?.text = "-- ms"
+
+                            // rfStatusText.text = audioClient.getRFStatus() // eliminado
+                        }
                     }
+
+                    uiHandler.postDelayed(this, 100)
                 }
+            }
 
         uiHandler.post(metricsUpdateRunnable!!)
     }
@@ -952,21 +1025,21 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(
-                    monitorReceiver,
-                    IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
-                    Context.RECEIVER_NOT_EXPORTED
+                monitorReceiver,
+                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
+                Context.RECEIVER_NOT_EXPORTED
             )
         } else {
             registerReceiver(
-                    monitorReceiver,
-                    IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
+                monitorReceiver,
+                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
             )
         }
         val headphoneFilter =
-                IntentFilter().apply {
-                    addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
-                    addAction(Intent.ACTION_HEADSET_PLUG)
-                }
+            IntentFilter().apply {
+                addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+                addAction(Intent.ACTION_HEADSET_PLUG)
+            }
         registerReceiver(headphoneReceiver, headphoneFilter)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -1013,16 +1086,16 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                     view,
                     windowInsets ->
                 val sysBarInsets =
-                        windowInsets.getInsets(
-                                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
-                                        androidx.core.view.WindowInsetsCompat.Type.displayCutout()
-                        )
+                    windowInsets.getInsets(
+                        androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                                androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+                    )
                 // Padding inferior igual a la barra de navegación
                 view.setPadding(
-                        view.paddingLeft,
-                        sysBarInsets.top,
-                        view.paddingRight,
-                        sysBarInsets.bottom
+                    view.paddingLeft,
+                    sysBarInsets.top,
+                    view.paddingRight,
+                    sysBarInsets.bottom
                 )
                 windowInsets
             }
@@ -1033,15 +1106,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (!::audioManager.isInitialized) return false
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val headphoneTypes =
-                    setOf(
-                            AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-                            AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                            AudioDeviceInfo.TYPE_USB_HEADSET,
-                            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                            AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-                            AudioDeviceInfo.TYPE_USB_DEVICE,
-                            AudioDeviceInfo.TYPE_USB_ACCESSORY
-                    )
+                setOf(
+                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    AudioDeviceInfo.TYPE_USB_HEADSET,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_USB_DEVICE,
+                    AudioDeviceInfo.TYPE_USB_ACCESSORY
+                )
             audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
                 it.type in headphoneTypes
             }
@@ -1050,3 +1123,4 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         }
     }
 }
+

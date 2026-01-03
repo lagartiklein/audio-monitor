@@ -757,6 +757,47 @@ class NativeAudioServer:
         except Exception as e:
             if config.DEBUG:
                 logger.error(f"Error notificando web: {e}")
+    
+    def broadcast_control_update(self, channel: int, source: str, gain: float = None, pan: float = None, active: bool = None, mute: bool = None):
+        """
+        ✅ NUEVO: Propagar cambio de control a todos los clientes nativos conectados
+        Usado cuando web UI cambia un control y necesitamos sincronizar Android
+        """
+        try:
+            control_data = {
+                'type': 'control_update',
+                'source': source,
+                'channel': channel,
+                'timestamp': int(time.time() * 1000)
+            }
+            
+            if gain is not None:
+                control_data['gain'] = gain
+            if pan is not None:
+                control_data['pan'] = pan
+            if active is not None:
+                control_data['active'] = active
+            if mute is not None:
+                control_data['mute'] = mute
+            
+            packet = NativeAndroidProtocol.create_control_packet('control_update', control_data, True)
+            if not packet:
+                return
+            
+            with self.client_lock:
+                for client_id, client in list(self.clients.items()):
+                    if client.status == 1 and client.is_alive():
+                        try:
+                            client.send_bytes_direct(packet)
+                        except Exception as e:
+                            if config.DEBUG:
+                                logger.debug(f"Error enviando control_update a {client_id[:12]}: {e}")
+            
+            logger.debug(f"📢 Control broadcast: ch={channel}, source={source}")
+            
+        except Exception as e:
+            if config.DEBUG:
+                logger.error(f"Error en broadcast_control_update: {e}")
 
     def push_mix_state_to_client(self, client_id: str) -> bool:
         """Enviar el estado de mezcla actual a un cliente nativo conectado."""

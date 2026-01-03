@@ -56,7 +56,7 @@ add_library(
 target_include_directories(
         fichatech_audio
         PRIVATE
-        "../../../../../../../../../audio-monitor/kotlin android"
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Flags de compilación específicos para el target

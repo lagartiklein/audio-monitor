@@ -100,7 +100,8 @@ class AudioStreamForegroundService : Service() {
         Log.d(TAG, "🎵 Servicio de streaming creado")
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
-        oboeAudioRenderer = OboeAudioRenderer()
+        // ✅ Usar singleton para compartir instancia con activity
+        oboeAudioRenderer = OboeAudioRenderer.getInstance(this)
         monitorHandler.post(monitorRunnable)
     }
 
