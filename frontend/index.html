@@ -57,6 +57,18 @@
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(88, 166, 255, 0.35), transparent);
+            pointer-events: none;
         }
 
         .logo {
@@ -130,7 +142,7 @@
             padding: 12px;
             margin-bottom: 8px;
             cursor: pointer;
-            transition: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
             position: relative;
             user-select: none;
             cursor: grab;
@@ -139,6 +151,7 @@
         .client-item:hover {
             border-color: var(--accent);
             box-shadow: 0 0 8px rgba(88, 166, 255, 0.2);
+            transform: translateY(-1px);
         }
 
         .client-item.dragging {
@@ -314,6 +327,11 @@
             transition: all 0.15s ease;
         }
 
+        .btn:focus-visible {
+            outline: 2px solid rgba(88, 166, 255, 0.6);
+            outline-offset: 2px;
+        }
+
         .btn:hover {
             background: var(--accent-dark);
             border-color: var(--accent);
@@ -352,6 +370,10 @@
             align-items: center;
             gap: 10px;
             transition: all 0.15s ease;
+        }
+
+        .channel-strip:hover {
+            transform: translateY(-1px);
         }
 
         .channel-strip:hover {
@@ -601,6 +623,10 @@
             outline: none;
         }
 
+        .name-input:focus {
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
@@ -694,6 +720,7 @@
                 this.draggedClientId = null;
                 this.inactivityTimeouts = {}; // Track timeouts per client
                 this.inactivityThreshold = 5 * 60 * 1000; // 5 minutes
+                this.editingClientId = null; // Track inline name edits
                 this.init();
             }
 
@@ -709,8 +736,207 @@
             }
 
             init() {
+                // Restore preferred client order from localStorage (persistent across reloads)
+                try {
+                    const saved = JSON.parse(localStorage.getItem('client_order') || '[]');
+                    if (Array.isArray(saved)) {
+                        this.clientOrder = saved.filter(v => typeof v === 'string' || typeof v === 'number');
+                    }
+                } catch {
+                    this.clientOrder = [];
+                }
                 this.connectWebSocket();
                 this.setupEventListeners();
+            }
+
+            getClientId(client) {
+                // Server uses device_uuid as stable id; fall back to id.
+                return (client && (client.device_uuid || client.id)) ?? null;
+            }
+
+            getClientNameStorageKey(client) {
+                const id = this.getClientId(client);
+                return id ? `client_custom_name_${id}` : null;
+            }
+
+            getDisplayName(client) {
+                const serverName = client?.custom_name;
+                const fallbackName = client?.device_name || (client?.type === 'native' ? 'Android' : 'Web Client');
+                // Only use localStorage as fallback when server has no custom_name
+                const key = this.getClientNameStorageKey(client);
+                const localName = key ? localStorage.getItem(key) : null;
+                return (serverName && String(serverName).trim()) || (localName && String(localName).trim()) || fallbackName;
+            }
+
+            syncClientOrderWith(clientsData) {
+                const ids = clientsData.map(c => this.getClientId(c)).filter(Boolean);
+
+                // Initialize from saved order if available; otherwise derive from current list
+                if (!this.clientOrder || this.clientOrder.length === 0) {
+                    this.clientOrder = [...ids];
+                }
+
+                // Add missing clients to end
+                for (const id of ids) {
+                    if (!this.clientOrder.includes(id)) this.clientOrder.push(id);
+                }
+
+                // Remove ids no longer present
+                this.clientOrder = this.clientOrder.filter(id => ids.includes(id));
+
+                // Persist local fallback; server is authoritative when it provides order
+                try {
+                    localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                } catch {
+                    // ignore
+                }
+            }
+
+            orderClients(clientsData) {
+                const byId = new Map();
+                for (const c of clientsData) {
+                    const id = this.getClientId(c);
+                    if (id) byId.set(id, c);
+                }
+                const ordered = [];
+                for (const id of this.clientOrder) {
+                    const c = byId.get(id);
+                    if (c) ordered.push(c);
+                }
+                // Any leftover (should be none after sync) appended
+                for (const c of clientsData) {
+                    const id = this.getClientId(c);
+                    if (id && !this.clientOrder.includes(id)) ordered.push(c);
+                }
+                return ordered;
+            }
+
+            createClientItem(client) {
+                const item = document.createElement('div');
+                item.className = `client-item ${client.type || 'web'}`;
+
+                const id = this.getClientId(client);
+                item.dataset.clientId = id;
+
+                if (this.selectedClientId === id) {
+                    item.classList.add('selected');
+                }
+                if (client.connected === false) {
+                    item.classList.add('disconnected');
+                }
+
+                const typeIcon = client.type === 'native' ? '📱' : '🌐';
+                const displayName = this.getDisplayName(client);
+
+                item.innerHTML = `
+                        <div class="client-header">
+                            <div class="client-name">
+                                <span>${typeIcon}</span>
+                                <span class="client-name-text" title="${displayName}">${displayName}</span>
+                                <button class="edit-name-btn" title="Editar nombre">✏️</button>
+                            </div>
+                        </div>
+                        <div class="client-info">
+                            ${client.active_channels || 0} canales activos
+                        </div>
+                        <div class="client-badges">
+                            ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
+                            ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
+                        </div>
+                    `;
+
+                // Click to select
+                item.addEventListener('click', (e) => {
+                    if (item.dataset.editing === '1') return;
+                    if (!e.target.classList.contains('edit-name-btn')) {
+                        this.selectClient(id);
+                        this.resetClientInactivityTimer(id);
+                    }
+                });
+
+                // Edit name button
+                const editBtn = item.querySelector('.edit-name-btn');
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (item.dataset.editing === '1') return;
+                    this.editClientName(id, displayName, item);
+                    this.resetClientInactivityTimer(id);
+                });
+
+                // Drag and drop events
+                item.draggable = true;
+
+                item.addEventListener('dragstart', (e) => {
+                    if (item.dataset.editing === '1') {
+                        e.preventDefault();
+                        return;
+                    }
+                    this.draggedElement = item;
+                    this.draggedClientId = id;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                item.addEventListener('dragend', () => {
+                    document.querySelectorAll('.client-item').forEach(el => {
+                        el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
+                    });
+                    this.draggedElement = null;
+                    this.draggedClientId = null;
+                });
+
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (item === this.draggedElement) return;
+
+                    const rect = item.getBoundingClientRect();
+                    const midpoint = rect.top + rect.height / 2;
+
+                    document.querySelectorAll('.client-item').forEach(el => {
+                        el.classList.remove('drag-over-top', 'drag-over-bottom');
+                    });
+
+                    if (e.clientY < midpoint) {
+                        item.classList.add('drag-over-top');
+                    } else {
+                        item.classList.add('drag-over-bottom');
+                    }
+                    e.dataTransfer.dropEffect = 'move';
+                });
+
+                item.addEventListener('dragleave', () => {
+                    item.classList.remove('drag-over-top', 'drag-over-bottom');
+                });
+
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (item === this.draggedElement) return;
+
+                    const draggedIndex = this.clientOrder.indexOf(this.draggedClientId);
+                    const targetIndex = this.clientOrder.indexOf(id);
+                    if (draggedIndex === -1 || targetIndex === -1) return;
+
+                    // Swap in order
+                    [this.clientOrder[draggedIndex], this.clientOrder[targetIndex]] =
+                        [this.clientOrder[targetIndex], this.clientOrder[draggedIndex]];
+
+                    // Persist locally as fallback
+                    try {
+                        localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                    } catch {
+                        // ignore
+                    }
+
+                    // Emit to server for global sync (authoritative)
+                    if (this.socket && this.socket.connected) {
+                        this.socket.emit('set_client_order', { order: this.clientOrder });
+                    }
+
+                    // Re-render immediately (server update will also arrive)
+                    this.updateClientsList(Object.values(this.clients));
+                });
+
+                return item;
             }
 
             connectWebSocket() {
@@ -758,11 +984,56 @@
                 });
 
                 this.socket.on('clients_update', (data) => {
+                    const prevSelected = this.selectedClientId ? this.clients[this.selectedClientId] : null;
+                    if (data && Array.isArray(data.order)) {
+                        this.clientOrder = data.order;
+                        try {
+                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                        } catch {
+                            // ignore
+                        }
+                    }
                     this.updateClientsList(data.clients);
+
+                    // If selected client's mix changed (from another controller), refresh mixer UI.
+                    if (!this.editingClientId && this.selectedClientId) {
+                        const nextSelected = this.clients[this.selectedClientId];
+                        if (prevSelected && nextSelected && this.mixStateSignature(prevSelected) !== this.mixStateSignature(nextSelected)) {
+                            this.renderMixer(this.selectedClientId);
+                        }
+                    }
                 });
 
                 this.socket.on('clients_list', (data) => {
+                    const prevSelected = this.selectedClientId ? this.clients[this.selectedClientId] : null;
+                    if (data && Array.isArray(data.order)) {
+                        this.clientOrder = data.order;
+                        try {
+                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                        } catch {
+                            // ignore
+                        }
+                    }
                     this.updateClientsList(data.clients);
+
+                    if (!this.editingClientId && this.selectedClientId) {
+                        const nextSelected = this.clients[this.selectedClientId];
+                        if (prevSelected && nextSelected && this.mixStateSignature(prevSelected) !== this.mixStateSignature(nextSelected)) {
+                            this.renderMixer(this.selectedClientId);
+                        }
+                    }
+                });
+
+                this.socket.on('client_order_saved', (data) => {
+                    if (data && Array.isArray(data.order)) {
+                        this.clientOrder = data.order;
+                        try {
+                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                        } catch {
+                            // ignore
+                        }
+                        this.updateClientsList(Object.values(this.clients));
+                    }
                 });
 
                 this.socket.on('mix_updated', (data) => {
@@ -788,6 +1059,31 @@
                     badge.textContent = 'Desconectado';
                     badge.classList.add('disconnected');
                 }
+            }
+
+            mixStateSignature(client) {
+                const channels = Array.isArray(client.channels) ? [...client.channels].sort((a, b) => a - b) : [];
+                const gains = client.gains || {};
+                const pans = client.pans || {};
+                const mutes = client.mutes || {};
+                const solos = Array.isArray(client.solos) ? [...client.solos].sort((a, b) => a - b) : [];
+                const pre = client.pre_listen ?? null;
+
+                const keys = (obj) => Object.keys(obj).sort();
+                const pickSorted = (obj) => {
+                    const out = {};
+                    for (const k of keys(obj)) out[k] = obj[k];
+                    return out;
+                };
+
+                return JSON.stringify({
+                    channels,
+                    gains: pickSorted(gains),
+                    pans: pickSorted(pans),
+                    mutes: pickSorted(mutes),
+                    solos,
+                    pre,
+                });
             }
 
             setupEventListeners() {
@@ -817,52 +1113,57 @@
                     return;
                 }
 
-                // First time setup - initialize order
-                if (this.clientOrder.length === 0) {
-                    this.clientOrder = clientsData.map(c => c.id);
-                    localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
-                }
+                this.syncClientOrderWith(clientsData);
+                const orderedClients = this.orderClients(clientsData);
 
-                // Check for new clients and add them to the end
-                const newClients = clientsData.filter(c => !this.clientOrder.includes(c.id));
-                if (newClients.length > 0) {
-                    newClients.forEach(client => {
-                        this.clientOrder.push(client.id);
+                // Update local cache (keyed by stable id)
+                orderedClients.forEach(client => {
+                    const id = this.getClientId(client);
+                    if (!id) return;
+                    this.clients[id] = client;
+                });
+
+                // Rebuild list in desired order using existing nodes when possible.
+                // Avoid breaking an active inline edit.
+                if (this.editingClientId) {
+                    // Still update data for non-editing items
+                    orderedClients.forEach(client => {
+                        const id = this.getClientId(client);
+                        if (!id || id === this.editingClientId) return;
+                        const existingItem = document.querySelector(`.client-item[data-client-id="${id}"]`);
+                        if (existingItem) this.updateClientItemUI(existingItem, client);
                     });
-                    localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                    return;
                 }
 
-                // Remove disconnected clients from order
-                this.clientOrder = this.clientOrder.filter(id => 
-                    clientsData.some(c => c.id === id)
-                );
-
-                // If container is empty, rebuild it (first render or after clearing)
-                if (container.innerHTML === '' || container.innerHTML.includes('no-clients')) {
-                    container.innerHTML = '';
-                    this.renderClientsList(clientsData, container);
-                } else {
-                    // Update existing clients data without changing DOM order
-                    clientsData.forEach(client => {
-                        const storageKey = `client_custom_name_${client.id}`;
-                        const savedName = localStorage.getItem(storageKey);
-                        if (savedName) {
-                            client.custom_name = savedName;
-                        }
-                        this.clients[client.id] = client;
-
-                        // Update the existing card's info if it exists
-                        const existingItem = document.querySelector(`.client-item[data-client-id="${client.id}"]`);
-                        if (existingItem) {
-                            this.updateClientItemUI(existingItem, client);
-                        }
-                    });
+                const fragment = document.createDocumentFragment();
+                for (const client of orderedClients) {
+                    const id = this.getClientId(client);
+                    if (!id) continue;
+                    let item = container.querySelector(`.client-item[data-client-id="${id}"]`);
+                    const isNewItem = !item;
+                    if (!item) {
+                        item = this.createClientItem(client);
+                    } else {
+                        // ensure class reflects type
+                        item.classList.remove('native', 'web');
+                        item.classList.add(client.type || 'web');
+                    }
+                    this.updateClientItemUI(item, client);
+                    if (this.selectedClientId === id) item.classList.add('selected');
+                    fragment.appendChild(item);
+                    if (isNewItem) {
+                        // Start inactivity timer only on first appearance; user interaction resets it.
+                        this.resetClientInactivityTimer(id);
+                    }
                 }
+
+                container.innerHTML = '';
+                container.appendChild(fragment);
             }
 
             updateClientItemUI(itemElement, client) {
-                const displayName = client.custom_name || client.device_name || 
-                    (client.type === 'native' ? 'Android' : 'Web Client');
+                const displayName = this.getDisplayName(client);
 
                 // Update info and badges only
                 const infoEl = itemElement.querySelector('.client-info');
@@ -894,140 +1195,12 @@
             }
 
             renderClientsList(clientsData, container) {
-                clientsData.forEach(client => {
-                    // Load custom name from localStorage
-                    const storageKey = `client_custom_name_${client.id}`;
-                    const savedName = localStorage.getItem(storageKey);
-                    if (savedName) {
-                        client.custom_name = savedName;
-                    }
-                    this.clients[client.id] = client;
-
-                    const item = document.createElement('div');
-                    item.className = `client-item ${client.type || 'web'}`;
-                    
-                    if (this.selectedClientId === client.id) {
-                        item.classList.add('selected');
-                    }
-                    if (client.connected === false) {
-                        item.classList.add('disconnected');
-                    }
-
-                    const displayName = client.custom_name || client.device_name || 
-                        (client.type === 'native' ? 'Android' : 'Web Client');
-                    const typeIcon = client.type === 'native' ? '📱' : '🌐';
-
-                    item.innerHTML = `
-                        <div class="client-header">
-                            <div class="client-name">
-                                <span>${typeIcon}</span>
-                                <span class="client-name-text" title="${displayName}">${displayName}</span>
-                                <button class="edit-name-btn" title="Editar nombre">✏️</button>
-                            </div>
-                        </div>
-                        <div class="client-info">
-                            ${client.active_channels || 0} canales activos
-                        </div>
-                        <div class="client-badges">
-                            ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
-                            ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
-                        </div>
-                    `;
-
-                    // Click to select
-                    item.addEventListener('click', (e) => {
-                        if (!e.target.classList.contains('edit-name-btn')) {
-                            this.selectClient(client.id);
-                            this.resetClientInactivityTimer(client.id);
-                        }
-                    });
-
-                    // Edit name button
-                    const editBtn = item.querySelector('.edit-name-btn');
-                    editBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.editClientName(client.id, displayName, item);
-                        this.resetClientInactivityTimer(client.id);
-                    });
-
-                    // Drag and drop events
-                    item.draggable = true;
-                    item.dataset.clientId = client.id;
-
-                    item.addEventListener('dragstart', (e) => {
-                        this.draggedElement = item;
-                        this.draggedClientId = client.id;
-                        item.classList.add('dragging');
-                        e.dataTransfer.effectAllowed = 'move';
-                    });
-
-                    item.addEventListener('dragend', (e) => {
-                        document.querySelectorAll('.client-item').forEach(el => {
-                            el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
-                        });
-                        this.draggedElement = null;
-                        this.draggedClientId = null;
-                    });
-
-                    item.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        if (item === this.draggedElement) return;
-
-                        const rect = item.getBoundingClientRect();
-                        const midpoint = rect.top + rect.height / 2;
-                        
-                        document.querySelectorAll('.client-item').forEach(el => {
-                            el.classList.remove('drag-over-top', 'drag-over-bottom');
-                        });
-
-                        if (e.clientY < midpoint) {
-                            item.classList.add('drag-over-top');
-                        } else {
-                            item.classList.add('drag-over-bottom');
-                        }
-                        e.dataTransfer.dropEffect = 'move';
-                    });
-
-                    item.addEventListener('dragleave', (e) => {
-                        item.classList.remove('drag-over-top', 'drag-over-bottom');
-                    });
-
-                    item.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        if (item === this.draggedElement) return;
-
-                        const draggedIndex = this.clientOrder.indexOf(this.draggedClientId);
-                        const targetIndex = this.clientOrder.indexOf(client.id);
-
-                        if (draggedIndex !== -1 && targetIndex !== -1) {
-                            [this.clientOrder[draggedIndex], this.clientOrder[targetIndex]] = 
-                            [this.clientOrder[targetIndex], this.clientOrder[draggedIndex]];
-                            
-                            // Save order to localStorage
-                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
-                            
-                            // Get the container
-                            const container = document.getElementById('client-list');
-                            
-                            // Get both items
-                            const draggedItem = this.draggedElement;
-                            const targetItem = item;
-                            
-                            // Swap DOM nodes directly
-                            const draggedParent = draggedItem.parentNode;
-                            const targetParent = targetItem.parentNode;
-                            
-                            const temp = document.createTextNode('');
-                            draggedParent.insertBefore(temp, draggedItem);
-                            targetParent.insertBefore(draggedItem, targetItem);
-                            draggedParent.insertBefore(targetItem, temp);
-                            temp.parentNode.removeChild(temp);
-                        }
-                    });
-
-                    // Start inactivity timer
-                    this.resetClientInactivityTimer(client.id);
-
+                const ordered = this.orderClients(clientsData);
+                ordered.forEach(client => {
+                    const id = this.getClientId(client);
+                    if (!id) return;
+                    this.clients[id] = client;
+                    const item = this.createClientItem(client);
                     container.appendChild(item);
                 });
             }
@@ -1045,40 +1218,57 @@
                 // Hide name text and edit button
                 nameTextEl.style.display = 'none';
                 editBtn.style.display = 'none';
+                itemElement.dataset.editing = '1';
+                itemElement.draggable = false;
+                this.editingClientId = clientId;
                 
                 // Insert input after name text
                 nameTextEl.parentNode.insertBefore(input, nameTextEl.nextSibling);
                 input.focus();
                 input.select();
 
-                const saveName = () => {
+                const finishEdit = (save) => {
                     const newName = input.value.trim();
-                    if (newName && newName !== currentName) {
-                        // Save to localStorage
-                        localStorage.setItem(`client_custom_name_${clientId}`, newName);
-                        
-                        // Update local client
-                        if (this.clients[clientId]) {
-                            this.clients[clientId].custom_name = newName;
-                        }
-                        
-                        // Notify server
-                        this.socket.emit('set_client_name', {
-                            client_id: clientId,
-                            custom_name: newName
-                        });
+
+                    // Cleanup input + restore view
+                    try {
+                        input.remove();
+                    } catch {
+                        // ignore
                     }
-                    
-                    // Refresh list
+                    nameTextEl.style.display = '';
+                    editBtn.style.display = '';
+                    itemElement.dataset.editing = '0';
+                    itemElement.draggable = true;
+                    this.editingClientId = null;
+
+                    if (save) {
+                        if (newName && newName !== currentName) {
+                            // Save local fallback (only used if server doesn't have custom_name)
+                            localStorage.setItem(`client_custom_name_${clientId}`, newName);
+
+                            if (this.clients[clientId]) {
+                                this.clients[clientId].custom_name = newName;
+                            }
+
+                            // Notify server (authoritative)
+                            this.socket.emit('set_client_name', {
+                                client_id: clientId,
+                                custom_name: newName
+                            });
+                        }
+                    }
+
+                    // Refresh UI from current cache
                     this.updateClientsList(Object.values(this.clients));
                 };
 
-                input.addEventListener('blur', saveName);
+                input.addEventListener('blur', () => finishEdit(true));
                 input.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
                         input.blur();
                     } else if (e.key === 'Escape') {
-                        this.updateClientsList(Object.values(this.clients));
+                        finishEdit(false);
                     }
                 });
             }
@@ -1091,7 +1281,7 @@
                     item.classList.remove('selected');
                 });
                 
-                const selectedItem = document.querySelector(`.client-item:nth-child(${Object.keys(this.clients).indexOf(clientId) + 1})`);
+                const selectedItem = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
                 if (selectedItem) {
                     selectedItem.classList.add('selected');
                 }
@@ -1099,8 +1289,8 @@
                 // Update title
                 const client = this.clients[clientId];
                 if (client) {
-                    const displayName = client.custom_name || client.device_name || 'Cliente';
-                    document.getElementById('mixer-title').textContent = `${displayName} - ${client.active_channels || 0} canales`;
+                    const displayName = this.getDisplayName(client);
+                    document.getElementById('mixer-title-text').textContent = `${displayName} - ${client.active_channels || 0} canales`;
                 }
 
                 this.renderMixer(clientId);

@@ -167,6 +167,48 @@ class NativeClient:
             
             return self.send_bytes_direct(packet_bytes)
         return False
+
+    def send_mix_state(self, subscription: dict) -> bool:
+        """Enviar estado de mezcla al cliente nativo (control packet).
+
+        El Android renderer decide cómo aplicar (gain/pan/active).
+        """
+        try:
+            if not subscription or self.status == 0:
+                return False
+
+            channels = subscription.get('channels', []) or []
+            gains = subscription.get('gains', {}) or {}
+            pans = subscription.get('pans', {}) or {}
+            mutes = subscription.get('mutes', {}) or {}
+            pre_listen = subscription.get('pre_listen', None)
+            solos = list(subscription.get('solos', set()) or [])
+            master_gain = subscription.get('master_gain', 1.0)
+
+            payload = {
+                'channels': [int(ch) for ch in channels],
+                'gains': {str(int(k)): float(v) for k, v in gains.items()},
+                'pans': {str(int(k)): float(v) for k, v in pans.items()},
+                'mutes': {str(int(k)): bool(v) for k, v in mutes.items()},
+                'pre_listen': pre_listen,
+                'solos': [int(ch) for ch in solos],
+                'master_gain': float(master_gain),
+            }
+
+            packet = NativeAndroidProtocol.create_control_packet(
+                'mix_state',
+                payload,
+                self.rf_mode,
+            )
+            if not packet:
+                return False
+
+            return self.send_bytes_direct(packet)
+
+        except Exception as e:
+            if config.DEBUG:
+                logger.error(f"❌ Error enviando mix_state a {self.id[:15]}: {e}")
+            return False
     
     def close(self):
         """✅ IMPROVED: Cierre más robusto"""
@@ -618,6 +660,15 @@ class NativeAudioServer:
             
             if response:
                 client.send_bytes_direct(response)
+
+            # ✅ NUEVO: Enviar estado completo de mezcla para que el Android aplique
+            try:
+                subscription = self.channel_manager.get_client_subscription(persistent_id)
+                if subscription:
+                    client.send_mix_state(subscription)
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"mix_state send failed: {e}")
             
             self._notify_web_clients_update()
         
@@ -632,6 +683,72 @@ class NativeAudioServer:
             )
             if response:
                 client.send_bytes_direct(response)
+
+        elif msg_type == 'update_mix':
+            # ✅ Permitir que el cliente Android controle su propia mezcla (ON/gain/pan)
+            try:
+                persistent_id = getattr(client, 'persistent_id', None) or client.id
+
+                channels = message.get('channels')
+                gains = message.get('gains')
+                pans = message.get('pans')
+
+                def _int_keyed_map(m):
+                    if not isinstance(m, dict):
+                        return None
+                    out = {}
+                    for k, v in m.items():
+                        try:
+                            out[int(k)] = float(v)
+                        except Exception:
+                            continue
+                    return out
+
+                gains_int = _int_keyed_map(gains)
+                pans_int = _int_keyed_map(pans)
+
+                ok = self.channel_manager.update_client_mix(
+                    persistent_id,
+                    channels=channels,
+                    gains=gains_int,
+                    pans=pans_int,
+                )
+
+                if ok:
+                    # ✅ NUEVO: Persistir el estado para que sea global y durable (igual que en WebSocket)
+                    try:
+                        subscription = self.channel_manager.get_client_subscription(persistent_id)
+                        device_uuid = None
+                        if subscription:
+                            device_uuid = subscription.get('device_uuid') or persistent_id
+
+                        if device_uuid and getattr(self.channel_manager, 'device_registry', None):
+                            config_to_save = {
+                                'channels': subscription.get('channels', []) if subscription else [],
+                                'gains': subscription.get('gains', {}) if subscription else {},
+                                'pans': subscription.get('pans', {}) if subscription else {},
+                                'mutes': subscription.get('mutes', {}) if subscription else {},
+                                'solos': list(subscription.get('solos', set())) if subscription else [],
+                                'pre_listen': subscription.get('pre_listen') if subscription else None,
+                                'master_gain': subscription.get('master_gain', 1.0) if subscription else 1.0,
+                                'timestamp': int(time.time() * 1000)
+                            }
+                            self.channel_manager.device_registry.update_configuration(device_uuid, config_to_save)
+                    except Exception as e:
+                        if config.DEBUG:
+                            logger.debug(f"DeviceRegistry update (native update_mix) failed: {e}")
+
+                    # refrescar web y devolver estado al propio Android
+                    self._notify_web_clients_update()
+                    try:
+                        subscription = self.channel_manager.get_client_subscription(persistent_id)
+                        if subscription:
+                            client.send_mix_state(subscription)
+                    except Exception:
+                        pass
+            except Exception as e:
+                if config.DEBUG:
+                    logger.error(f"❌ update_mix error: {e}")
     
     def _notify_web_clients_update(self):
         try:
@@ -640,6 +757,23 @@ class NativeAudioServer:
         except Exception as e:
             if config.DEBUG:
                 logger.error(f"Error notificando web: {e}")
+
+    def push_mix_state_to_client(self, client_id: str) -> bool:
+        """Enviar el estado de mezcla actual a un cliente nativo conectado."""
+        try:
+            subscription = self.channel_manager.get_client_subscription(client_id)
+            if not subscription:
+                return False
+
+            with self.client_lock:
+                client = self.clients.get(client_id)
+                if not client:
+                    return False
+                return client.send_mix_state(subscription)
+        except Exception as e:
+            if config.DEBUG:
+                logger.error(f"❌ push_mix_state_to_client({client_id[:12]}) failed: {e}")
+            return False
     
     def on_audio_data(self, audio_data):
         """✅ IMPROVED: Envío con verificación de zombies"""

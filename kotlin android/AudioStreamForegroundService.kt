@@ -135,7 +135,7 @@ class AudioStreamForegroundService : Service() {
             // ✅ Crear notificación ANTES de startForeground()
             val notification = createNotification(
                 "🔴 Transmitiendo",
-                "Streaming de audio RF activo"
+                "Streaming de audio activo"
             )
 
             // ✅ Iniciar foreground con tipo específico (requerido Android 14+)
@@ -305,12 +305,34 @@ class AudioStreamForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // ✅ NUEVO: Intent para pausar/reanudar
+        val pauseIntent = Intent(this, AudioStreamForegroundService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val pausePendingIntent = PendingIntent.getService(
+            this, 2, pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(message)
             .setSmallIcon(R.drawable.logooficialdemo) // Tu icono de app
             .setOngoing(true) // No se puede deslizar para cerrar
             .setContentIntent(openPendingIntent)
+            // ✅ NUEVO: Acción "Volver a la App"
+            .addAction(
+                android.R.drawable.ic_menu_view,
+                "Volver",
+                openPendingIntent
+            )
+            // ✅ Acción "Pausar"
+            .addAction(
+                android.R.drawable.ic_media_pause,
+                "Pausar",
+                pausePendingIntent
+            )
+            // ✅ Acción "Desconectar"
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "Desconectar",

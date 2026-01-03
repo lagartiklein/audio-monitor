@@ -23,7 +23,7 @@ DEFAULT_SAMPLE_RATE = 48000  # Tasa de muestreo por defecto
 DEFAULT_BLOCKSIZE = 128
 
 # Configurar apariencia de CustomTkinter
-ctk.set_appearance_mode("light")
+ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 class AudioMonitorGUI:
@@ -93,8 +93,8 @@ class AudioMonitorGUI:
     def setup_ui(self):
         """Configurar elementos de la interfaz"""
         # Frame principal con padding
-        main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame = ctk.CTkFrame(self.root, fg_color="#0a0a0a")
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
         
         # Configurar grid
         main_frame.grid_columnconfigure(0, weight=1)
@@ -117,7 +117,7 @@ class AudioMonitorGUI:
     
     def setup_header(self, parent):
         """Configurar encabezado moderno"""
-        header_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#ffffff")
+        header_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#0a0a0a")
         header_frame.grid(row=0, column=0, pady=(0, 15), sticky="ew")
         header_frame.grid_columnconfigure(1, weight=1)
         
@@ -146,24 +146,24 @@ class AudioMonitorGUI:
         title_label.grid(row=0, column=1, sticky="ew", pady=(20, 0))
 
         subtitle_button = ctk.CTkButton(header_frame,
-                text="Streaming de audio multicanal en tiempo real - www.cepalabs.cl/fichatech",
-                font=ctk.CTkFont(size=13),
-                fg_color="transparent",
-                hover_color="gray20",
-                text_color="gray70",
-                command=lambda: webbrowser.open("https://www.cepalabs.cl/fichatech"))
+            text="Streaming de audio multicanal en tiempo real - www.cepalabs.cl/fichatech",
+            font=ctk.CTkFont(size=13),
+            fg_color="transparent",
+            hover_color="#0a2240",
+            text_color="#cbd5e1",
+            command=lambda: webbrowser.open("https://www.cepalabs.cl/fichatech"))
         subtitle_button.grid(row=1, column=1, sticky="ew", pady=(0, 5))
         
         # Estado del servidor
         self.server_status_label = ctk.CTkLabel(header_frame,
-                                               text="● Servidor detenido",
-                                               font=ctk.CTkFont(size=14, weight="bold"),
-                                               text_color=self.error_color)
-        self.server_status_label.grid(row=0, column=2, rowspan=2, padx=20, pady=20)
+                               text="●",
+                               font=ctk.CTkFont(size=14, weight="bold"),
+                               text_color="#6b7280")
+        self.server_status_label.grid(row=0, column=2, rowspan=2, padx=70, pady=20)
     
     def setup_status_frame(self, parent):
         """Frame de estado actual modernizado"""
-        status_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#ffffff")
+        status_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#0a0a0a")
         status_frame.grid(row=1, column=0, pady=(0, 15), sticky="ew")
         status_frame.grid_columnconfigure((0, 1), weight=1)
         
@@ -171,11 +171,11 @@ class AudioMonitorGUI:
         section_label = ctk.CTkLabel(status_frame,
                                      text="📊 DISPOSITIVO DE AUDIO",
                                      font=ctk.CTkFont(size=12, weight="bold"),
-                                     text_color="gray60")
+                                     text_color="#a0aec0")
         section_label.grid(row=0, column=0, columnspan=2, pady=(15, 10), padx=20, sticky="w")
         
         # Frame de dispositivo seleccionado
-        device_info_frame = ctk.CTkFrame(status_frame, corner_radius=10)
+        device_info_frame = ctk.CTkFrame(status_frame, corner_radius=0, fg_color="#0a0a0a")
         device_info_frame.grid(row=1, column=0, padx=20, pady=(0, 15), sticky="ew")
         
         # Icono y nombre del dispositivo
@@ -184,7 +184,7 @@ class AudioMonitorGUI:
                                    font=ctk.CTkFont(size=24))
         device_icon.pack(side="left", padx=15, pady=15)
         
-        device_details = ctk.CTkFrame(device_info_frame, fg_color="transparent")
+        device_details = ctk.CTkFrame(device_info_frame, fg_color="#0a0a0a")
         device_details.pack(side="left", fill="both", expand=True, padx=(0, 15), pady=15)
         
         self.device_name_label = ctk.CTkLabel(device_details,
@@ -197,17 +197,20 @@ class AudioMonitorGUI:
         device_specs_label = ctk.CTkLabel(device_details,
                                          textvariable=self.device_info_var,
                                          font=ctk.CTkFont(size=12),
-                                         text_color="gray70",
+                                         text_color="#cbd5e1",
                                          anchor="w")
         device_specs_label.pack(anchor="w", pady=(5, 0))
         
         # Botón para cambiar dispositivo
         self.change_device_btn = ctk.CTkButton(status_frame,
-                                              text="🔄 Cambiar Dispositivo",
-                                              command=self.show_device_selector,
-                                              corner_radius=10,
-                                              height=40,
-                                              font=ctk.CTkFont(size=13, weight="bold"))
+                              text="🔄 Cambiar Dispositivo",
+                              command=self.show_device_selector,
+                              fg_color="#0a0a0a",
+                              hover_color="#222",
+                              text_color="#ffffff",
+                              corner_radius=10,
+                              height=40,
+                              font=ctk.CTkFont(size=13, weight="bold"))
         self.change_device_btn.grid(row=1, column=1, padx=20, pady=(0, 15), sticky="ew")
     
     def show_device_selector(self):
@@ -218,10 +221,11 @@ class AudioMonitorGUI:
         dialog.geometry("800x600")
         dialog.transient(self.root)
         dialog.grab_set()
+        dialog.configure(bg="#0a0a0a")
 
         # Frame principal
-        main_container = ctk.CTkFrame(dialog, fg_color="transparent")
-        main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        main_container = ctk.CTkFrame(dialog, fg_color="#0a0a0a", corner_radius=0, border_width=2, border_color="#000000")
+        main_container.pack(fill="both", expand=True, padx=0, pady=0)
         main_container.grid_rowconfigure(1, weight=1)
         main_container.grid_columnconfigure(0, weight=1)
 
@@ -232,8 +236,8 @@ class AudioMonitorGUI:
         title_label.grid(row=0, column=0, pady=(0, 15), sticky="w")
 
         # Frame scrollable para dispositivos
-        scrollable_frame = ctk.CTkScrollableFrame(main_container, corner_radius=10)
-        scrollable_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 15))
+        scrollable_frame = ctk.CTkScrollableFrame(main_container, corner_radius=0, fg_color="#0a0a0a")
+        scrollable_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 10), padx=10)
         scrollable_frame.grid_columnconfigure(0, weight=1)
 
         # Cargar dispositivos y ordenarlos por calidad
@@ -246,7 +250,7 @@ class AudioMonitorGUI:
 
         # Crear botones radio para cada dispositivo
         for i, (device_id, device) in enumerate(input_devices):
-            device_frame = ctk.CTkFrame(scrollable_frame, corner_radius=10)
+            device_frame = ctk.CTkFrame(scrollable_frame, corner_radius=0, fg_color="#0a0a0a")
             device_frame.grid(row=i, column=0, pady=5, padx=5, sticky="ew")
             device_frame.grid_columnconfigure(1, weight=1)
 
@@ -258,7 +262,7 @@ class AudioMonitorGUI:
             radio.grid(row=0, column=0, padx=15, pady=15, sticky="w")
 
             # Información del dispositivo
-            info_frame = ctk.CTkFrame(device_frame, fg_color="transparent")
+            info_frame = ctk.CTkFrame(device_frame, fg_color="#0a0a0a")
             info_frame.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=15)
 
             # Nombre
@@ -279,13 +283,13 @@ class AudioMonitorGUI:
             specs_label = ctk.CTkLabel(info_frame,
                                       text=specs_text,
                                       font=ctk.CTkFont(size=11),
-                                      text_color="gray70",
+                                      text_color="#cbd5e1",
                                       anchor="w")
             specs_label.pack(anchor="w", pady=(5, 0))
 
         # Frame de botones
-        button_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        button_frame.grid(row=2, column=0, sticky="ew")
+        button_frame = ctk.CTkFrame(main_container, fg_color="#0a0a0a")
+        button_frame.grid(row=2, column=0, sticky="ew", padx=30, pady=(0, 18))
 
         def on_select():
             device_id = self.device_var.get()
@@ -300,34 +304,29 @@ class AudioMonitorGUI:
         def on_cancel():
             dialog.destroy()
 
-        def on_refresh():
-            dialog.destroy()
-            self.show_device_selector()
 
         select_btn = ctk.CTkButton(button_frame,
-                                  text="✅ Seleccionar",
-                                  command=on_select,
-                                  fg_color=self.success_color,
-                                  hover_color="#27ae60",
-                                  height=40,
-                                  font=ctk.CTkFont(size=13, weight="bold"))
-        select_btn.pack(side="left", padx=(0, 10))
+                      text="✅ Seleccionar",
+                      command=on_select,
+                      fg_color="#10b981",
+                      hover_color="#059669",
+                      text_color="#ffffff",
+                      height=42,
+                      font=ctk.CTkFont(size=14, weight="bold"),
+                      corner_radius=10)
+        select_btn.pack(side="left", padx=(0, 12), pady=6, fill="x", expand=True)
 
-        refresh_btn = ctk.CTkButton(button_frame,
-                                   text="🔄 Actualizar",
-                                   command=on_refresh,
-                                   height=40,
-                                   font=ctk.CTkFont(size=13, weight="bold"))
-        refresh_btn.pack(side="left", padx=(0, 10))
 
         cancel_btn = ctk.CTkButton(button_frame,
-                                  text="❌ Cancelar",
-                                  command=on_cancel,
-                                  fg_color="gray40",
-                                  hover_color="gray30",
-                                  height=40,
-                                  font=ctk.CTkFont(size=13, weight="bold"))
-        cancel_btn.pack(side="right")
+                      text="❌ Cancelar",
+                      command=on_cancel,
+                      fg_color="#0a2240",
+                      hover_color="#0a0a0a",
+                      text_color="#ffffff",
+                      height=42,
+                      font=ctk.CTkFont(size=14, weight="bold"),
+                      corner_radius=10)
+        cancel_btn.pack(side="right", padx=(0, 0), pady=6, fill="x", expand=True)
 
         # Centrar ventana
         dialog.update_idletasks()
@@ -359,7 +358,7 @@ class AudioMonitorGUI:
     
     def setup_logs_frame(self, parent):
         """Frame de logs modernizado"""
-        logs_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#ffffff")
+        logs_frame = ctk.CTkFrame(parent, corner_radius=15, fg_color="#0a0a0a")
         logs_frame.grid(row=2, column=0, pady=(0, 15), sticky="nsew")
         logs_frame.grid_rowconfigure(1, weight=1)
         logs_frame.grid_columnconfigure(0, weight=1)
@@ -368,56 +367,61 @@ class AudioMonitorGUI:
         section_label = ctk.CTkLabel(logs_frame,
                                      text="📝 LOGS DEL SISTEMA",
                                      font=ctk.CTkFont(size=12, weight="bold"),
-                                     text_color="gray60")
+                                     text_color="#a0aec0")
         section_label.grid(row=0, column=0, pady=(15, 10), padx=20, sticky="w")
         
         # Textbox para logs
         self.log_text = ctk.CTkTextbox(logs_frame,
-                          corner_radius=10,
-                          font=ctk.CTkFont(family="Consolas", size=11),
-                          wrap="word")
+                  corner_radius=10,
+                  font=ctk.CTkFont(family="Consolas", size=11),
+                  wrap="word",
+                  fg_color="#0a0a0a",
+                  text_color="#ffffff")
         self.log_text.grid(row=1, column=0, padx=15, pady=(0, 15), sticky="nsew")
         self.initialize_stats_banner()
     
     def setup_controls_frame(self, parent):
         """Frame de controles modernizado"""
-        controls_frame = ctk.CTkFrame(parent, fg_color="#ffffff")
-        controls_frame.grid(row=3, column=0, sticky="ew")
+        controls_frame = ctk.CTkFrame(parent, fg_color="#0a0a0a", corner_radius=18, border_width=2, border_color="#222")
+        controls_frame.grid(row=3, column=0, sticky="ew", padx=80, pady=(10, 18))
         controls_frame.grid_columnconfigure(1, weight=1)
         
         # Botón de inicio
         self.start_btn = ctk.CTkButton(controls_frame,
-                                      text="🚀 Iniciar Servidor",
-                                      command=self.start_server,
-                                      fg_color=self.success_color,
-                                      hover_color="#27ae60",
-                                      height=45,
-                                      font=ctk.CTkFont(size=14, weight="bold"),
-                                      corner_radius=10)
-        self.start_btn.grid(row=0, column=0, padx=(0, 10), sticky="ew")
-        
+                          text="🚀 Iniciar Servidor",
+                          command=self.start_server,
+                          fg_color="#10b981",
+                          hover_color="#059669",
+                          text_color="#ffffff",
+                          height=44,
+                          font=ctk.CTkFont(size=15, weight="bold"),
+                          corner_radius=10)
+        self.start_btn.grid(row=0, column=0, padx=(12, 8), pady=6, sticky="ew")
+
         # Botón de detener
         self.stop_btn = ctk.CTkButton(controls_frame,
-                                     text="🛑 Detener Servidor",
-                                     command=self.stop_server,
-                                     fg_color=self.error_color,
-                                     hover_color="#c0392b",
-                                     height=45,
-                                     font=ctk.CTkFont(size=14, weight="bold"),
-                                     corner_radius=10,
-                                     state="disabled")
-        self.stop_btn.grid(row=0, column=1, padx=(0, 10), sticky="ew")
-        
+                         text="🛑 Detener Servidor",
+                         command=self.stop_server,
+                         fg_color="#ef4444",
+                         hover_color="#dc2626",
+                         text_color="#ffffff",
+                         height=44,
+                         font=ctk.CTkFont(size=15, weight="bold"),
+                         corner_radius=10,
+                         state="disabled")
+        self.stop_btn.grid(row=0, column=1, padx=(0, 8), pady=6, sticky="ew")
+
         # Botón de salir
         exit_btn = ctk.CTkButton(controls_frame,
-                                text="👋 Salir",
-                                command=self.on_closing,
-                                fg_color="gray40",
-                                hover_color="gray30",
-                                height=45,
-                                font=ctk.CTkFont(size=14, weight="bold"),
-                                corner_radius=10)
-        exit_btn.grid(row=0, column=2, sticky="ew")
+                text="👋 Salir",
+                command=self.on_closing,
+                fg_color="#0a2240",
+                hover_color="#0a0a0a",
+                text_color="#ffffff",
+                height=44,
+                font=ctk.CTkFont(size=15, weight="bold"),
+                corner_radius=10)
+        exit_btn.grid(row=0, column=2, padx=(0, 12), pady=6, sticky="ew")
     
     def log_message(self, message, tag='INFO'):
         """Agregar mensaje al log con colores"""
@@ -433,7 +437,7 @@ class AudioMonitorGUI:
             'WEB': self.web_color
         }
         
-        color = color_map.get(tag, "gray70")
+        color = color_map.get(tag, "#ffffff")
         
         # Formatear mensaje con timestamp
         log_entry = f"[{timestamp}] {message}\n"
@@ -464,7 +468,7 @@ class AudioMonitorGUI:
         # Actualizar estado
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
-        self.server_status_label.configure(text="● Servidor ejecutándose", text_color=self.success_color)
+        self.server_status_label.configure(text="●", text_color="#10b981")
         
         self.log_message("✅ Servidor iniciado correctamente", 'SUCCESS')
     
@@ -477,7 +481,7 @@ class AudioMonitorGUI:
         # Actualizar estado
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
-        self.server_status_label.configure(text="● Servidor detenido", text_color=self.error_color)
+        self.server_status_label.configure(text="●", text_color="#6b7280")
         
         self.log_message("🛑 Servidor detenido", 'WARNING')
     

@@ -275,7 +275,7 @@ class AudioServerApp:
 
             # Inicializar servidor WebSocket
 
-            init_server(self.channel_manager)
+            init_server(self.channel_manager, self.native_server)
             
             # ✅ NUEVO: Configurar callback de VU levels
             from audio_server.websocket_server import broadcast_audio_levels

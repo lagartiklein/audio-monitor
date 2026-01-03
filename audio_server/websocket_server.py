@@ -13,6 +13,7 @@ import os
 import logging
 import config
 import threading  # ✅ Asegurar que threading esté disponible
+import json
 import engineio.server
 
 # ✅ PATCH: Forzar async_modes a solo 'threading' para PyInstaller
@@ -24,6 +25,92 @@ engineio.base_server.BaseServer.async_modes = patched_async_modes
 # Configurar rutas
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
+
+# ✅ NUEVO: Estado UI global (orden de clientes) compartido entre navegadores
+UI_STATE_FILE = os.path.join(BASE_DIR, 'config', 'web_ui_state.json')
+ui_state_lock = __import__('threading').Lock()
+ui_state = {
+    'client_order': [],
+    'updated_at': 0
+}
+
+
+def _load_ui_state_from_disk():
+    """Cargar estado global de UI desde disco."""
+    try:
+        os.makedirs(os.path.dirname(UI_STATE_FILE) or '.', exist_ok=True)
+        if not os.path.exists(UI_STATE_FILE):
+            return
+        with open(UI_STATE_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f) or {}
+        order = data.get('client_order', [])
+        if not isinstance(order, list):
+            order = []
+        with ui_state_lock:
+            ui_state['client_order'] = order
+            ui_state['updated_at'] = int(data.get('updated_at') or 0)
+        logger.info(f"[WebSocket] 🧭 UI state cargado: {len(order)} items")
+    except Exception as e:
+        logger.debug(f"[WebSocket] UI state load failed: {e}")
+
+
+def _save_ui_state_to_disk():
+    """Guardar estado global de UI a disco."""
+    try:
+        os.makedirs(os.path.dirname(UI_STATE_FILE) or '.', exist_ok=True)
+        with ui_state_lock:
+            payload = {
+                'client_order': ui_state.get('client_order', []),
+                'updated_at': ui_state.get('updated_at', 0)
+            }
+
+        tmp_path = UI_STATE_FILE + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, UI_STATE_FILE)
+    except Exception as e:
+        logger.debug(f"[WebSocket] UI state save failed: {e}")
+
+
+def _get_client_order() -> list:
+    with ui_state_lock:
+        order = ui_state.get('client_order', [])
+        return order[:] if isinstance(order, list) else []
+
+
+def _set_client_order(order: list, known_device_uuids: list) -> list:
+    """Sanitiza y guarda orden global. Retorna el orden final persistido."""
+    if not isinstance(order, list):
+        order = []
+
+    # Normalizar a strings y filtrar unknowns
+    normalized = []
+    for v in order:
+        if v is None:
+            continue
+        s = str(v)
+        if s and s not in normalized:
+            normalized.append(s)
+
+    known_set = set(str(x) for x in (known_device_uuids or []) if x is not None)
+    normalized = [x for x in normalized if x in known_set]
+
+    # Agregar los conocidos que falten al final (mantener orden previo si existe)
+    for dev in known_device_uuids or []:
+        dev = str(dev)
+        if dev and dev not in normalized:
+            normalized.append(dev)
+
+    with ui_state_lock:
+        ui_state['client_order'] = normalized
+        ui_state['updated_at'] = int(time.time() * 1000)
+
+    _save_ui_state_to_disk()
+    return normalized
+
+
+# Cargar estado al importar
+_load_ui_state_from_disk()
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -60,6 +147,7 @@ socketio.init_app(app)
 
 # Estado global
 channel_manager = None
+native_server_instance = None
 web_clients = {}  # ✅ NUEVO: Tracking de clientes web
 web_clients_lock = __import__('threading').Lock()
 
@@ -112,9 +200,10 @@ def cleanup_expired_web_states():
                 del web_persistent_state[pid]
 
 
-def init_server(manager):
-    global channel_manager
+def init_server(manager, native_server=None):
+    global channel_manager, native_server_instance
     channel_manager = manager
+    native_server_instance = native_server
     
     # ✅ Inyectar socketio en channel_manager para broadcasts
     if hasattr(channel_manager, 'set_socketio'):
@@ -528,6 +617,15 @@ def handle_update_client_mix(data):
             
             # ✅ Broadcast a todos (incluye el cambio)
             broadcast_clients_update()
+
+            # ✅ NUEVO: Si el target es un cliente nativo conectado, empujar mix_state en tiempo real
+            try:
+                subscription = channel_manager.get_client_subscription(target_client_id)
+                if subscription and subscription.get('client_type') == 'native':
+                    if native_server_instance is not None:
+                        native_server_instance.push_mix_state_to_client(target_client_id)
+            except Exception as e:
+                logger.debug(f"[WebSocket] mix_state push failed: {e}")
             
         else:
             emit('error', {'message': f'Failed to update mix for {target_client_id}'})
@@ -548,11 +646,54 @@ def handle_get_clients():
         clients_info = get_all_clients_info()
         emit('clients_list', {
             'clients': clients_info,
+            'order': _get_client_order(),
             'timestamp': int(time.time() * 1000)
         })
         
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en get_clients: {e}")
+        emit('error', {'message': str(e)})
+
+
+@socketio.on('set_client_order')
+def handle_set_client_order(data):
+    """✅ NUEVO: Setear orden global de clientes para TODOS los navegadores."""
+    update_client_activity(request.sid)
+
+    try:
+        if not channel_manager:
+            emit('error', {'message': 'Channel manager not available'})
+            return
+
+        order = (data or {}).get('order')
+
+        known = []
+        device_registry = getattr(channel_manager, 'device_registry', None)
+        if device_registry:
+            # Todos los devices conocidos (activos o no)
+            for d in device_registry.get_all_devices(active_only=False):
+                u = d.get('uuid')
+                if u:
+                    known.append(u)
+        else:
+            # Fallback: solo los que están activos
+            for c in channel_manager.get_all_clients_info():
+                u = c.get('device_uuid') or c.get('id')
+                if u:
+                    known.append(u)
+
+        final_order = _set_client_order(order, known)
+
+        emit('client_order_saved', {
+            'status': 'ok',
+            'order': final_order,
+            'timestamp': int(time.time() * 1000)
+        })
+
+        broadcast_clients_update()
+
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en set_client_order: {e}")
         emit('error', {'message': str(e)})
 
 
@@ -889,8 +1030,21 @@ def get_all_clients_info():
                 client_info['connected_at'] = web_info.get('connected_at')
                 client_info['last_activity'] = web_info.get('last_activity')
 
-    # Ordenar: conectados primero, luego desconectados
-    merged_clients.sort(key=lambda c: (not c.get('connected', False), -(c.get('last_activity') or 0)))
+    # ✅ NUEVO: Orden global (si existe) compartido entre navegadores
+    order = _get_client_order()
+    if order:
+        order_index = {str(v): i for i, v in enumerate(order)}
+
+        def _sort_key(c):
+            cid = c.get('device_uuid') or c.get('id')
+            idx = order_index.get(str(cid), 10**9)
+            # dentro de "no ordenados": conectados primero y más reciente primero
+            return (idx, not c.get('connected', False), -(c.get('last_activity') or 0))
+
+        merged_clients.sort(key=_sort_key)
+    else:
+        # Orden por defecto: conectados primero, luego desconectados
+        merged_clients.sort(key=lambda c: (not c.get('connected', False), -(c.get('last_activity') or 0)))
     return merged_clients
 
 
@@ -937,7 +1091,11 @@ def broadcast_clients_update():
     """Optimización de la actualización de clientes."""
     try:
         clients_info = get_all_clients_info()
-        socketio.emit('clients_update', {'clients': clients_info})
+        socketio.emit('clients_update', {
+            'clients': clients_info,
+            'order': _get_client_order(),
+            'timestamp': int(time.time() * 1000)
+        })
         logger.info(f"[WebSocket] 📡 Actualización enviada: {len(clients_info)} clientes")
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en broadcast_clients_update: {e}")
