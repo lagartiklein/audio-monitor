@@ -811,6 +811,7 @@ def get_all_clients_info():
     seen_uuids = set()
     for device in all_devices:
         device_uuid = device.get('uuid')
+        config_data = device.get('configuration', {})
         client_info = {
             'id': device_uuid,
             'type': device.get('type', 'unknown'),
@@ -818,11 +819,14 @@ def get_all_clients_info():
             'device_model': device.get('device_info', {}).get('model') or device.get('device_info', {}).get('device_model'),
             'custom_name': device.get('custom_name'),
             'device_name': device.get('name'),
-            'channels': device.get('configuration', {}).get('channels', []),
-            'active_channels': len(device.get('configuration', {}).get('channels', [])),
-            'has_solo': bool(device.get('configuration', {}).get('solos')),
-            'pre_listen': device.get('configuration', {}).get('pre_listen'),
-            'master_gain': device.get('configuration', {}).get('master_gain', 1.0),
+            'channels': config_data.get('channels', []),
+            'gains': config_data.get('gains', {}),
+            'pans': config_data.get('pans', {}),
+            'solos': config_data.get('solos', []),
+            'active_channels': len(config_data.get('channels', [])),
+            'has_solo': bool(config_data.get('solos')),
+            'pre_listen': config_data.get('pre_listen'),
+            'master_gain': config_data.get('master_gain', 1.0),
             'last_update': device.get('last_seen', 0),
             'connected': False,
             'address': device.get('primary_ip'),

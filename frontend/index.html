@@ -4,526 +4,642 @@
     <link rel="icon" type="image/png" href="assets/icon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Center - Audio RF</title>
+    <title>Fichatech - Audio Control</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
         }
-        
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --accent: #58a6ff;
+            --accent-dark: #1f6feb;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --green: #3fb950;
+            --yellow: #d29922;
+            --red: #f85149;
+            --purple: #bc8cff;
+        }
+
         body {
-            font-family: 'Courier New', monospace;
-            background: #0a0a0a;
-            color: #00ff00;
-            overflow-x: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
-            min-width: 100vw;
-            width: 100vw;
-            height: 100vh;
-            box-sizing: border-box;
         }
-        
+
         .container {
-            width: 100vw;
-            height: 100vh;
-            max-width: 100vw;
-            max-height: 100vh;
-            margin: 0;
-            padding: 0;
             display: flex;
             flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
-        
+
+        /* Header */
         header {
-            text-align: center;
-            padding: 20px;
-            background: linear-gradient(to bottom, #111, #0a0a0a);
-            border-bottom: 3px solid #00ff00;
-            margin-bottom: 30px;
-        }
-        
-        h1 {
-            font-size: 2em;
-            letter-spacing: 3px;
-            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-        }
-        
-        .main-layout {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
             display: flex;
-            flex: 1 1 auto;
-            height: 100%;
-            min-height: 0;
-        }
-        
-        @media (max-width: 1200px) {
-            .main-layout {
-                flex-direction: column;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .main-layout {
-                flex-direction: column;
-            }
-        }
-        
-        .sidebar {
-            background: #111;
-            padding: 20px 10px 20px 10px;
-            border-radius: 10px;
-            border: 2px solid #070404;
-            overflow-y: auto;
-            max-height: 100vh;
-            min-width: 220px;
-            width: 300px;
+            align-items: center;
+            justify-content: space-between;
             flex-shrink: 0;
         }
-        
-        @media (max-width: 768px) {
-            .sidebar {
-                max-height: 40vh;
-                margin-bottom: 20px;
-                width: 100vw;
-                min-width: 0;
-            }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        
-        .sidebar h2 {
-            color: #00ff00;
-            font-size: 1.2em;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #00ff00;
+
+        .logo h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
-        
-        .client-list {
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .status-badge.disconnected {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--red);
+            border-color: rgba(248, 81, 73, 0.3);
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            flex-shrink: 0;
         }
-        
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h2 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .client-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
         .client-item {
-            background: #1a1a1a;
-            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            border: 2px solid #333;
+            padding: 12px;
+            margin-bottom: 8px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.15s ease;
             position: relative;
         }
-        
+
         .client-item:hover {
-            border-color: #00ff00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            border-color: var(--accent);
         }
 
-        .client-menu-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #222;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            border-radius: 4px;
-            padding: 4px 8px;
-            cursor: pointer;
-            font-size: 1.2em;
-            transition: all 0.2s;
-            display: none;
-        }
-
-        .client-item:hover .client-menu-btn {
-            display: block;
-        }
-
-        .client-menu-btn:hover {
-            background: #00ff00;
-            color: #000;
-        }
-
-        .client-menu {
-            position: absolute;
-            top: 35px;
-            right: 8px;
-            background: #1a1a1a;
-            border: 2px solid #00ff00;
-            border-radius: 4px;
-            min-width: 180px;
-            z-index: 1000;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-            display: none;
-        }
-
-        .client-menu.active {
-            display: block;
-        }
-
-        .client-menu-item {
-            padding: 10px 15px;
-            color: #00ff00;
-            cursor: pointer;
-            border-bottom: 1px solid #333;
-            transition: all 0.2s;
-            font-size: 0.9em;
-        }
-
-        .client-menu-item:last-child {
-            border-bottom: none;
-        }
-
-        .client-menu-item:hover {
-            background: #00ff00;
-            color: #000;
-        }
-        
-        
         .client-item.selected {
-            border-color: #00ff00;
-            background: #222;
+            border-color: var(--accent);
+            background: rgba(88, 166, 255, 0.1);
         }
 
         .client-item.disconnected {
             opacity: 0.5;
-            filter: grayscale(0.7);
-            cursor: not-allowed;
-            background: #222 !important;
-            border-color: #555 !important;
         }
-        
-        .client-item.native {
-            border-left: 4px solid #ff4444;
+
+        .client-item.native::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 3px;
+            background: var(--green);
+            border-radius: 0 2px 2px 0;
         }
-        
-        .client-item.web {
-            border-left: 4px solid #4444ff;
+
+        .client-item.web::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 3px;
+            background: var(--accent);
+            border-radius: 0 2px 2px 0;
         }
-        
-        .client-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .client-info {
-            font-size: 0.85em;
-            color: #0a0;
-        }
-        
-        .mixer-area {
-            background: #111;
-            padding: 20px;
-            border-radius: 10px;
-            border: 2px solid #222;
-            flex: 1 1 auto;
-            min-width: 0;
-            min-height: 0;
-            height: 100%;
-            overflow: auto;
-        }
-        
-        .mixer-header {
+
+        .client-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #00ff00;
+            justify-content: space-between;
+            margin-bottom: 6px;
         }
-        
+
+        .client-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .client-name-text {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .edit-name-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 2px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .client-item:hover .edit-name-btn {
+            opacity: 1;
+        }
+
+        .edit-name-btn:hover {
+            color: var(--accent);
+        }
+
+        .client-info {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .client-badges {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.solo {
+            background: rgba(210, 153, 34, 0.2);
+            color: var(--yellow);
+        }
+
+        .badge.pfl {
+            background: rgba(188, 140, 255, 0.2);
+            color: var(--purple);
+        }
+
+        .no-clients {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        /* Mixer Area */
+        .mixer-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .mixer-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+        }
+
         .mixer-title {
-            font-size: 1.3em;
-            color: #00ff00;
+            font-size: 1rem;
+            font-weight: 600;
         }
-        
+
         .mixer-controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
-        
+
         .btn {
-            padding: 8px 15px;
-            background: #222;
-            color: #00ff00;
-            border: 2px solid #00ff00;
-            border-radius: 5px;
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            transition: all 0.3s;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
         }
-        
+
         .btn:hover {
-            background: #00ff00;
-            color: #000;
+            background: var(--accent-dark);
+            border-color: var(--accent);
+            color: white;
         }
-        
+
         .btn.active {
-            background: #00ff00;
-            color: #000;
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
         }
-        
+
+        /* Channel Grid */
+        .channel-grid-wrapper {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+
         .channel-grid {
             display: flex;
-            flex-direction: row;
-            gap: 15px;
-            overflow-x: auto;
-            width: 100%;
-            min-height: 420px;
-            padding-bottom: 10px;
+            gap: 12px;
+            min-height: 100%;
         }
-        
-        @media (max-width: 1024px) {
-            .channel-grid {
-                gap: 10px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .channel-grid {
-                gap: 6px;
-            }
-        }
-        
+
+        /* Channel Strip */
         .channel-strip {
-            background: linear-gradient(180deg, #1a1a1a, #0a0a0a);
-            border: 2px solid #222;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 10px;
-            padding: 15px 10px;
+            padding: 12px;
+            min-width: 90px;
+            width: 90px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
-            min-height: 400px;
+            gap: 10px;
+            transition: all 0.15s ease;
         }
-        
+
+        .channel-strip:hover {
+            border-color: var(--accent);
+        }
+
         .channel-strip.active {
-            border-color: #00ff00;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            border-color: var(--green);
+            box-shadow: 0 0 0 1px var(--green);
         }
-        
-        .channel-strip.solo {
-            border-color: #ffff00;
-            box-shadow: 0 0 20px rgba(255, 255, 0, 0.3);
+
+        .channel-strip.pfl-active {
+            border-color: var(--purple);
+            box-shadow: 0 0 0 1px var(--purple);
         }
-        
-        .channel-strip.pfl {
-            border-color: #ff00ff;
-            box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+
+        .channel-strip.solo-active {
+            border-color: var(--yellow);
+            box-shadow: 0 0 0 1px var(--yellow);
         }
-        
+
         .channel-number {
-            font-size: 1.1em;
-            font-weight: bold;
-            color: #0a0;
-            padding: 5px 15px;
-            background: #000;
-            border-radius: 8px;
-            border: 1px solid #333;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            padding: 4px 10px;
+            border-radius: 4px;
             width: 100%;
             text-align: center;
         }
-        
+
         .channel-strip.active .channel-number {
-            color: #00ff00;
-            border-color: #00ff00;
+            color: var(--green);
+            background: rgba(63, 185, 80, 0.1);
         }
-        
+
+        /* Channel Buttons */
         .channel-buttons {
             display: flex;
-            gap: 5px;
+            flex-direction: column;
+            gap: 4px;
             width: 100%;
         }
-        
+
         .channel-btn {
-            flex: 1;
-            padding: 8px 5px;
-            background: #222;
-            color: #666;
-            border: 2px solid #333;
-            border-radius: 5px;
+            padding: 6px 4px;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8em;
-            font-weight: bold;
-            transition: all 0.3s;
+            font-size: 0.7rem;
+            font-weight: 700;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
         }
-        
+
         .channel-btn:hover {
-            border-color: #00ff00;
-            color: #00ff00;
+            border-color: var(--accent);
+            color: var(--text-primary);
         }
-        
-        .channel-btn.active {
-            background: #00ff00;
-            color: #000;
-            border-color: #00ff00;
+
+        .channel-btn.on-btn.active {
+            background: var(--green);
+            border-color: var(--green);
+            color: white;
         }
-        
+
         .channel-btn.solo.active {
-            background: #ffff00;
-            color: #000;
-            border-color: #ffff00;
+            background: var(--yellow);
+            border-color: var(--yellow);
+            color: black;
         }
-        
+
         .channel-btn.pfl.active {
-            background: #ff00ff;
-            color: #000;
-            border-color: #ff00ff;
+            background: var(--purple);
+            border-color: var(--purple);
+            color: white;
         }
-        
-        /* ✅ NUEVO: Estilos para canales operacionales */
-        .channel-strip.operational {
-            border-left: 4px solid #00ff00;
-            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.1);
-        }
-        
-        .channel-strip.operational .channel-number {
-            color: #00ff00;
-            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-            font-weight: bold;
-        }
-        
-        .channel-strip:not(.operational) .channel-number {
-            color: #666;
-            opacity: 0.6;
-        }
-        
+
+        /* VU Meter */
         .vu-meter {
-            width: 30px;
-            height: 180px;
-            background: #000;
-            border: 2px solid #333;
-            border-radius: 5px;
+            width: 24px;
+            height: 140px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
             position: relative;
             overflow: hidden;
         }
-        
+
         .vu-fill {
             position: absolute;
             bottom: 0;
-            width: 100%;
-            background: linear-gradient(to top, #00ff00 0%, #00ff00 40%, #ffff00 41%, #ffff00 75%, #ff0000 76%);
-            transition: height 0.1s;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, 
+                var(--green) 0%, 
+                var(--green) 60%, 
+                var(--yellow) 60%, 
+                var(--yellow) 85%, 
+                var(--red) 85%);
+            transition: height 0.08s linear;
+            height: 0%;
         }
-        
+
+        .vu-scale {
+            position: absolute;
+            right: 2px;
+            width: 4px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2px 0;
+            pointer-events: none;
+        }
+
+        .vu-tick {
+            width: 100%;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Fader Section */
         .fader-section {
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: 6px;
             width: 100%;
-            gap: 10px;
         }
-        
+
+        .fader-wrapper {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .fader {
-            width: 100%;
-            height: 150px;
-            writing-mode: bt-lr;
-            -webkit-appearance: slider-vertical;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            transform: rotate(-90deg);
+            cursor: pointer;
         }
-        
+
+        .fader::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 3px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .fader::-moz-range-thumb {
+            width: 16px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 3px;
+            cursor: pointer;
+            border: none;
+        }
+
         .db-display {
-            width: 90%;
-            padding: 8px;
-            background: #000;
-            border: 2px solid #333;
-            border-radius: 5px;
-            color: #00ff00;
-            font-weight: bold;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent);
+            background: var(--bg-tertiary);
+            padding: 3px 8px;
+            border-radius: 4px;
+            width: 100%;
             text-align: center;
+            font-family: 'SF Mono', 'Consolas', monospace;
         }
-        
+
+        /* Pan Control */
         .pan-control {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
             width: 100%;
         }
-        
-        .pan-knob {
-            width: 45px;
-            height: 45px;
-            background: radial-gradient(circle at 30% 30%, #333, #111);
-            border-radius: 50%;
-            border: 2px solid #444;
-            position: relative;
+
+        .pan-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
             cursor: pointer;
         }
-        
-        .pan-mark {
-            position: absolute;
-            top: 5px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 2px;
+
+        .pan-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
             height: 12px;
-            background: #00ff00;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            cursor: pointer;
         }
-        
+
+        .pan-slider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
         .pan-value {
-            font-size: 0.85em;
-            color: #00ff00;
-            padding: 3px 8px;
-            background: #000;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* No client selected */
+        .no-selection {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        /* Input edit */
+        .name-input {
+            background: var(--bg-primary);
+            border: 1px solid var(--accent);
+            color: var(--text-primary);
+            padding: 4px 8px;
             border-radius: 4px;
-            border: 1px solid #333;
+            font-size: 0.85rem;
+            width: 100%;
+            outline: none;
         }
-        
-        .no-client-msg {
-            text-align: center;
-            padding: 50px;
-            color: #666;
-            font-size: 1.2em;
-        }
-        
-        @media (max-width: 1200px) {
-            .main-layout {
-                grid-template-columns: 1fr;
-            }
-            
+
+        /* Responsive */
+        @media (max-width: 768px) {
             .sidebar {
-                margin-bottom: 20px;
+                width: 100%;
+                max-height: 200px;
             }
-            
-            .client-list {
-                flex-direction: row;
-                flex-wrap: wrap;
+
+            .main-layout {
+                flex-direction: column;
             }
+
+            .channel-strip {
+                min-width: 80px;
+                width: 80px;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎛️ FICHATECH SERVER</h1>
-            <div style="color: #0a0; font-size: 0.9em; margin-top: 10px;">
-                Monitor de audio en tiempo real
+            <div class="logo">
+                <h1>🎛️ Fichatech Audio</h1>
             </div>
+            <span class="status-badge" id="connection-status">Conectando...</span>
         </header>
 
         <div class="main-layout">
-            <!-- Sidebar: Lista de clientes -->
             <div class="sidebar">
-                <h2>📡 CLIENTES CONECTADOS</h2>
+                <div class="sidebar-header">
+                    <h2>Clientes</h2>
+                </div>
                 <div id="client-list" class="client-list">
-                    <div class="no-client-msg">Sin clientes</div>
+                    <div class="no-clients">Sin clientes conectados</div>
                 </div>
             </div>
 
-            <!-- Mixer Area -->
             <div class="mixer-area">
                 <div class="mixer-header">
                     <div class="mixer-title" id="mixer-title">Selecciona un cliente</div>
                     <div class="mixer-controls">
-                        <button class="btn" id="btn-select-all">All</button>
-                        <button class="btn" id="btn-select-none">None</button>
+                        <button class="btn" id="btn-select-all">Todos ON</button>
+                        <button class="btn" id="btn-select-none">Todos OFF</button>
                         <button class="btn" id="btn-clear-solo">Clear Solo</button>
                         <button class="btn" id="btn-clear-pfl">Clear PFL</button>
                     </div>
                 </div>
                 
-                <div id="channel-grid" class="channel-grid">
-                    <div class="no-client-msg">Selecciona un cliente para gestionar su mezcla</div>
+                <div class="channel-grid-wrapper">
+                    <div id="channel-grid" class="channel-grid">
+                        <div class="no-selection">Selecciona un cliente para ver su mixer</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -537,29 +653,25 @@
                 this.selectedClientId = null;
                 this.deviceInfo = null;
                 this.webDeviceUuid = this.getOrCreateWebDeviceUuid();
+                this.pflChannel = {}; // Track PFL per client
+                this.soloChannels = {}; // Track SOLO per client
                 this.init();
             }
 
             getOrCreateWebDeviceUuid() {
                 const key = 'fichatech_web_device_uuid';
                 let v = localStorage.getItem(key);
-                if (v) return v;
-
-                // crypto.randomUUID() está en la mayoría de navegadores modernos.
-                if (window.crypto && crypto.randomUUID) {
-                    v = crypto.randomUUID();
-                } else {
-                    // Fallback simple (suficiente para estabilidad local)
-                    v = 'web-' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+                if (!v) {
+                    v = window.crypto?.randomUUID?.() || 
+                        'web-' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+                    localStorage.setItem(key, v);
                 }
-                localStorage.setItem(key, v);
                 return v;
             }
 
-            async init() {
+            init() {
                 this.connectWebSocket();
                 this.setupEventListeners();
-                this.startAutoRefreshClients();
             }
 
             connectWebSocket() {
@@ -567,6 +679,7 @@
                     transports: ['websocket'],
                     upgrade: false,
                     reconnection: true,
+                    reconnectionDelay: 1000,
                     auth: {
                         device_uuid: this.webDeviceUuid,
                         device_name: 'control-center'
@@ -575,20 +688,26 @@
 
                 this.socket.on('connect', () => {
                     console.log('[Control] ✅ Conectado');
+                    this.updateConnectionStatus(true);
                     this.socket.emit('get_clients');
+                });
+
+                this.socket.on('disconnect', () => {
+                    console.log('[Control] ❌ Desconectado');
+                    this.updateConnectionStatus(false);
                 });
 
                 this.socket.on('device_info', (info) => {
                     this.deviceInfo = info;
-                    console.log('[Device]', info);
+                    console.log('[Device Info]', info);
+                    if (this.selectedClientId) {
+                        this.renderMixer(this.selectedClientId);
+                    }
                 });
-                
-                // ✅ NUEVO: Escuchar actualizaciones de canales operacionales
+
                 this.socket.on('operational_channels_updated', (data) => {
                     if (this.deviceInfo) {
                         this.deviceInfo.operational_channels = data.operational_channels;
-                        console.log('[Operational Channels Updated]', data.operational_channels);
-                        // Redibujar mixer si está visible
                         if (this.selectedClientId) {
                             this.renderMixer(this.selectedClientId);
                         }
@@ -609,7 +728,27 @@
 
                 this.socket.on('mix_updated', (data) => {
                     console.log('[Mix Updated]', data);
+                    // Refresh clients to get updated state
+                    this.socket.emit('get_clients');
                 });
+
+                // Auto refresh clients
+                setInterval(() => {
+                    if (this.socket.connected) {
+                        this.socket.emit('get_clients');
+                    }
+                }, 3000);
+            }
+
+            updateConnectionStatus(connected) {
+                const badge = document.getElementById('connection-status');
+                if (connected) {
+                    badge.textContent = 'Conectado';
+                    badge.classList.remove('disconnected');
+                } else {
+                    badge.textContent = 'Desconectado';
+                    badge.classList.add('disconnected');
+                }
             }
 
             setupEventListeners() {
@@ -634,272 +773,190 @@
                 const container = document.getElementById('client-list');
                 container.innerHTML = '';
 
-                if (clientsData.length === 0) {
-                    container.innerHTML = '<div class="no-client-msg">Sin clientes</div>';
+                if (!clientsData || clientsData.length === 0) {
+                    container.innerHTML = '<div class="no-clients">Sin clientes conectados</div>';
                     return;
                 }
 
                 clientsData.forEach(client => {
-                    // Cargar custom_name desde localStorage si no viene del servidor
-                    if (!client.custom_name) {
-                        const storageKey = `client_custom_name_${client.id}`;
-                        const savedName = localStorage.getItem(storageKey);
-                        if (savedName) {
-                            client.custom_name = savedName;
-                        }
+                    // Load custom name from localStorage
+                    const storageKey = `client_custom_name_${client.id}`;
+                    const savedName = localStorage.getItem(storageKey);
+                    if (savedName) {
+                        client.custom_name = savedName;
                     }
                     this.clients[client.id] = client;
 
                     const item = document.createElement('div');
-                    item.className = `client-item ${client.type}`;
+                    item.className = `client-item ${client.type || 'web'}`;
+                    
                     if (this.selectedClientId === client.id) {
                         item.classList.add('selected');
                     }
-                    // Marcar desconectados
                     if (client.connected === false) {
                         item.classList.add('disconnected');
                     }
 
+                    const displayName = client.custom_name || client.device_name || 
+                        (client.type === 'native' ? 'Android' : 'Web Client');
                     const typeIcon = client.type === 'native' ? '📱' : '🌐';
-                    const typeName = client.type === 'native' ? 'Android' : 'Web';
-                    let displayName = client.custom_name || client.device_name || typeName;
-                    const modelInfo = client.device_model ? `<div class="client-info" style="font-size: 0.8em; color: #0aa;">📱 ${client.device_model}</div>` : '';
 
-                    // --- Nombre del cliente ---
-                    const nameDiv = document.createElement('div');
-                    nameDiv.className = 'client-name';
-                    nameDiv.innerHTML = `${typeIcon} <span class="client-name-text">${displayName}</span>`;
-                    item.appendChild(nameDiv);
+                    item.innerHTML = `
+                        <div class="client-header">
+                            <div class="client-name">
+                                <span>${typeIcon}</span>
+                                <span class="client-name-text" title="${displayName}">${displayName}</span>
+                                <button class="edit-name-btn" title="Editar nombre">✏️</button>
+                            </div>
+                        </div>
+                        <div class="client-info">
+                            ${client.active_channels || 0} canales activos
+                        </div>
+                        <div class="client-badges">
+                            ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
+                            ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
+                        </div>
+                    `;
 
-                    // --- Botón de menú (engranaje) en la esquina superior derecha ---
-                    const menuBtn = document.createElement('button');
-                    menuBtn.className = 'client-menu-btn';
-                    menuBtn.innerHTML = '⚙️';
-                    menuBtn.title = 'Opciones del cliente';
-                    
-                    // --- Menú contextual ---
-                    const menu = document.createElement('div');
-                    menu.className = 'client-menu';
-                    
-                    const menuChangeNameItem = document.createElement('div');
-                    menuChangeNameItem.className = 'client-menu-item';
-                    menuChangeNameItem.innerHTML = '✏️ Cambiar nombre';
-                    menuChangeNameItem.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const newName = prompt('Nombre del cliente:', displayName);
-                        if (newName !== null && newName.trim()) {
-                            const trimmedName = newName.trim();
-                            // Guardar en localStorage
-                            const storageKey = `client_custom_name_${client.id}`;
-                            localStorage.setItem(storageKey, trimmedName);
-                            // Actualizar en cliente local
-                            if (this.clients[client.id]) {
-                                this.clients[client.id].custom_name = trimmedName;
-                            }
-                            // Notificar al servidor
-                            this.socket.emit('set_client_name', {
-                                client_id: client.id,
-                                custom_name: trimmedName
-                            });
-                            // Refrescar lista
-                            this.updateClientsList(Object.values(this.clients));
+                    // Click to select
+                    item.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('edit-name-btn')) {
+                            this.selectClient(client.id);
                         }
-                        menu.classList.remove('active');
                     });
-                    menu.appendChild(menuChangeNameItem);
-                    
-                    // --- Manejar click del botón de menú ---
-                    menuBtn.addEventListener('click', (e) => {
+
+                    // Edit name button
+                    const editBtn = item.querySelector('.edit-name-btn');
+                    editBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        menu.classList.toggle('active');
+                        this.editClientName(client.id, displayName, item);
                     });
-                    
-                    item.appendChild(menuBtn);
-                    item.appendChild(menu);
 
-                    // --- Resto de info del cliente ---
-                    if (modelInfo) {
-                        item.innerHTML += modelInfo;
-                    }
-                    item.innerHTML += `<div class="client-info">ID: ${client.id.substring(0, 8)}...</div>`;
-                    item.innerHTML += `<div class="client-info">Canales: ${client.active_channels}</div>`;
-                    if (client.has_solo) item.innerHTML += '<div class="client-info" style="color: #ff0;">SOLO</div>';
-                    if (client.pre_listen !== null) item.innerHTML += '<div class="client-info" style="color: #f0f;">PFL</div>';
-
-                    item.addEventListener('click', () => {
-                        this.selectClient(client.id, item);
-                    });
-                    
-                    // Cerrar menú al hacer click fuera
-                    document.addEventListener('click', () => {
-                        menu.classList.remove('active');
-                    });
-                    
                     container.appendChild(item);
                 });
             }
 
-            // Refrescar lista de clientes cada 3 segundos
-            startAutoRefreshClients() {
-                setInterval(() => {
-                    this.socket.emit('get_clients');
-                }, 3000);
-            }
-            // ✅ NUEVO: Función para editar nombre directamente en el DOM
-            enableClientNameEdit(nameDiv, client, currentName) {
-                const nameText = nameDiv.querySelector('.client-name-text');
-                if (!nameText) return;
+            editClientName(clientId, currentName, itemElement) {
+                const nameTextEl = itemElement.querySelector('.client-name-text');
+                const editBtn = itemElement.querySelector('.edit-name-btn');
                 
-                // Crear input para editar
+                // Create input
                 const input = document.createElement('input');
                 input.type = 'text';
+                input.className = 'name-input';
                 input.value = currentName;
-                input.className = 'client-name-edit';
-                input.style.width = '85%';
-                input.style.fontSize = '1em';
-                input.style.background = '#222';
-                input.style.color = '#0f0';
-                input.style.border = '2px solid #0f0';
-                input.style.borderRadius = '4px';
-                input.style.padding = '4px 8px';
-                input.style.fontFamily = 'Courier New, monospace';
                 
-                // Reemplazar span por input
-                nameText.replaceWith(input);
+                // Hide name text and edit button
+                nameTextEl.style.display = 'none';
+                editBtn.style.display = 'none';
+                
+                // Insert input after name text
+                nameTextEl.parentNode.insertBefore(input, nameTextEl.nextSibling);
                 input.focus();
                 input.select();
-                
-                const saveEdit = () => {
+
+                const saveName = () => {
                     const newName = input.value.trim();
                     if (newName && newName !== currentName) {
-                        // Guardar en localStorage
-                        const storageKey = `client_custom_name_${client.id}`;
-                        localStorage.setItem(storageKey, newName);
+                        // Save to localStorage
+                        localStorage.setItem(`client_custom_name_${clientId}`, newName);
                         
-                        // Actualizar en cliente local
-                        if (this.clients[client.id]) {
-                            this.clients[client.id].custom_name = newName;
+                        // Update local client
+                        if (this.clients[clientId]) {
+                            this.clients[clientId].custom_name = newName;
                         }
                         
-                        // Notificar al servidor
+                        // Notify server
                         this.socket.emit('set_client_name', {
-                            client_id: client.id,
+                            client_id: clientId,
                             custom_name: newName
                         });
-                        
-                        console.log(`[Client] Nombre actualizado: ${newName}`);
-                        
-                        // Refrescar lista
-                        this.updateClientsList(Object.values(this.clients));
-                    } else {
-                        // Restaurar si no hay cambio
-                        const newSpan = document.createElement('span');
-                        newSpan.className = 'client-name-text';
-                        newSpan.textContent = currentName;
-                        input.replaceWith(newSpan);
                     }
+                    
+                    // Refresh list
+                    this.updateClientsList(Object.values(this.clients));
                 };
-                
-                input.addEventListener('blur', saveEdit);
+
+                input.addEventListener('blur', saveName);
                 input.addEventListener('keydown', (e) => {
-                    e.stopPropagation();
                     if (e.key === 'Enter') {
                         input.blur();
                     } else if (e.key === 'Escape') {
-                        const newSpan = document.createElement('span');
-                        newSpan.className = 'client-name-text';
-                        newSpan.textContent = currentName;
-                        input.replaceWith(newSpan);
+                        this.updateClientsList(Object.values(this.clients));
                     }
                 });
             }
 
-            // ✅ NUEVO: Editar nombre personalizado de cliente web
-            editClientName(clientId, currentName) {
-                const newName = prompt('Nombre personalizado para este cliente:', currentName);
-                if (newName !== null && newName.trim()) {
-                    const trimmedName = newName.trim();
-                    
-                    // Guardar en localStorage
-                    const storageKey = `client_custom_name_${clientId}`;
-                    localStorage.setItem(storageKey, trimmedName);
-                    
-                    // Actualizar en cliente local
-                    if (this.clients[clientId]) {
-                        this.clients[clientId].custom_name = trimmedName;
-                    }
-                    
-                    // Notificar al servidor (opcional - para sincronización)
-                    this.socket.emit('set_client_name', {
-                        client_id: clientId,
-                        custom_name: trimmedName
-                    });
-                    
-                    // Actualizar UI
-                    this.updateClientsList(Object.values(this.clients));
-                    
-                    console.log(`[Client] Nombre guardado: ${trimmedName}`);
-                }
-            }
-
-            selectClient(clientId, selectedElement) {
+            selectClient(clientId) {
                 this.selectedClientId = clientId;
                 
-                // Update UI
+                // Update sidebar selection
                 document.querySelectorAll('.client-item').forEach(item => {
                     item.classList.remove('selected');
                 });
                 
-                selectedElement?.classList.add('selected');
+                const selectedItem = document.querySelector(`.client-item:nth-child(${Object.keys(this.clients).indexOf(clientId) + 1})`);
+                if (selectedItem) {
+                    selectedItem.classList.add('selected');
+                }
 
+                // Update title
                 const client = this.clients[clientId];
-                if (!client) return;
-
-                const typeIcon = client.type === 'native' ? '📱' : '🌐';
-                document.getElementById('mixer-title').textContent = 
-                    `${typeIcon} ${client.id.substring(0, 12)}... (${client.active_channels} CH)`;
+                if (client) {
+                    const displayName = client.custom_name || client.device_name || 'Cliente';
+                    document.getElementById('mixer-title').textContent = `${displayName} - ${client.active_channels || 0} canales`;
+                }
 
                 this.renderMixer(clientId);
+                
+                // Also update sidebar to show selection
+                this.updateClientsList(Object.values(this.clients));
             }
 
             renderMixer(clientId) {
                 const container = document.getElementById('channel-grid');
                 container.innerHTML = '';
 
-                if (!this.deviceInfo) return;
+                if (!this.deviceInfo) {
+                    container.innerHTML = '<div class="no-selection">Esperando información del dispositivo...</div>';
+                    return;
+                }
 
                 const client = this.clients[clientId];
-                if (!client) return;
+                if (!client) {
+                    container.innerHTML = '<div class="no-selection">Cliente no encontrado</div>';
+                    return;
+                }
 
-                // Limitar a máximo 32 canales
-                const numChannels = Math.min(32, this.deviceInfo.channels);
-                // ✅ NUEVO: Obtener canales operacionales desde deviceInfo
-                const operationalChannels = this.deviceInfo.operational_channels || [];
-                
-                // ✅ NUEVO: Obtener gains del cliente
+                const numChannels = Math.min(32, this.deviceInfo.channels || 8);
                 const gains = client.gains || {};
                 const pans = client.pans || {};
+                const activeChannels = client.channels || [];
+                const pflChannel = client.pre_listen;
+                const soloChannels = client.solos || [];
 
                 for (let i = 0; i < numChannels; i++) {
-                    const isActive = client.channels.includes(i);
-                    const isOperational = operationalChannels.includes(i);  // ✅ NUEVO
+                    const isActive = activeChannels.includes(i);
+                    const isPfl = pflChannel === i;
+                    const isSolo = soloChannels.includes(i);
                     
-                    // ✅ NUEVO: Obtener gain en dB para este canal
-                    const gainLinear = gains[i] || 1.0;
-                    const gainDB = this.gainToDb(gainLinear);
-                    
+                    const gainLinear = gains[i] !== undefined ? gains[i] : 1.0;
+                    const gainDB = this.linearToDb(gainLinear);
+                    const panValue = pans[i] !== undefined ? pans[i] : 0;
+
                     const strip = document.createElement('div');
                     strip.className = 'channel-strip';
                     if (isActive) strip.classList.add('active');
-                    if (isOperational) strip.classList.add('operational');  // ✅ NUEVO
+                    if (isPfl) strip.classList.add('pfl-active');
+                    if (isSolo) strip.classList.add('solo-active');
 
                     strip.innerHTML = `
                         <div class="channel-number">CH ${i + 1}</div>
                         
                         <div class="channel-buttons">
-                            <button class="channel-btn on-btn" data-channel="${i}">ON</button>
-                            <button class="channel-btn solo" data-channel="${i}">S</button>
-                            <button class="channel-btn pfl" data-channel="${i}">PFL</button>
+                            <button class="channel-btn on-btn ${isActive ? 'active' : ''}" data-channel="${i}">ON</button>
+                            <button class="channel-btn solo ${isSolo ? 'active' : ''}" data-channel="${i}">SOLO</button>
+                            <button class="channel-btn pfl ${isPfl ? 'active' : ''}" data-channel="${i}">PFL</button>
                         </div>
 
                         <div class="vu-meter">
@@ -907,39 +964,50 @@
                         </div>
 
                         <div class="fader-section">
-                            <input type="range" class="fader" data-channel="${i}" 
-                                   min="-60" max="12" value="${gainDB}" step="0.5" orient="vertical">
-                            <div class="db-display" data-channel="${i}">${gainDB >= 0 ? '+' : ''}${gainDB.toFixed(1)}dB</div>
+                            <div class="fader-wrapper">
+                                <input type="range" class="fader" data-channel="${i}" 
+                                       min="-60" max="12" value="${gainDB}" step="0.5">
+                            </div>
+                            <div class="db-display" data-channel="${i}">${this.formatDb(gainDB)}</div>
                         </div>
 
                         <div class="pan-control">
-                            <div class="pan-knob" data-channel="${i}">
-                                <div class="pan-mark"></div>
-                            </div>
-                            <div class="pan-value" data-channel="${i}">C</div>
+                            <input type="range" class="pan-slider" data-channel="${i}"
+                                   min="-100" max="100" value="${panValue * 100}" step="1">
+                            <div class="pan-value" data-channel="${i}">${this.formatPan(panValue)}</div>
                         </div>
                     `;
 
-                    // Event listeners
+                    // ON button
                     const onBtn = strip.querySelector('.on-btn');
-                    if (isActive) onBtn.classList.add('active');
-                    onBtn.addEventListener('click', () => {
-                        this.toggleChannel(clientId, i);
-                    });
+                    onBtn.addEventListener('click', () => this.toggleChannel(clientId, i));
 
+                    // SOLO button
                     const soloBtn = strip.querySelector('.solo');
-                    soloBtn.addEventListener('click', () => {
-                        this.toggleSolo(clientId, i);
-                    });
+                    soloBtn.addEventListener('click', () => this.toggleSolo(clientId, i));
 
+                    // PFL button
                     const pflBtn = strip.querySelector('.pfl');
-                    pflBtn.addEventListener('click', () => {
-                        this.setPFL(clientId, i);
-                    });
+                    pflBtn.addEventListener('click', () => this.togglePFL(clientId, i));
 
+                    // Fader
                     const fader = strip.querySelector('.fader');
                     fader.addEventListener('input', (e) => {
-                        this.updateGain(clientId, i, parseFloat(e.target.value));
+                        const db = parseFloat(e.target.value);
+                        this.updateGain(clientId, i, db);
+                    });
+
+                    // Pan slider
+                    const panSlider = strip.querySelector('.pan-slider');
+                    panSlider.addEventListener('input', (e) => {
+                        const pan = parseInt(e.target.value) / 100;
+                        this.updatePan(clientId, i, pan);
+                    });
+
+                    // Double click pan to reset
+                    panSlider.addEventListener('dblclick', () => {
+                        panSlider.value = 0;
+                        this.updatePan(clientId, i, 0);
                     });
 
                     container.appendChild(strip);
@@ -950,7 +1018,7 @@
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                const channels = [...client.channels];
+                const channels = [...(client.channels || [])];
                 const index = channels.indexOf(channel);
 
                 if (index >= 0) {
@@ -974,56 +1042,100 @@
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                // SOLO = Pre-listen (solo de escucha)
-                // Enviar al servidor para que solo este canal sea audible
+                const solos = [...(client.solos || [])];
+                const index = solos.indexOf(channel);
+
+                if (index >= 0) {
+                    solos.splice(index, 1);
+                } else {
+                    solos.push(channel);
+                }
+
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
-                    pre_listen: channel  // Activar solo
+                    solos: solos
                 });
 
-                console.log('[Solo Activated]', clientId, channel);
+                client.solos = solos;
+                client.has_solo = solos.length > 0;
+                this.renderMixer(clientId);
             }
 
-            setPFL(clientId, channel) {
+            togglePFL(clientId, channel) {
                 const client = this.clients[clientId];
                 if (!client) return;
 
+                // PFL is exclusive - only one channel at a time
+                const newPfl = client.pre_listen === channel ? null : channel;
+
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
-                    pre_listen: channel
+                    pre_listen: newPfl
                 });
 
-                console.log('[PFL]', clientId, channel);
+                client.pre_listen = newPfl;
+                this.renderMixer(clientId);
             }
 
             updateGain(clientId, channel, db) {
-                const gain = this.dbToGain(db);
+                const gain = this.dbToLinear(db);
                 
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
                     gains: { [channel]: gain }
                 });
 
-                // Update UI
+                // Update display
                 const dbDisplay = document.querySelector(`.db-display[data-channel="${channel}"]`);
                 if (dbDisplay) {
-                    dbDisplay.textContent = `${db >= 0 ? '+' : ''}${db.toFixed(1)}dB`;
+                    dbDisplay.textContent = this.formatDb(db);
+                }
+
+                // Update local
+                if (this.clients[clientId]) {
+                    if (!this.clients[clientId].gains) {
+                        this.clients[clientId].gains = {};
+                    }
+                    this.clients[clientId].gains[channel] = gain;
+                }
+            }
+
+            updatePan(clientId, channel, pan) {
+                this.socket.emit('update_client_mix', {
+                    target_client_id: clientId,
+                    pans: { [channel]: pan }
+                });
+
+                // Update display
+                const panValue = document.querySelector(`.pan-value[data-channel="${channel}"]`);
+                if (panValue) {
+                    panValue.textContent = this.formatPan(pan);
+                }
+
+                // Update local
+                if (this.clients[clientId]) {
+                    if (!this.clients[clientId].pans) {
+                        this.clients[clientId].pans = {};
+                    }
+                    this.clients[clientId].pans[channel] = pan;
                 }
             }
 
             selectAllChannels() {
-                if (!this.selectedClientId) return;
+                if (!this.selectedClientId || !this.deviceInfo) return;
                 
-                // Limitar a máximo 32 canales
-                const channels = Array.from({length: Math.min(32, this.deviceInfo.channels)}, (_, i) => i);
+                const numChannels = Math.min(32, this.deviceInfo.channels || 8);
+                const channels = Array.from({ length: numChannels }, (_, i) => i);
                 
                 this.socket.emit('update_client_mix', {
                     target_client_id: this.selectedClientId,
                     channels: channels
                 });
 
-                this.clients[this.selectedClientId].channels = channels;
-                this.clients[this.selectedClientId].active_channels = channels.length;
+                if (this.clients[this.selectedClientId]) {
+                    this.clients[this.selectedClientId].channels = channels;
+                    this.clients[this.selectedClientId].active_channels = channels.length;
+                }
                 this.renderMixer(this.selectedClientId);
             }
 
@@ -1035,8 +1147,10 @@
                     channels: []
                 });
 
-                this.clients[this.selectedClientId].channels = [];
-                this.clients[this.selectedClientId].active_channels = 0;
+                if (this.clients[this.selectedClientId]) {
+                    this.clients[this.selectedClientId].channels = [];
+                    this.clients[this.selectedClientId].active_channels = 0;
+                }
                 this.renderMixer(this.selectedClientId);
             }
 
@@ -1047,6 +1161,12 @@
                     target_client_id: this.selectedClientId,
                     solos: []
                 });
+
+                if (this.clients[this.selectedClientId]) {
+                    this.clients[this.selectedClientId].solos = [];
+                    this.clients[this.selectedClientId].has_solo = false;
+                }
+                this.renderMixer(this.selectedClientId);
             }
 
             clearPFL() {
@@ -1056,33 +1176,50 @@
                     target_client_id: this.selectedClientId,
                     pre_listen: null
                 });
+
+                if (this.clients[this.selectedClientId]) {
+                    this.clients[this.selectedClientId].pre_listen = null;
+                }
+                this.renderMixer(this.selectedClientId);
             }
 
-            dbToGain(db) {
+            // Utility functions
+            dbToLinear(db) {
                 return Math.pow(10, db / 20);
             }
 
-            gainToDb(gain) {
-                // Convertir gain lineal a dB
-                // 1.0 = 0dB, 0.5 = -6dB, 2.0 = 6dB
+            linearToDb(gain) {
                 if (gain <= 0) return -60;
-                return Math.log10(gain) * 20;
+                return 20 * Math.log10(gain);
+            }
+
+            formatDb(db) {
+                if (db <= -60) return '-∞ dB';
+                return `${db >= 0 ? '+' : ''}${db.toFixed(1)} dB`;
+            }
+
+            formatPan(pan) {
+                if (Math.abs(pan) < 0.05) return 'C';
+                if (pan < 0) return `L${Math.abs(Math.round(pan * 100))}`;
+                return `R${Math.round(pan * 100)}`;
             }
 
             updateAudioLevels(levels) {
-                // ✅ NUEVO: Actualizar las barras de VU con los niveles de audio
+                if (!levels) return;
+                
                 for (const channel in levels) {
                     const level = levels[channel];
                     const rmsPercent = level.rms_percent || 0;
                     
                     const vuFill = document.querySelector(`.vu-fill[data-channel="${channel}"]`);
                     if (vuFill) {
-                        vuFill.style.height = `${rmsPercent}%`;
+                        vuFill.style.height = `${Math.min(100, rmsPercent)}%`;
                     }
                 }
             }
         }
 
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             window.controlCenter = new ControlCenter();
         });

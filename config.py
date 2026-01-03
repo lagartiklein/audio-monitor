@@ -7,7 +7,7 @@
 # ============================================================================
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
-BLOCKSIZE = 128  # ✅ ~2.67ms latencia mínima
+BLOCKSIZE = 64  # ✅ ~2.67ms latencia mínima
 
 # ✅ CANALES POR DEFECTO
 DEFAULT_NUM_CHANNELS = 32  # Limitar a 32 canales por compatibilidad protocolo

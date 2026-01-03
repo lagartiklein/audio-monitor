@@ -710,18 +710,19 @@ class ChannelManager:
                 'id': client_id,
                 'type': client_type,
                 'device_uuid': device_uuid,
-                'device_model': device_model,  # ✅ NUEVO
-                'custom_name': custom_name,  # ✅ NUEVO
-                'device_name': device_name,  # ✅ NUEVO
+                'device_model': device_model,
+                'custom_name': custom_name,
+                'device_name': device_name,
                 'channels': sub['channels'],
-                'gains': sub['gains'],  # ✅ NUEVO: Incluir gains
-                'pans': sub['pans'],  # ✅ NUEVO: Incluir pans
+                'gains': sub['gains'],
+                'pans': sub['pans'],
+                'solos': list(sub.get('solos', set())),  # ✅ Incluir solos como lista
                 'active_channels': len(sub['channels']),
                 'has_solo': len(sub.get('solos', set())) > 0,
                 'pre_listen': sub.get('pre_listen'),
                 'master_gain': sub.get('master_gain', 1.0),
                 'last_update': sub.get('last_update', 0),
-                'connected': connected  # ✅ NUEVO
+                'connected': connected
             })
         return clients_info
 

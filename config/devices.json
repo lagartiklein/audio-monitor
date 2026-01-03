@@ -75,62 +75,26 @@
       "user_agent": null
     },
     "first_seen": 1767396786.752031,
-    "last_seen": 1767400201.6828642,
-    "reconnections": 55,
+    "last_seen": 1767405493.6634147,
+    "reconnections": 63,
     "configuration": {
       "channels": [
         0
       ],
       "gains": {
-        "0": 2.2387211385683394,
-        "1": 1.0,
-        "2": 1.0
+        "0": 0.001
       },
       "pans": {
-        "0": 0.0,
-        "1": 0.0,
-        "2": 0.0
+        "0": 0.0
       },
       "mutes": {
-        "0": false,
-        "1": true,
-        "2": true,
-        "3": true,
-        "4": true,
-        "5": true,
-        "6": true,
-        "7": true,
-        "8": true,
-        "9": true,
-        "10": true,
-        "11": true,
-        "12": true,
-        "13": true,
-        "14": true,
-        "15": true,
-        "16": true,
-        "17": true,
-        "18": true,
-        "19": true,
-        "20": true,
-        "21": true,
-        "22": true,
-        "23": true,
-        "24": true,
-        "25": true,
-        "26": true,
-        "27": true,
-        "28": true,
-        "29": true,
-        "30": true,
-        "31": true
+        "0": false
       },
       "solos": [],
-      "pre_listen": 0,
-      "master_gain": 1.0,
-      "timestamp": 1767400201591
+      "pre_listen": null,
+      "master_gain": 1.0
     },
-    "configuration_session_id": "936e6d2b1e6843bcb5f3768c62dfdb59",
+    "configuration_session_id": "5a4c7ebfea7a4189816cc3f1e9970373",
     "tags": [],
     "active": true
   },
@@ -150,14 +114,14 @@
       "user_agent": null
     },
     "first_seen": 1767396786.9770272,
-    "last_seen": 1767400198.31114,
-    "reconnections": 105,
+    "last_seen": 1767405462.4255264,
+    "reconnections": 115,
     "configuration": {
       "channels": [
         0
       ],
       "gains": {
-        "0": 1.0
+        "0": 0.251188643150958
       },
       "pans": {
         "0": 0.0
@@ -167,10 +131,9 @@
       },
       "solos": [],
       "pre_listen": null,
-      "master_gain": 1.0,
-      "timestamp": 1767400198311
+      "master_gain": 1.0
     },
-    "configuration_session_id": "936e6d2b1e6843bcb5f3768c62dfdb59",
+    "configuration_session_id": "5a4c7ebfea7a4189816cc3f1e9970373",
     "tags": [],
     "active": true
   },
@@ -367,8 +330,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767399460.1473691,
-    "last_seen": 1767400146.9367163,
-    "reconnections": 8,
+    "last_seen": 1767403678.8037317,
+    "reconnections": 9,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -407,7 +370,47 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767400172.9187508,
-    "last_seen": 1767400172.9187508,
+    "last_seen": 1767403511.038483,
+    "reconnections": 6,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "e1bd477c-458e-4355-870d-4ab22c09cf19": {
+    "uuid": "e1bd477c-458e-4355-870d-4ab22c09cf19",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.107.1 Chrome/142.0.7444.175 Electron/39.2.3 Safari/537.36"
+    },
+    "first_seen": 1767403510.292964,
+    "last_seen": 1767403510.292964,
+    "reconnections": 0,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "d3660615-d503-44a3-a1fe-95ee942ad667": {
+    "uuid": "d3660615-d503-44a3-a1fe-95ee942ad667",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767403522.0478623,
+    "last_seen": 1767403522.0478623,
     "reconnections": 0,
     "configuration": {},
     "configuration_session_id": null,
