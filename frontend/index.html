@@ -1101,6 +1101,8 @@
                     
                     // Actualizar estado local si el cliente existe
                     if (this.clients[client_id]) {
+                        let needsListUpdate = false;
+                        
                         if (type === 'gain') {
                             if (!this.clients[client_id].gains) this.clients[client_id].gains = {};
                             this.clients[client_id].gains[channel] = value;
@@ -1114,6 +1116,7 @@
                             if (!value && idx >= 0) channels.splice(idx, 1);
                             this.clients[client_id].channels = channels;
                             this.clients[client_id].active_channels = channels.length;
+                            needsListUpdate = true;  // ✅ Los canales activos cambiaron
                         } else if (type === 'solo') {
                             const solos = this.clients[client_id].solos || [];
                             const idx = solos.indexOf(channel);
@@ -1121,17 +1124,23 @@
                             if (!value && idx >= 0) solos.splice(idx, 1);
                             this.clients[client_id].solos = solos;
                             this.clients[client_id].has_solo = solos.length > 0;
+                            needsListUpdate = true;  // ✅ Estado SOLO cambió
                         } else if (type === 'pfl') {
                             this.clients[client_id].pre_listen = value;
+                            needsListUpdate = true;  // ✅ Estado PFL cambió
                         }
                         
-                        // Re-renderizar si el cliente afectado está seleccionado
+                        // ✅ Re-renderizar inmediatamente si el cliente afectado está seleccionado
                         if (this.selectedClientId === client_id) {
+                            console.log('[Param Sync] Renderizando mixer para', client_id);
                             this.renderMixer(client_id);
                         }
                         
-                        // Actualizar sidebar también
-                        this.updateClientsList(Object.values(this.clients));
+                        // ✅ Actualizar sidebar si hubo cambios visuales
+                        if (needsListUpdate) {
+                            console.log('[Param Sync] Actualizando lista de clientes');
+                            this.updateClientsList(Object.values(this.clients));
+                        }
                     }
                 });
 
@@ -1206,8 +1215,20 @@
                     return;
                 }
 
-                this.syncClientOrderWith(clientsData);
-                const orderedClients = this.orderClients(clientsData);
+                // ✅ FILTRO: Solo mostrar clientes reales (web o native/android)
+                const realClients = clientsData.filter(c => {
+                    const type = c.type || 'web';
+                    return type === 'web' || type === 'native' || type === 'android';
+                });
+
+                if (realClients.length === 0) {
+                    container.innerHTML = '<div class="no-clients">Sin clientes reales conectados</div>';
+                    this.clientOrder = [];
+                    return;
+                }
+
+                this.syncClientOrderWith(realClients);
+                const orderedClients = this.orderClients(realClients);
 
                 // Update local cache (keyed by stable id)
                 orderedClients.forEach(client => {
@@ -1288,7 +1309,13 @@
             }
 
             renderClientsList(clientsData, container) {
-                const ordered = this.orderClients(clientsData);
+                // ✅ FILTRO: Solo mostrar clientes reales (web o native/android)
+                const realClients = clientsData.filter(c => {
+                    const type = c.type || 'web';
+                    return type === 'web' || type === 'native' || type === 'android';
+                });
+                
+                const ordered = this.orderClients(realClients);
                 ordered.forEach(client => {
                     const id = this.getClientId(client);
                     if (!id) return;

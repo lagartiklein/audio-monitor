@@ -241,7 +241,12 @@ def cleanup_initial_state():
 @app.route('/')
 def index():
     """Página principal"""
-    return send_from_directory(app.static_folder, 'index.html')
+    response = send_from_directory(app.static_folder, 'index.html')
+    # ✅ No cachear HTML para asegurar cambios inmediatos
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @app.route('/<path:path>')
@@ -992,6 +997,7 @@ def _save_client_config_to_registry(client_id):
 def get_all_clients_info():
     """
     ✅ Obtener información de TODOS los clientes (nativos + web)
+    ✅ FILTRO: Solo mostrar clientes reales (type='web' o 'native'/'android')
     """
     # --- NUEVO: Mostrar todos los dispositivos conocidos (persistentes y activos) ---
     all_devices = []
@@ -999,6 +1005,8 @@ def get_all_clients_info():
     if device_registry:
         try:
             all_devices = device_registry.get_all_devices(active_only=False)
+            # ✅ FILTRO: Solo clientes reales (web o native/android)
+            all_devices = [d for d in all_devices if d.get('type') in ('web', 'native', 'android')]
         except Exception as e:
             logger.error(f"[WebSocket] Error obteniendo dispositivos de device_registry: {e}")
 
@@ -1007,6 +1015,9 @@ def get_all_clients_info():
     if channel_manager:
         try:
             for c in channel_manager.get_all_clients_info():
+                # ✅ FILTRO: Solo clientes reales
+                if c.get('type') not in ('web', 'native', 'android'):
+                    continue
                 # Indexar por device_uuid si existe, sino por id
                 key = c.get('device_uuid') or c.get('id')
                 active_clients[key] = c
@@ -1051,7 +1062,9 @@ def get_all_clients_info():
     # Agregar clientes activos que no tengan device_uuid (ej: legacy o sin registro)
     for key, active in active_clients.items():
         if key and key not in seen_uuids:
-            merged_clients.append(active)
+            # ✅ FILTRO: Solo clientes reales
+            if active.get('type') in ('web', 'native', 'android'):
+                merged_clients.append(active)
 
     # Enriquecer con info de web_clients (address, last_activity)
     with web_clients_lock:
