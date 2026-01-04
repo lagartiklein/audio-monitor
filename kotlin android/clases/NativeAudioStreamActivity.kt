@@ -194,6 +194,21 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         initializeViews()
 
+        // Inicializar vistas según la orientación inicial: si la Activity se lanza ya en LANDSCAPE
+        // debemos preparar la consola de canales en lugar de los controles de portrait.
+        val isLandscapeInitial = resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+        if (isLandscapeInitial) {
+            initializeViewsLandscape()
+            // Asegurar que la consola tenga vistas aunque no haya llegado info del servidor
+            ensureChannelConsole(lastKnownMaxChannels)
+            // Ocultar UI (modo inmersivo) para landscape inicial
+            hideSystemUI()
+        } else {
+            initializeViews()
+        }
+
         initializeAudioComponents()
 
         loadSessionPreferences()
@@ -396,6 +411,26 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             channelStripContainer?.removeAllViews()
             channelViews.clear()
             Log.d(TAG, "🔄 Vistas de canales limpias, listas para recrearse")
+        }
+
+        // Asegurar que el contenedor esté visible y que los controles de portrait (si existen)
+        // no queden sobrepuestos. Esto soluciona el caso donde la Activity se abre desde
+        // otra en landscape y la consola se queda oculta.
+        try {
+            channelStripContainer?.visibility = View.VISIBLE
+            // Ocultar controles de portrait si fueron inflados
+            statusText?.visibility = View.GONE
+            ipEditText?.visibility = View.GONE
+            portEditText?.visibility = View.GONE
+            connectButton?.visibility = View.GONE
+            masterVolumeSeekBar?.visibility = View.GONE
+            masterVolumeText?.visibility = View.GONE
+            muteButton?.visibility = View.GONE
+            latencyText?.visibility = View.GONE
+            webControlText?.visibility = View.GONE
+            infoText?.visibility = View.GONE
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Error ajustando visibilidad en landscape: ${e.message}")
         }
     }
 
@@ -688,8 +723,8 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 infoText?.text =
 
                             "•Verifica radio optimo de trabajo.\n" +
-                            "•Los Canales son gestionados desde WEB, vía wifi\n" +
-                            "•Motor Oboe Transmitiendo en modo Ultra baja latencia ."
+                            "•Los Canales son gestionados desde WEB.\n" +
+                            "•Motor Oboe Transmitiendo en modo Ultra baja latencia."
             }
 
             val maxChannels =
@@ -815,55 +850,21 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (connected == headphonesConnected) return
         headphonesConnected = connected
         audioManager.mode = AudioManager.MODE_NORMAL
-
-        try {
-            if (connected) {
-                // ✅ Auriculares CONECTADOS
-                audioManager.isSpeakerphoneOn = false
-                Log.d(TAG, "🎧 Auriculares detectados")
-
-                if (wasMutedByHeadphoneLoss && isMuted) {
-                    // Si fue apagado por pérdida de auriculares, reabre
-                    toggleMute()
-                    wasMutedByHeadphoneLoss = false
-                    showToast("🎧 Audio reanudado en auriculares")
-                } else {
-                    showToast("🎧 Auriculares detectados")
-                }
-            } else {
-                // ✅ Auriculares DESCONECTADOS - CAMBIO IMPORTANTE
-                audioManager.isSpeakerphoneOn = true
-                Log.d(TAG, "📢 Auriculares desconectados")
-
-                // ✅ CRÍTICO: Reiniciar streams Oboe para cambio de dispositivo
-                if (isConnected) {
-                    try {
-                        Log.d(TAG, "🔄 Reiniciando streams para parlante...")
-                        audioRenderer.stop()  // Detiene streams actuales
-                        Thread.sleep(100)     // Pequeño delay para que se cierren
-                        Log.d(TAG, "✅ Streams reiniciados para parlante")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "⚠️ Error reiniciando streams: ${e.message}")
-                    }
-
-                    if (isMuted && wasMutedByHeadphoneLoss) {
-                        // Si audio fue apagado por auriculares anteriormente, reabre
-                        toggleMute()
-                        wasMutedByHeadphoneLoss = false
-                        Log.d(TAG, "✅ Audio restaurado a parlante desde mute previo")
-                        showToast("📢 Audio restaurado en parlante")
-                    } else if (!isMuted) {
-                        // Audio está ON, simplemente continúa en parlante
-                        Log.d(TAG, "📢 Cambiando a parlante - audio mantiene nivel")
-                        showToast("📢 Audio en parlante (volumen mantiene nivel)")
-                    }
-                } else {
-                    // No está conectado a servidor
-                    showToast("📢 Dispositivo: parlante")
-                }
+        if (connected) {
+            audioManager.isSpeakerphoneOn = false
+            if (wasMutedByHeadphoneLoss && isMuted) {
+                toggleMute()
+                showToast("Auriculares conectados: audio reanudado automáticamente")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error en cambio de auriculares: ${e.message}")
+            showToast("Audio optimizado para auriculares")
+        } else {
+            audioManager.isSpeakerphoneOn = true
+            if (isConnected && !isMuted) {
+                wasMutedByHeadphoneLoss = true
+                toggleMute()
+                showToast("Auriculares desconectados: stream sigue pero audio OFF en altavoz")
+            }
+            showToast("Audio optimizado para parlante")
         }
     }
 
@@ -875,12 +876,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed) return@runOnUiThread
 
             if (connected) {
-                // ✅ NUEVO: Resetear canales visuales al reconectar
-                channelViews.forEach { (ch, view) ->
-                    view.activateChannel(false)  // Estado inicial OFF
-                    view.setGainDb(0f)            // Ganancia neutral
-                    view.setPanValue(0f)          // Pan centrado
-                }
 
                 statusText?.text = "$message"
 

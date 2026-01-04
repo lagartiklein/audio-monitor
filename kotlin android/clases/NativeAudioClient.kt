@@ -60,21 +60,21 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         // Heartbeat keep-alive
         private const val HEARTBEAT_INTERVAL_MS = 2000L  // ⚠️ REDUCIDO: 3s → 2s para respuesta más rápida
         private const val HEARTBEAT_TIMEOUT_MS = 6000L   // ⚠️ REDUCIDO: 9s → 6s
-        
+
         // ✅ OPTIMIZACIÓN LATENCIA: Constante para división Int16->Float
         private const val INVERSE_32768 = 1f / 32768f
-        
+
         // ✅ OPTIMIZACIÓN LATENCIA: Buffers pre-alocados para evitar GC
         private val shortBufferPool = ArrayDeque<ShortArray>()
         private val floatBufferPool = ArrayDeque<FloatArray>()
         private const val MAX_POOLED_BUFFERS = 4
-        
+
         private fun acquireShortBuffer(size: Int): ShortArray {
             return synchronized(shortBufferPool) {
                 shortBufferPool.removeFirstOrNull()?.takeIf { it.size >= size }
             } ?: ShortArray(size)
         }
-        
+
         private fun releaseShortBuffer(buffer: ShortArray) {
             synchronized(shortBufferPool) {
                 if (shortBufferPool.size < MAX_POOLED_BUFFERS) {
@@ -82,13 +82,13 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                 }
             }
         }
-        
+
         private fun acquireFloatBuffer(size: Int): FloatArray {
             return synchronized(floatBufferPool) {
                 floatBufferPool.removeFirstOrNull()?.takeIf { it.size >= size }
             } ?: FloatArray(size)
         }
-        
+
         private fun releaseFloatBuffer(buffer: FloatArray) {
             synchronized(floatBufferPool) {
                 if (floatBufferPool.size < MAX_POOLED_BUFFERS) {
@@ -328,7 +328,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     .coerceAtLeast(500L)  // ✅ NUEVO: Mínimo 500ms
 
                 attempt++
-                
+
                 // ✅ Log de progreso
                 if (attempt % 5 == 0) {
                     Log.w(TAG, "⚠️ Llevamos $attempt intentos, retryando...")
@@ -494,13 +494,13 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     synchronized(readLock) {
                         input.readFully(headerBuffer)
                     }
-                    
+
                     val header = decodeHeader(headerBuffer)
 
                     if (header.magic != MAGIC_NUMBER) {
                         consecutiveMagicErrors++
                         Log.w(TAG, "⚠️ Magic error #$consecutiveMagicErrors/$maxConsecutiveMagicErrors")
-                        
+
                         if (consecutiveMagicErrors >= maxConsecutiveMagicErrors) {
                             handleConnectionLost("Protocolo inválido ($consecutiveMagicErrors errores consecutivos)")
                             break
@@ -722,7 +722,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
             // ✅ OPTIMIZADO: Usar Integer.bitCount para contar canales activos
             val numActiveChannels = Integer.bitCount(channelMask)
             if (numActiveChannels == 0) return null
-            
+
             // ✅ OPTIMIZADO: Construir lista de canales activos más eficientemente
             val activeChannels = ArrayList<Int>(numActiveChannels)
             var mask = channelMask
@@ -740,7 +740,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
             val floatArray: FloatArray
             var shortArrayToRelease: ShortArray? = null
-            
+
             if (isInt16) {
                 val shortCount = remainingBytes / 2
                 if (shortCount % numActiveChannels != 0) return null
@@ -754,7 +754,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                 floatArray = acquireFloatBuffer(shortCount)
                 var i = 0
                 val limit = shortCount - (shortCount % 4)
-                
+
                 // Procesar en bloques de 4 (SIMD-friendly)
                 while (i < limit) {
                     floatArray[i] = shortArray[i] * INVERSE_32768
@@ -768,7 +768,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     floatArray[i] = shortArray[i] * INVERSE_32768
                     i++
                 }
-                
+
                 // Devolver buffer al pool
                 releaseShortBuffer(shortArray)
                 shortArrayToRelease = null
@@ -797,7 +797,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     srcIndex += numActiveChannels
                 }
             }
-            
+
             // Devolver buffer al pool (el audioData es nuevo, no del pool)
             releaseFloatBuffer(floatArray)
 

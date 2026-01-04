@@ -208,28 +208,25 @@
       "user_agent": null
     },
     "first_seen": 1767396786.9770272,
-    "last_seen": 1767522142.9328542,
-    "reconnections": 577,
+    "last_seen": 1767527835.0143082,
+    "reconnections": 1329,
     "configuration": {
       "channels": [
         1
       ],
       "gains": {
-        "1": 1.0,
-        "0": 1.0
+        "1": 1.0
       },
       "pans": {
-        "1": 0.0,
-        "0": 0.0
+        "1": 0.0
       },
       "mutes": {
-        "1": false,
-        "0": false
+        "1": false
       },
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767522142932
+      "timestamp": 1767527835014
     },
     "configuration_session_id": "f57717282ffb470188b8cfb91c6610be",
     "tags": [],
@@ -660,28 +657,36 @@
     "type": "android",
     "name": "android-cd1f98c6",
     "mac_address": null,
-    "primary_ip": null,
+    "primary_ip": "192.168.1.9",
     "device_info": {
-      "type": "native",
-      "name": "native-cd1f98c6",
-      "primary_ip": null,
+      "type": "android",
+      "name": "android-cd1f98c6",
+      "primary_ip": "192.168.1.9",
       "client_id": "cd1f98c6-4bd4-4903-afe8-cd6c9acc4972",
       "protocol_version": 2,
       "rf_mode": true,
       "user_agent": null
     },
     "first_seen": 1767442886.0863066,
-    "last_seen": 1767522335.1655495,
-    "reconnections": 1473,
+    "last_seen": 1767528140.0711246,
+    "reconnections": 4500,
     "configuration": {
-      "channels": [],
-      "gains": {},
-      "pans": {},
-      "mutes": {},
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767522335165
+      "timestamp": 1767528124228
     },
     "configuration_session_id": null,
     "tags": [],
@@ -964,8 +969,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767482238.9807353,
-    "last_seen": 1767521579.8768747,
-    "reconnections": 33,
+    "last_seen": 1767522454.9811513,
+    "reconnections": 34,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1250,8 +1255,8 @@
       "user_agent": null
     },
     "first_seen": 1767497385.7275724,
-    "last_seen": 1767522110.5800924,
-    "reconnections": 297,
+    "last_seen": 1767528095.0845003,
+    "reconnections": 317,
     "configuration": {
       "channels": [
         1
@@ -1268,7 +1273,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767522110580
+      "timestamp": 1767528095084
     },
     "configuration_session_id": null,
     "tags": [],

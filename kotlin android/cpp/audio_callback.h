@@ -105,8 +105,15 @@ public:
             }
         }
 
-        // 2) Obtener frames disponibles (lectura atómica)
-        int available = availableFrames.load(std::memory_order_acquire);
+        // 2-4) Obtener frames y posición actual CON PROTECCIÓN
+        int currentReadPos;
+        int available;
+        {
+            // ✅ CRITICAL: Lock mínimo para leer valores consistentes
+            std::lock_guard<std::mutex> lock(resetMutex);
+            available = availableFrames.load(std::memory_order_acquire);
+            currentReadPos = readPos.load(std::memory_order_acquire);
+        }
         
         // 3) Underrun: no hay datos (caso raro, optimizar path común)
         if (UNLIKELY(available == 0)) {
@@ -125,9 +132,6 @@ public:
             wasSilent.store(true);
             return oboe::DataCallbackResult::Continue;
         }
-
-        // 4) Obtener posición de lectura actual
-        int currentReadPos = readPos.load(std::memory_order_acquire);
         
         // Validar posición (raramente falla)
         if (UNLIKELY(currentReadPos < 0 || currentReadPos >= bufferSizeSamples)) {
@@ -168,10 +172,13 @@ public:
                         (samplesNeeded - samplesToPlay) * sizeof(float));
         }
 
-        // 7) Actualizar posición de lectura (atómico)
-        int newReadPos = (currentReadPos + samplesToPlay) % bufferSizeSamples;
-        readPos.store(newReadPos, std::memory_order_release);
-        availableFrames.fetch_sub(framesToPlay, std::memory_order_release);
+        // 7) Actualizar posición de lectura (CON PROTECCIÓN contra drop simultáneo)
+        {
+            std::lock_guard<std::mutex> lock(resetMutex);
+            int newReadPos = (currentReadPos + samplesToPlay) % bufferSizeSamples;
+            readPos.store(newReadPos, std::memory_order_release);
+            availableFrames.fetch_sub(framesToPlay, std::memory_order_release);
+        }
 
         // 8) Actualizar timestamp si reproducimos algo
         if (LIKELY(framesToPlay > 0)) {
@@ -182,19 +189,22 @@ public:
             }
         }
 
-        // 9) Drop preventivo si el buffer crece demasiado (raro)
-        int currentAvailable = availableFrames.load();
-        if (UNLIKELY(currentAvailable > DROP_THRESHOLD)) {
-            int excess = currentAvailable - TARGET_BUFFER_FRAMES;
-            if (excess > 0) {
-                int currentRP = readPos.load();
-                int newRP = (currentRP + excess * channelCount) % bufferSizeSamples;
-                readPos.store(newRP, std::memory_order_release);
-                availableFrames.fetch_sub(excess, std::memory_order_release);
-                dropCount.fetch_add(excess);
-                
-                if (excess > 256) {
-                    LOGD("🗑️ Drop preventivo: %d frames", excess);
+        // 9) Drop preventivo si el buffer crece demasiado (raro) - CON PROTECCIÓN
+        {
+            std::lock_guard<std::mutex> lock(resetMutex);
+            int currentAvailable = availableFrames.load();
+            if (UNLIKELY(currentAvailable > DROP_THRESHOLD)) {
+                int excess = currentAvailable - TARGET_BUFFER_FRAMES;
+                if (excess > 0) {
+                    int currentRP = readPos.load();
+                    int newRP = (currentRP + excess * channelCount) % bufferSizeSamples;
+                    readPos.store(newRP, std::memory_order_release);
+                    availableFrames.fetch_sub(excess, std::memory_order_release);
+                    dropCount.fetch_add(excess);
+                    
+                    if (excess > 256) {
+                        LOGD("🗑️ Drop preventivo: %d frames", excess);
+                    }
                 }
             }
         }
@@ -217,20 +227,28 @@ public:
         int available = availableFrames.load(std::memory_order_acquire);
         int freeFrames = BUFFER_SIZE_FRAMES - available;
 
-        // 2) Si no hay espacio suficiente, hacer drop menos agresivo (ahora con buffer mayor)
+        // 2) Si no hay espacio suficiente, hacer drop con mutex (evita race condition)
         if (UNLIKELY(freeFrames < numFrames)) {
-            // ✅ FIX: En lugar de limpiar 75%, solo limpiar 50% (menos lag)
-            int framesToClear = (available * 1) / 2;  // 50% en lugar de 75%
-            if (framesToClear > 0) {
-                LOGW("🗑️ Buffer saturado (%d frames), limpiando %d", available, framesToClear);
-                
-                int currentRP = readPos.load(std::memory_order_acquire);
-                int newRP = (currentRP + framesToClear * channelCount) % bufferSizeSamples;
-                readPos.store(newRP, std::memory_order_release);
-                availableFrames.fetch_sub(framesToClear, std::memory_order_release);
-                dropCount.fetch_add(framesToClear);
-                
-                freeFrames = BUFFER_SIZE_FRAMES - availableFrames.load();
+            // ✅ CRITICAL FIX: Usar mutex para drop - readPos se está leyendo desde callback simultáneamente
+            std::lock_guard<std::mutex> lock(resetMutex);
+            
+            available = availableFrames.load(std::memory_order_acquire);
+            freeFrames = BUFFER_SIZE_FRAMES - available;
+            
+            if (UNLIKELY(freeFrames < numFrames) && available > 100) {
+                // ✅ FIX: Cleanly drop solo 30% (mucho menos agresivo que 50%)
+                int framesToClear = (available * 3) / 10;  // 30% en lugar de 75% anterior
+                if (framesToClear > 0) {
+                    LOGW("🗑️ Buffer saturado (%d frames), limpiando %d", available, framesToClear);
+                    
+                    int currentRP = readPos.load(std::memory_order_acquire);
+                    int newRP = (currentRP + framesToClear * channelCount) % bufferSizeSamples;
+                    readPos.store(newRP, std::memory_order_release);
+                    availableFrames.fetch_sub(framesToClear, std::memory_order_release);
+                    dropCount.fetch_add(framesToClear);
+                    
+                    freeFrames = BUFFER_SIZE_FRAMES - availableFrames.load();
+                }
             }
         }
 
