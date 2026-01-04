@@ -61,13 +61,23 @@ class OboeAudioRenderer(private val context: Context? = null) {
     private external fun nativeSetBufferSize(streamHandle: Long, bufferSize: Int)
 
     private var engineHandle: Long = 0
-    private val streamHandles = ConcurrentHashMap<Int, StreamState>()
+    private val streamHandles = ConcurrentHashMap<Int, StreamState>()  // Solo canales del usuario
     private val channelStates = ConcurrentHashMap<Int, ChannelState>()
 
     private var masterGainDb = 0f
     private var isInitialized = false
     private var totalPacketsReceived = 0
     private var totalPacketsDropped = 0
+
+    // ✅ FIX: Evitar race conditions entre render (nativeWriteAudio) y destroyStream/nativeStopStream
+    // Se usa un lock corto SOLO alrededor de llamadas nativas (no alrededor de la mezcla).
+    private val streamOpLock = Any()
+
+    // ✅ INTERNO: Stream maestro estéreo (mezcla de todos los canales mono)
+    // Completamente privado, el usuario NO tiene acceso a él
+    // Se gestiona internamente en renderMixedChannels()
+    private var masterStreamState: StreamState? = null
+    private val MASTER_STREAM_NATIVE_CHANNEL_ID = 0
 
     // ✅ Device capabilities con valores seguros
     // ✅ OPTIMIZACIÓN LATENCIA FASE 1: Buffer pool para reducir GC pauses
@@ -206,33 +216,76 @@ class OboeAudioRenderer(private val context: Context? = null) {
      * ✅ CORREGIDO: Usar método nativo correcto
      */
     private fun getOrCreateStream(channel: Int): Long {
-        val streamState = streamHandles[channel]
+        return getOrCreateStreamInternal(key = channel, nativeChannelId = channel)
+    }
 
-        if (streamState != null && streamState.consecutiveFailures < MAX_WRITE_FAILURES) {
-            return streamState.handle
-        }
-
-        if (streamState != null) {
-            Log.w(TAG, "🔄 Recreando stream canal $channel (${streamState.consecutiveFailures} fallos)")
-            destroyStream(channel)
-        }
-
-        if (streamHandles.size >= MAX_SIMULTANEOUS_STREAMS && !streamHandles.containsKey(channel)) {
-            Log.w(TAG, "⚠️ Límite de streams alcanzado ($MAX_SIMULTANEOUS_STREAMS)")
-
-            val leastUsed = streamHandles.entries
-                .minByOrNull { it.value.lastWriteTime }
-                ?.key
-
-            if (leastUsed != null) {
-                Log.w(TAG, "🗑️ Liberando canal $leastUsed por límite")
-                destroyStream(leastUsed)
-            } else {
-                return 0L
+    /**
+     * ✅ INTERNO: Obtener o crear el stream maestro (mezcla estéreo)
+     * Completamente privado, no expuesto al usuario
+     */
+    private fun getOrCreateMasterStream(): Long {
+        return synchronized(streamOpLock) {
+            // Si existe y está sano, reutilizar
+            if (masterStreamState != null && masterStreamState!!.consecutiveFailures < MAX_WRITE_FAILURES) {
+                return@synchronized masterStreamState!!.handle
             }
-        }
 
-        return createNewStream(channel)
+            // Destruir el anterior si estaba fallando
+            if (masterStreamState != null) {
+                Log.w(TAG, "🔄 Recreando master stream (${masterStreamState!!.consecutiveFailures} fallos)")
+                destroyMasterStream()
+            }
+
+            // Crear nuevo
+            val handle = synchronized(streamOpLock) {
+                nativeCreateStream(engineHandle, MASTER_STREAM_NATIVE_CHANNEL_ID)
+            }
+            if (handle != 0L) {
+                synchronized(streamOpLock) {
+                    nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
+                    nativeStartStream(handle)
+                }
+                masterStreamState = StreamState(handle = handle)
+                val latencyEstimate = (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE).format(1)
+                Log.d(TAG, "✅ Master stream creado (estéreo, ~${latencyEstimate}ms)")
+            } else {
+                Log.e(TAG, "❌ Falló creación del master stream")
+            }
+
+            handle
+        }
+    }
+
+    private fun getOrCreateStreamInternal(key: Int, nativeChannelId: Int): Long {
+        return synchronized(streamOpLock) {
+            val streamState = streamHandles[key]
+
+            if (streamState != null && streamState.consecutiveFailures < MAX_WRITE_FAILURES) {
+                return@synchronized streamState.handle
+            }
+
+            if (streamState != null) {
+                Log.w(TAG, "🔄 Recreando stream canal $key (${streamState.consecutiveFailures} fallos)")
+                destroyStream(key)
+            }
+
+            if (streamHandles.size >= MAX_SIMULTANEOUS_STREAMS && !streamHandles.containsKey(key)) {
+                Log.w(TAG, "⚠️ Límite de streams alcanzado ($MAX_SIMULTANEOUS_STREAMS)")
+
+                val leastUsed = streamHandles.entries
+                    .minByOrNull { it.value.lastWriteTime }
+                    ?.key
+
+                if (leastUsed != null) {
+                    Log.w(TAG, "🗑️ Liberando canal $leastUsed por límite")
+                    destroyStream(leastUsed)
+                } else {
+                    return@synchronized 0L
+                }
+            }
+
+            createNewStream(key = key, nativeChannelId = nativeChannelId)
+        }
     }
 
     /**
@@ -245,38 +298,41 @@ class OboeAudioRenderer(private val context: Context? = null) {
      *
      * NO necesitamos método nativo custom para MMAP.
      */
-    private fun createNewStream(channel: Int): Long {
+    private fun createNewStream(key: Int, nativeChannelId: Int): Long {
         try {
             if (!isInitialized) {
                 Log.e(TAG, "❌ Engine no inicializado")
                 return 0L
             }
 
-            // ✅ Usar método nativo estándar
-            val handle = nativeCreateStream(engineHandle, channel)
+            val handle = synchronized(streamOpLock) {
+                // ✅ Usar método nativo estándar
+                nativeCreateStream(engineHandle, nativeChannelId)
+            }
 
             if (handle != 0L) {
                 // ✅ Configurar buffer size óptimo
-                nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
-
-                nativeStartStream(handle)
-                streamHandles[channel] = StreamState(handle = handle)
+                synchronized(streamOpLock) {
+                    nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
+                    nativeStartStream(handle)
+                }
+                streamHandles[key] = StreamState(handle = handle)
 
                 val latencyEstimate = (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE).format(1)
 
                 Log.d(TAG, """
-                    ✅ Stream canal $channel creado
+                    ✅ Stream canal $key creado
                        Buffer: $OPTIMAL_BUFFER_SIZE frames (~${latencyEstimate}ms)
                        Sample Rate: $OPTIMAL_SAMPLE_RATE Hz
                 """.trimIndent())
             } else {
-                Log.e(TAG, "❌ Falló creación de stream para canal $channel")
+                Log.e(TAG, "❌ Falló creación de stream para canal $key")
             }
 
             return handle
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Excepción creando stream canal $channel: ${e.message}", e)
+            Log.e(TAG, "❌ Excepción creando stream canal $key: ${e.message}", e)
             return 0L
         }
     }
@@ -381,7 +437,9 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
         // Escribir a Oboe
         try {
-            val written = nativeWriteAudio(streamHandle, stereoBuffer)
+            val written = synchronized(streamOpLock) {
+                nativeWriteAudio(streamHandle, stereoBuffer)
+            }
             val streamState = streamHandles[channel]
 
             if (written < stereoBuffer.size) {
@@ -393,10 +451,12 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
                     // Estrategia de recuperación
                     when (streamState.consecutiveFailures) {
-                        1 -> nativeClearBuffer(streamHandle)
+                        1 -> synchronized(streamOpLock) { nativeClearBuffer(streamHandle) }
                         3 -> {
-                            nativeStopStream(streamHandle)
-                            nativeStartStream(streamHandle)
+                            synchronized(streamOpLock) {
+                                nativeStopStream(streamHandle)
+                                nativeStartStream(streamHandle)
+                            }
                         }
                         5 -> destroyStream(channel)
                     }
@@ -422,7 +482,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
                 if (timeSinceLastClear > 500) {
                     try {
-                        nativeClearBuffer(streamHandle)
+                        synchronized(streamOpLock) { nativeClearBuffer(streamHandle) }
                         streamState.lastClearTime = System.currentTimeMillis()
                     } catch (ignored: Exception) {
                         streamState.consecutiveFailures = MAX_WRITE_FAILURES
@@ -546,10 +606,12 @@ class OboeAudioRenderer(private val context: Context? = null) {
             }
 
             // ✅ ESCRIBIR UNA SOLA VEZ al stream único de Oboe
-            val masterStreamHandle = getOrCreateStream(0)  // Stream maestro en canal 0
+            val masterStreamHandle = getOrCreateMasterStream()  // Stream maestro separado de CH1
             if (masterStreamHandle != 0L) {
                 try {
-                    val written = nativeWriteAudio(masterStreamHandle, mixedBuffer)
+                    val written = synchronized(streamOpLock) {
+                        nativeWriteAudio(masterStreamHandle, mixedBuffer)
+                    }
 
                     if (written < stereoBufferSize) {
                         val dropped = (stereoBufferSize - written) / 2
@@ -559,22 +621,23 @@ class OboeAudioRenderer(private val context: Context? = null) {
                             Log.d(TAG, "🗑️ Mixed Drop: $dropped frames")
                         }
 
-                        val streamState = streamHandles[0]
-                        if (streamState != null) {
-                            streamState.consecutiveFailures++
+                        if (masterStreamState != null) {
+                            masterStreamState!!.consecutiveFailures++
 
                             // Estrategia de recuperación
-                            when (streamState.consecutiveFailures) {
-                                1 -> nativeClearBuffer(masterStreamHandle)
+                            when (masterStreamState!!.consecutiveFailures) {
+                                1 -> synchronized(streamOpLock) { nativeClearBuffer(masterStreamHandle) }
                                 3 -> {
-                                    nativeStopStream(masterStreamHandle)
-                                    nativeStartStream(masterStreamHandle)
+                                    synchronized(streamOpLock) {
+                                        nativeStopStream(masterStreamHandle)
+                                        nativeStartStream(masterStreamHandle)
+                                    }
                                 }
-                                5 -> destroyStream(0)
+                                5 -> destroyMasterStream()
                             }
                         }
                     } else {
-                        streamHandles[0]?.let {
+                        masterStreamState?.let {
                             it.consecutiveFailures = 0
                             it.lastWriteTime = System.currentTimeMillis()
                         }
@@ -584,13 +647,13 @@ class OboeAudioRenderer(private val context: Context? = null) {
                     Log.e(TAG, "❌ Error escribiendo stream mezclado: ${e.message}")
                     totalPacketsDropped += stereoBufferSize / 2
 
-                    streamHandles[0]?.let { streamState ->
+                    masterStreamState?.let { streamState ->
                         streamState.consecutiveFailures++
                         val timeSinceLastClear = System.currentTimeMillis() - streamState.lastClearTime
 
                         if (timeSinceLastClear > 500) {
                             try {
-                                nativeClearBuffer(masterStreamHandle)
+                                synchronized(streamOpLock) { nativeClearBuffer(masterStreamHandle) }
                                 streamState.lastClearTime = System.currentTimeMillis()
                             } catch (ignored: Exception) {
                                 streamState.consecutiveFailures = MAX_WRITE_FAILURES
@@ -644,11 +707,31 @@ class OboeAudioRenderer(private val context: Context? = null) {
         val streamState = streamHandles.remove(channel) ?: return
 
         try {
-            nativeStopStream(streamState.handle)
-            nativeDestroyStream(streamState.handle)
+            synchronized(streamOpLock) {
+                nativeStopStream(streamState.handle)
+                nativeDestroyStream(streamState.handle)
+            }
             Log.d(TAG, "🗑️ Stream canal $channel destruido")
         } catch (e: Exception) {
             Log.e(TAG, "Error destruyendo stream canal $channel: ${e.message}")
+        }
+    }
+
+    /**
+     * ✅ INTERNO: Destruir el stream maestro (privado)
+     */
+    private fun destroyMasterStream() {
+        val streamState = masterStreamState ?: return
+
+        try {
+            synchronized(streamOpLock) {
+                nativeStopStream(streamState.handle)
+                nativeDestroyStream(streamState.handle)
+            }
+            masterStreamState = null
+            Log.d(TAG, "🗑️ Master stream destruido")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error destruyendo master stream: ${e.message}")
         }
     }
 
@@ -659,6 +742,9 @@ class OboeAudioRenderer(private val context: Context? = null) {
         channelsToRecreate.forEach { channel ->
             destroyStream(channel)
         }
+
+        // También destruir el master stream para que se recree
+        destroyMasterStream()
 
         Log.i(TAG, "✅ Streams marcados para recreación: ${channelsToRecreate.size}")
     }
@@ -796,6 +882,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
                     Log.e(TAG, "⚠️ Error deteniendo stream $channel: ${e.message}")
                 }
             }
+            destroyMasterStream()
             channelStates.clear()
             resetRFStats()
             Log.d(TAG, "✅ OboeAudioRenderer detenido completamente")

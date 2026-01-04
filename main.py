@@ -433,6 +433,9 @@ class AudioServerApp:
                 else:
 
                     self.executor = None
+                
+                # ✅ NUEVO: Referencia al websocket_server para streaming de audio maestro
+                self.websocket_server_ref = None
 
                 
 
@@ -507,19 +510,26 @@ class AudioServerApp:
                     if not isinstance(subscription, dict):
 
                         return
-
+                    
+                    # ✅ NUEVO: Verificar si es el cliente maestro
+                    is_master = subscription.get('is_master', False)
                     
 
                     channels = subscription.get('channels', [])
 
                     gains = subscription.get('gains', {})
 
+                    pans = subscription.get('pans', {})
                     
+                    if not channels:
+                        return
 
-                    if channels:
-
+                    
+                    if is_master:
+                        # ✅ Enviar audio mezclado al cliente maestro vía web
+                        self._send_master_audio(audio_data, channels, gains, pans, subscription)
+                    else:
                         self._send_audio_optimized(client_id, audio_data, channels, gains)
-
                 except:
 
                     pass
@@ -535,6 +545,9 @@ class AudioServerApp:
                     if not isinstance(subscription, dict):
 
                         return
+                    
+                    # ✅ NUEVO: Verificar si es el cliente maestro
+                    is_master = subscription.get('is_master', False)
 
                     
 
@@ -542,15 +555,98 @@ class AudioServerApp:
 
                     gains = subscription.get('gains', {})
 
+                    pans = subscription.get('pans', {})
                     
+                    if not channels:
+                        return
 
-                    if channels:
-
+                    
+                    if is_master:
+                        # ✅ Enviar audio mezclado al cliente maestro vía web
+                        self._send_master_audio(audio_data, channels, gains, pans, subscription)
+                    else:
                         self._send_audio_optimized(client_id, audio_data, channels, gains)
-
                 except:
 
                     pass
+            
+            def _send_master_audio(self, audio_data, channels, gains, pans, subscription):
+                """✅ NUEVO: Enviar audio mezclado para el cliente maestro vía WebSocket"""
+                try:
+                    from audio_server import websocket_server
+                    
+                    # Verificar si hay listeners activos
+                    if not websocket_server.master_audio_listeners:
+                        return
+                    
+                    # Pre-escucha tiene prioridad
+                    pre_listen = subscription.get('pre_listen')
+                    solos = subscription.get('solos', set())
+                    mutes = subscription.get('mutes', {})
+                    master_gain = subscription.get('master_gain', 1.0)
+                    
+                    # Determinar canales activos
+                    if pre_listen is not None:
+                        active_channels = [pre_listen]
+                    elif solos:
+                        active_channels = [ch for ch in channels if ch in solos]
+                    else:
+                        active_channels = [ch for ch in channels if not mutes.get(ch, False)]
+                    
+                    if not active_channels:
+                        return
+                    
+                    # Crear buffer de salida stereo
+                    num_samples = audio_data.shape[0]
+                    output_L = np.zeros(num_samples, dtype=np.float32)
+                    output_R = np.zeros(num_samples, dtype=np.float32)
+                    
+                    # Mezclar canales activos
+                    for ch in active_channels:
+                        if ch >= audio_data.shape[1]:
+                            continue
+                        
+                        channel_data = audio_data[:, ch].astype(np.float32)
+                        
+                        # Aplicar ganancia individual
+                        gain = gains.get(ch, 1.0) * master_gain
+                        if gain != 1.0:
+                            channel_data = channel_data * gain
+                        
+                        # Aplicar panorama
+                        pan = pans.get(ch, 0.0)  # -1.0 = izquierda, 1.0 = derecha
+                        
+                        # Cálculo de pan (equal power panning)
+                        pan_normalized = (pan + 1.0) / 2.0  # 0.0 a 1.0
+                        gain_L = np.cos(pan_normalized * np.pi / 2)
+                        gain_R = np.sin(pan_normalized * np.pi / 2)
+                        
+                        output_L += channel_data * gain_L
+                        output_R += channel_data * gain_R
+                    
+                    # Limitar para evitar clipping
+                    output_L = np.clip(output_L, -1.0, 1.0)
+                    output_R = np.clip(output_R, -1.0, 1.0)
+                    
+                    # Intercalar L/R para formato stereo
+                    stereo_data = np.empty(num_samples * 2, dtype=np.float32)
+                    stereo_data[0::2] = output_L
+                    stereo_data[1::2] = output_R
+                    
+                    # Convertir a int16 para menor tamaño de datos
+                    audio_int16 = (stereo_data * 32767).astype(np.int16)
+                    audio_bytes = audio_int16.tobytes()
+                    
+                    # Enviar a través del websocket_server
+                    websocket_server.broadcast_master_audio(
+                        audio_bytes,
+                        config.SAMPLE_RATE,
+                        2  # stereo
+                    )
+                    
+                except Exception as e:
+                    if config.DEBUG:
+                        print(f"[MASTER] Error enviando audio: {e}")
 
             
 

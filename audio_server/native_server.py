@@ -252,7 +252,15 @@ class NativeClient:
         
         if isinstance(audio_data, memoryview):
             num_channels = len(self.subscribed_channels)
-            audio_data = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, num_channels)
+            # ✅ ARREGLO: Validar que num_channels sea válido antes de reshape
+            if num_channels <= 0:
+                return True  # Sin canales, no hay nada que enviar
+            try:
+                audio_data = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, num_channels)
+            except (ValueError, RuntimeError) as e:
+                if config.DEBUG:
+                    logger.error(f"❌ Error reshape audio: num_channels={num_channels}, error={e}")
+                return False
         
         channels = sorted(list(self.subscribed_channels))
         max_channel = audio_data.shape[1] - 1
@@ -1257,6 +1265,8 @@ class NativeAudioServer:
             
             channels = subscription.get('channels', [])
             if not channels:
+                # ✅ ARREGLO: Asegurar que subscribed_channels es vacío cuando no hay canales
+                client.subscribed_channels = set()
                 continue
             
             # ✅ FASE 2: Usar cache de paquetes por grupo de canales
@@ -1270,6 +1280,8 @@ class NativeAudioServer:
                 # Crear paquete y cachear
                 valid_channels = sorted([ch for ch in channels if ch < audio_data.shape[1]])
                 if not valid_channels:
+                    # ✅ ARREGLO: Limpiar subscribed_channels si no hay canales válidos
+                    client.subscribed_channels = set()
                     continue
                     
                 packet_bytes = NativeAndroidProtocol.create_audio_packet(
@@ -1282,7 +1294,10 @@ class NativeAudioServer:
                 else:
                     continue
             
-            client.subscribed_channels = set(channels)
+            # ✅ ARREGLO: Actualizar subscribed_channels con validación
+            # Solo guardar canales que existen en el audio_data
+            valid_subscribed = [ch for ch in channels if ch < audio_data.shape[1]]
+            client.subscribed_channels = set(valid_subscribed)
             
             try:
                 # ✅ ULTRA-BAJA LATENCIA: Envío síncrono directo (sin cola async)

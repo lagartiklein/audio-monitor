@@ -142,3 +142,17 @@ MAX_CONCURRENT_SENDS = 4
 # AUDIO WORKLET (No usado en WiFi sin HTTPS)
 # ============================================================================
 USE_AUDIO_WORKLET = False
+
+# ============================================================================
+# ✅ CLIENTE MAESTRO (SONIDISTA WEB MONITOR)
+# ============================================================================
+# El cliente maestro es un cliente especial que:
+# - Aparece siempre primero en la lista de clientes
+# - Se reproduce vía Web Audio API en el navegador
+# - Permite al sonidista monitorear sin interferir con Android
+MASTER_CLIENT_ENABLED = True
+MASTER_CLIENT_UUID = "__master_server_client__"
+MASTER_CLIENT_NAME = "🎧 Monitor Sonidista"
+MASTER_CLIENT_DEFAULT_CHANNELS = []  # Empezar sin canales, el usuario selecciona
+WEB_AUDIO_BUFFER_SIZE = 2048  # Buffer para Web Audio (samples)
+WEB_AUDIO_STREAM_ENABLED = True  # Habilitar streaming de audio vía WebSocket

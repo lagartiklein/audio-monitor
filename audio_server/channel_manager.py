@@ -29,6 +29,8 @@ class ChannelManager:
     ✅ NUEVO: Integración con Device Registry para identificación persistente
     
     ✅ NUEVO: Mapeo automático de interfaces físicas a canales lógicos
+    
+    ✅ NUEVO: Cliente Maestro (Sonidista) para monitor vía web
 
     """
 
@@ -38,7 +40,7 @@ class ChannelManager:
 
         self.subscriptions = {}  # client_id -> subscription_data
 
-        self.client_types = {}   # client_id -> "native" | "web"
+        self.client_types = {}   # client_id -> "native" | "web" | "master"
 
         # ✅ socketio se inyecta desde websocket_server
 
@@ -54,8 +56,50 @@ class ChannelManager:
         # ✅ NUEVO: Mapeo de interfaces físicas a canales lógicos
         self.device_channel_map = {}  # device_uuid -> {'start_channel': int, 'num_channels': int, 'physical_channels': int}
         self.next_available_channel = 0  # Próximo canal disponible para asignar
+        
+        # ✅ NUEVO: Cliente Maestro (Sonidista Web Monitor)
+        self.master_client_id = None
+        if getattr(config, 'MASTER_CLIENT_ENABLED', True):
+            self._init_master_client()
 
         print(f"[ChannelManager] ✅ Inicializado: {num_channels} canales")
+    
+    def _init_master_client(self):
+        """✅ NUEVO: Inicializar cliente maestro para monitor del sonidista"""
+        master_uuid = getattr(config, 'MASTER_CLIENT_UUID', '__master_server_client__')
+        master_name = getattr(config, 'MASTER_CLIENT_NAME', '🎧 Monitor Sonidista')
+        default_channels = getattr(config, 'MASTER_CLIENT_DEFAULT_CHANNELS', [])
+        
+        self.master_client_id = master_uuid
+        
+        # Crear suscripción del cliente maestro
+        self.subscriptions[master_uuid] = {
+            'channels': list(default_channels),
+            'gains': {ch: 1.0 for ch in default_channels},
+            'pans': {ch: 0.0 for ch in default_channels},
+            'mutes': {ch: False for ch in default_channels},
+            'solos': set(),
+            'pre_listen': None,
+            'master_gain': 1.0,
+            'client_type': 'master',
+            'device_uuid': master_uuid,
+            'is_master': True,  # ✅ Flag especial para identificación
+            'custom_name': master_name,
+            'last_update': time.time()
+        }
+        
+        self.client_types[master_uuid] = 'master'
+        self.device_client_map[master_uuid] = master_uuid
+        
+        logger.info(f"[ChannelManager] 🎧 Cliente Maestro inicializado: {master_name}")
+    
+    def is_master_client(self, client_id: str) -> bool:
+        """✅ NUEVO: Verificar si un cliente es el cliente maestro"""
+        return client_id == self.master_client_id
+    
+    def get_master_client_id(self) -> str:
+        """✅ NUEVO: Obtener ID del cliente maestro"""
+        return self.master_client_id
 
     
 
@@ -669,6 +713,7 @@ class ChannelManager:
     def get_all_clients_info(self):
         """
         ✅ NUEVO: Obtener info de todos los clientes
+        ✅ MEJORADO: Incluye cliente maestro con flag especial
         """
         clients_info = []
 
@@ -686,25 +731,28 @@ class ChannelManager:
         for client_id, sub in self.subscriptions.items():
             client_type = self.client_types.get(client_id, "unknown")
             device_uuid = sub.get('device_uuid')
+            is_master = sub.get('is_master', False)
 
             # ✅ Obtener device_model y custom_name desde device_registry
             device_model = None
-            custom_name = None
+            custom_name = sub.get('custom_name')  # Primero verificar si está en subscription
             device_name = None
-            if device_uuid and self.device_registry:
+            if device_uuid and self.device_registry and not is_master:
                 try:
                     device_info = self.device_registry.get_device(device_uuid)
                     if device_info:
                         device_model = device_info.get('device_info', {}).get('model') or \
                                       device_info.get('device_info', {}).get('device_model')
-                        custom_name = device_info.get('custom_name')
+                        custom_name = custom_name or device_info.get('custom_name')
                         device_name = device_info.get('name')
                 except Exception as e:
                     logger.debug(f"[ChannelManager] Error getting device info: {e}")
 
             # Determinar si está conectado
             connected = False
-            if client_type == 'native':
+            if is_master:
+                connected = True  # ✅ El cliente maestro siempre está "conectado"
+            elif client_type == 'native':
                 connected = client_id in connected_native_ids
             elif client_type == 'web':
                 connected = client_id in connected_web_ids
@@ -725,7 +773,8 @@ class ChannelManager:
                 'pre_listen': sub.get('pre_listen'),
                 'master_gain': sub.get('master_gain', 1.0),
                 'last_update': sub.get('last_update', 0),
-                'connected': connected
+                'connected': connected,
+                'is_master': is_master  # ✅ NUEVO: Flag para identificar cliente maestro
             })
         return clients_info
 

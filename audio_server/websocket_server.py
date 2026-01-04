@@ -4,6 +4,7 @@ WebSocket Server - COMPLETE & FIXED
 ✅ Gestión de clientes nativos y web
 ✅ Broadcast optimizado
 ✅ Detección de clientes zombie
+✅ NUEVO: Streaming de audio para cliente maestro
 """
 
 from flask import Flask, send_from_directory, request
@@ -14,6 +15,7 @@ import logging
 import config
 import threading  # ✅ Asegurar que threading esté disponible
 import json
+import numpy as np
 import engineio.server
 
 # ✅ PATCH: Forzar async_modes a solo 'threading' para PyInstaller
@@ -172,6 +174,57 @@ def broadcast_audio_levels(levels):
         }, broadcast=True, namespace='/')
     except Exception as e:
         logger.debug(f"[WebSocket] Error broadcasting audio levels: {e}")
+
+
+# ✅ NUEVO: Streaming de audio para cliente maestro
+master_audio_listeners = {}  # sid -> True (clientes web que escuchan audio del maestro)
+master_audio_lock = __import__('threading').Lock()
+
+
+def broadcast_master_audio(audio_data: bytes, sample_rate: int, channels: int):
+    """
+    ✅ NUEVO: Emitir audio mezclado del cliente maestro a los listeners web
+    
+    Args:
+        audio_data: bytes del audio en formato int16
+        sample_rate: tasa de muestreo
+        channels: número de canales en la mezcla
+    """
+    try:
+        with master_audio_lock:
+            if not master_audio_listeners:
+                return
+            
+            listeners = list(master_audio_listeners.keys())
+        
+        # Emitir solo a los listeners activos
+        for sid in listeners:
+            try:
+                socketio.emit('master_audio_data', {
+                    'audio': audio_data,  # bytes en base64 si es necesario
+                    'sample_rate': sample_rate,
+                    'channels': channels,
+                    'timestamp': int(time.time() * 1000)
+                }, to=sid, namespace='/')
+            except Exception as e:
+                logger.debug(f"[WebSocket] Error enviando audio a {sid[:8]}: {e}")
+    except Exception as e:
+        logger.debug(f"[WebSocket] Error en broadcast_master_audio: {e}")
+
+
+def register_master_audio_listener(sid: str):
+    """✅ NUEVO: Registrar un cliente web para recibir audio del maestro"""
+    with master_audio_lock:
+        master_audio_listeners[sid] = True
+        logger.info(f"[WebSocket] 🎧 Listener de audio maestro registrado: {sid[:8]}")
+
+
+def unregister_master_audio_listener(sid: str):
+    """✅ NUEVO: Desregistrar un cliente web del audio del maestro"""
+    with master_audio_lock:
+        if sid in master_audio_listeners:
+            del master_audio_listeners[sid]
+            logger.info(f"[WebSocket] 🎧 Listener de audio maestro removido: {sid[:8]}")
 
 def cleanup_expired_web_states():
     """Limpiar estados persistentes expirados para web clients"""
@@ -378,6 +431,9 @@ def handle_disconnect():
     
     # ✅ CONFIGURACIÓN DE SESIÓN: No guardar estado persistente
     # Las configuraciones de clientes web se pierden al desconectar (solo durante la sesión)
+    
+    # ✅ NUEVO: Desregistrar listener de audio maestro si estaba activo
+    unregister_master_audio_listener(client_id)
     
     # ✅ Remover de tracking
     with web_clients_lock:
@@ -947,6 +1003,109 @@ def handle_heartbeat(data):
 
 
 # ============================================================================
+# EVENTOS SOCKETIO - CLIENTE MAESTRO (AUDIO STREAMING)
+# ============================================================================
+
+@socketio.on('start_master_audio')
+def handle_start_master_audio():
+    """
+    ✅ NUEVO: Iniciar recepción de audio del cliente maestro
+    El cliente web solicita recibir el stream de audio del maestro
+    """
+    client_id = request.sid
+    update_client_activity(client_id)
+    
+    if not channel_manager:
+        emit('error', {'message': 'Channel manager not available'})
+        return
+    
+    try:
+        # Verificar que el cliente maestro existe
+        master_id = channel_manager.get_master_client_id()
+        if not master_id:
+            emit('error', {'message': 'Master client not enabled'})
+            return
+        
+        # Registrar como listener
+        register_master_audio_listener(client_id)
+        
+        # Enviar confirmación con información del stream
+        emit('master_audio_started', {
+            'master_client_id': master_id,
+            'sample_rate': config.SAMPLE_RATE,
+            'buffer_size': getattr(config, 'WEB_AUDIO_BUFFER_SIZE', 2048),
+            'channels': 2,  # Siempre stereo para el master
+            'status': 'streaming',
+            'timestamp': int(time.time() * 1000)
+        })
+        
+        logger.info(f"[WebSocket] 🎧 Cliente {client_id[:8]} inició stream de audio maestro")
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en start_master_audio: {e}")
+        emit('error', {'message': str(e)})
+
+
+@socketio.on('stop_master_audio')
+def handle_stop_master_audio():
+    """
+    ✅ NUEVO: Detener recepción de audio del cliente maestro
+    """
+    client_id = request.sid
+    update_client_activity(client_id)
+    
+    try:
+        unregister_master_audio_listener(client_id)
+        
+        emit('master_audio_stopped', {
+            'status': 'stopped',
+            'timestamp': int(time.time() * 1000)
+        })
+        
+        logger.info(f"[WebSocket] 🎧 Cliente {client_id[:8]} detuvo stream de audio maestro")
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en stop_master_audio: {e}")
+
+
+@socketio.on('get_master_client_info')
+def handle_get_master_client_info():
+    """
+    ✅ NUEVO: Obtener información del cliente maestro
+    """
+    update_client_activity(request.sid)
+    
+    if not channel_manager:
+        emit('error', {'message': 'Channel manager not available'})
+        return
+    
+    try:
+        master_id = channel_manager.get_master_client_id()
+        if not master_id:
+            emit('master_client_info', {
+                'enabled': False,
+                'message': 'Master client not enabled'
+            })
+            return
+        
+        subscription = channel_manager.get_client_subscription(master_id)
+        
+        emit('master_client_info', {
+            'enabled': True,
+            'master_client_id': master_id,
+            'name': getattr(config, 'MASTER_CLIENT_NAME', '🎧 Monitor Sonidista'),
+            'channels': subscription.get('channels', []) if subscription else [],
+            'sample_rate': config.SAMPLE_RATE,
+            'buffer_size': getattr(config, 'WEB_AUDIO_BUFFER_SIZE', 2048),
+            'streaming_available': getattr(config, 'WEB_AUDIO_STREAM_ENABLED', True),
+            'timestamp': int(time.time() * 1000)
+        })
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en get_master_client_info: {e}")
+
+
+# ============================================================================
 # FUNCIONES HELPER
 # ============================================================================
 
@@ -996,8 +1155,8 @@ def _save_client_config_to_registry(client_id):
 
 def get_all_clients_info():
     """
-    ✅ Obtener información de TODOS los clientes (nativos + web)
-    ✅ FILTRO: Solo mostrar clientes reales (type='web' o 'native'/'android')
+    ✅ Obtener información de TODOS los clientes (nativos + web + maestro)
+    ✅ FILTRO: Solo mostrar clientes reales (type='web' o 'native'/'android' o 'master')
     """
     # --- NUEVO: Mostrar todos los dispositivos conocidos (persistentes y activos) ---
     all_devices = []
@@ -1010,14 +1169,18 @@ def get_all_clients_info():
         except Exception as e:
             logger.error(f"[WebSocket] Error obteniendo dispositivos de device_registry: {e}")
 
-    # Obtener clientes activos en memoria
+    # Obtener clientes activos en memoria (incluye el maestro)
     active_clients = {}
     if channel_manager:
         try:
             for c in channel_manager.get_all_clients_info():
-                # ✅ FILTRO: Solo clientes reales
-                if c.get('type') not in ('web', 'native', 'android'):
+                # ✅ MEJORADO: Incluir clientes reales Y el cliente maestro
+                client_type = c.get('type', 'unknown')
+                is_master = c.get('is_master', False)
+                
+                if client_type not in ('web', 'native', 'android', 'master') and not is_master:
                     continue
+                    
                 # Indexar por device_uuid si existe, sino por id
                 key = c.get('device_uuid') or c.get('id')
                 active_clients[key] = c
@@ -1062,8 +1225,11 @@ def get_all_clients_info():
     # Agregar clientes activos que no tengan device_uuid (ej: legacy o sin registro)
     for key, active in active_clients.items():
         if key and key not in seen_uuids:
-            # ✅ FILTRO: Solo clientes reales
-            if active.get('type') in ('web', 'native', 'android'):
+            # ✅ MEJORADO: Incluir clientes reales Y el cliente maestro
+            client_type = active.get('type', 'unknown')
+            is_master = active.get('is_master', False)
+            
+            if client_type in ('web', 'native', 'android', 'master') or is_master:
                 merged_clients.append(active)
 
     # Enriquecer con info de web_clients (address, last_activity)
@@ -1077,21 +1243,35 @@ def get_all_clients_info():
                 client_info['last_activity'] = web_info.get('last_activity')
 
     # ✅ NUEVO: Orden global (si existe) compartido entre navegadores
+    # ✅ IMPORTANTE: El cliente maestro SIEMPRE va primero, seguido de clientes activos
     order = _get_client_order()
+    
+    # Separar cliente maestro del resto
+    master_clients = [c for c in merged_clients if c.get('is_master', False)]
+    other_clients = [c for c in merged_clients if not c.get('is_master', False)]
+    
+    # Separar clientes activos de inactivos
+    active_clients = [c for c in other_clients if c.get('connected', False)]
+    inactive_clients = [c for c in other_clients if not c.get('connected', False)]
+    
     if order:
         order_index = {str(v): i for i, v in enumerate(order)}
 
         def _sort_key(c):
             cid = c.get('device_uuid') or c.get('id')
             idx = order_index.get(str(cid), 10**9)
-            # dentro de "no ordenados": conectados primero y más reciente primero
-            return (idx, not c.get('connected', False), -(c.get('last_activity') or 0))
+            # Ordenar por: orden global, luego por actividad reciente
+            return (idx, -(c.get('last_activity') or 0))
 
-        merged_clients.sort(key=_sort_key)
+        active_clients.sort(key=_sort_key)
+        inactive_clients.sort(key=_sort_key)
     else:
-        # Orden por defecto: conectados primero, luego desconectados
-        merged_clients.sort(key=lambda c: (not c.get('connected', False), -(c.get('last_activity') or 0)))
-    return merged_clients
+        # Orden por defecto: más reciente primero
+        active_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
+        inactive_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
+    
+    # ✅ Orden final: Maestro → Activos → Inactivos
+    return master_clients + active_clients + inactive_clients
 
 
 def get_server_stats():

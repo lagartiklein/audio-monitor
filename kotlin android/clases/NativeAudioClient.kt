@@ -460,7 +460,9 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         pans?.let { data["pans"] = it.mapKeys { e -> e.key.toString() } }
         mutes?.let { data["mutes"] = it.mapKeys { e -> e.key.toString() } }
 
-        if (data.size > 2) {
+        // ✅ ARREGLO: Enviar incluso si channels es el único cambio (incluso si está vacío)
+        // Anteriormente: if (data.size > 2) fallaba cuando channels=[] era el único cambio
+        if (data.size > 2 || channels != null) {  // ← Incluir channels incluso si está vacío
             sendControlMessage("update_mix", data)
         }
     }

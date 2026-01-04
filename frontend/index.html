@@ -234,6 +234,80 @@
             border-radius: 0 2px 2px 0;
         }
 
+        /* ✅ NUEVO: Estilo para cliente maestro */
+        .client-item.master {
+            background: linear-gradient(135deg, rgba(188, 140, 255, 0.15), rgba(88, 166, 255, 0.1));
+            border: 2px solid var(--purple);
+        }
+
+        .client-item.master::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 4px;
+            background: linear-gradient(180deg, var(--purple), var(--accent));
+            border-radius: 0 2px 2px 0;
+        }
+
+        .client-item.master:hover {
+            border-color: var(--purple);
+            box-shadow: 0 0 12px rgba(188, 140, 255, 0.4);
+        }
+
+        .client-item.master.selected {
+            border-color: var(--purple);
+            background: rgba(188, 140, 255, 0.2);
+        }
+
+        /* Audio player para cliente maestro */
+        .master-audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .master-audio-btn {
+            padding: 6px 12px;
+            background: var(--purple);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .master-audio-btn:hover {
+            background: #9e6fdf;
+            transform: scale(1.02);
+        }
+
+        .master-audio-btn.playing {
+            background: var(--green);
+        }
+
+        .master-audio-btn.playing:hover {
+            background: #2ea043;
+        }
+
+        .master-audio-status {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .master-audio-status.active {
+            color: var(--green);
+        }
+
         .client-header {
             display: flex;
             align-items: center;
@@ -726,6 +800,15 @@
                 this.inactivityTimeouts = {}; // Track timeouts per client
                 this.inactivityThreshold = 5 * 60 * 1000; // 5 minutes
                 this.editingClientId = null; // Track inline name edits
+                
+                // ✅ NUEVO: Audio del cliente maestro
+                this.masterAudioContext = null;
+                this.masterAudioPlaying = false;
+                this.masterAudioBuffer = [];
+                this.masterSampleRate = 48000;
+                this.masterNextPlayTime = 0;
+                this.masterScriptProcessor = null;
+                
                 this.init();
             }
 
@@ -774,7 +857,11 @@
             }
 
             syncClientOrderWith(clientsData) {
-                const ids = clientsData.map(c => this.getClientId(c)).filter(Boolean);
+                // ✅ NUEVO: Excluir clientes maestros del orden (siempre van primero)
+                const ids = clientsData
+                    .filter(c => !c.is_master && c.type !== 'master')
+                    .map(c => this.getClientId(c))
+                    .filter(Boolean);
 
                 // Initialize from saved order if available; otherwise derive from current list
                 if (!this.clientOrder || this.clientOrder.length === 0) {
@@ -803,42 +890,76 @@
                     const id = this.getClientId(c);
                     if (id) byId.set(id, c);
                 }
+                
+                // ✅ NUEVO: Separar clientes maestros (van siempre primero)
+                const masterClients = [];
+                const regularClients = [];
+                
+                for (const c of clientsData) {
+                    if (c.is_master || c.type === 'master') {
+                        masterClients.push(c);
+                    } else {
+                        regularClients.push(c);
+                    }
+                }
+                
+                // Ordenar clientes regulares según clientOrder
                 const ordered = [];
                 for (const id of this.clientOrder) {
                     const c = byId.get(id);
-                    if (c) ordered.push(c);
+                    if (c && !c.is_master && c.type !== 'master') ordered.push(c);
                 }
+                
                 // Any leftover (should be none after sync) appended
-                for (const c of clientsData) {
+                for (const c of regularClients) {
                     const id = this.getClientId(c);
                     if (id && !this.clientOrder.includes(id)) ordered.push(c);
                 }
-                return ordered;
+                
+                // ✅ Maestro siempre primero
+                return [...masterClients, ...ordered];
             }
 
             createClientItem(client) {
                 const item = document.createElement('div');
-                item.className = `client-item ${client.type || 'web'}`;
+                const isMaster = client.is_master || client.type === 'master';
+                item.className = `client-item ${isMaster ? 'master' : (client.type || 'web')}`;
 
                 const id = this.getClientId(client);
                 item.dataset.clientId = id;
+                item.dataset.isMaster = isMaster ? '1' : '0';
 
                 if (this.selectedClientId === id) {
                     item.classList.add('selected');
                 }
-                if (client.connected === false) {
+                if (client.connected === false && !isMaster) {
                     item.classList.add('disconnected');
                 }
 
-                const typeIcon = client.type === 'native' ? '📱' : '🌐';
+                // ✅ NUEVO: Icono diferente para el maestro
+                let typeIcon = client.type === 'native' ? '📱' : '🌐';
+                if (isMaster) {
+                    typeIcon = '🎧';
+                }
                 const displayName = this.getDisplayName(client);
+
+                // ✅ NUEVO: Controles de audio para el cliente maestro
+                const masterAudioHTML = isMaster ? `
+                    <div class="master-audio-controls">
+                        <button class="master-audio-btn" data-action="toggle-audio">
+                            <span class="play-icon">▶️</span>
+                            <span class="btn-text">Escuchar</span>
+                        </button>
+                        <span class="master-audio-status">Detenido</span>
+                    </div>
+                ` : '';
 
                 item.innerHTML = `
                         <div class="client-header">
                             <div class="client-name">
                                 <span>${typeIcon}</span>
                                 <span class="client-name-text" title="${displayName}">${displayName}</span>
-                                <button class="edit-name-btn" title="Editar nombre">✏️</button>
+                                ${!isMaster ? '<button class="edit-name-btn" title="Editar nombre">✏️</button>' : ''}
                             </div>
                         </div>
                         <div class="client-info">
@@ -848,28 +969,46 @@
                             ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
                             ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
                         </div>
+                        ${masterAudioHTML}
                     `;
 
                 // Click to select
                 item.addEventListener('click', (e) => {
                     if (item.dataset.editing === '1') return;
-                    if (!e.target.classList.contains('edit-name-btn')) {
+                    if (!e.target.classList.contains('edit-name-btn') && 
+                        !e.target.classList.contains('master-audio-btn') &&
+                        !e.target.closest('.master-audio-btn')) {
                         this.selectClient(id);
                         this.resetClientInactivityTimer(id);
                     }
                 });
 
-                // Edit name button
-                const editBtn = item.querySelector('.edit-name-btn');
-                editBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (item.dataset.editing === '1') return;
-                    this.editClientName(id, displayName, item);
-                    this.resetClientInactivityTimer(id);
-                });
+                // ✅ NUEVO: Botón de audio para el maestro
+                if (isMaster) {
+                    const audioBtn = item.querySelector('.master-audio-btn');
+                    if (audioBtn) {
+                        audioBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.toggleMasterAudio(id, audioBtn, item);
+                        });
+                    }
+                }
 
-                // Drag and drop events
-                item.draggable = true;
+                // Edit name button (no para el maestro)
+                if (!isMaster) {
+                    const editBtn = item.querySelector('.edit-name-btn');
+                    if (editBtn) {
+                        editBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (item.dataset.editing === '1') return;
+                            this.editClientName(id, displayName, item);
+                            this.resetClientInactivityTimer(id);
+                        });
+                    }
+                }
+
+                // Drag and drop events (no para el maestro - siempre primero)
+                item.draggable = !isMaster;
 
                 item.addEventListener('dragstart', (e) => {
                     if (item.dataset.editing === '1') {
@@ -986,6 +1125,20 @@
 
                 this.socket.on('audio_levels', (data) => {
                     this.updateAudioLevels(data.levels);
+                });
+
+                // ✅ NUEVO: Recibir datos de audio del cliente maestro
+                this.socket.on('master_audio_data', (data) => {
+                    this.handleMasterAudioData(data);
+                });
+
+                this.socket.on('master_audio_started', (data) => {
+                    console.log('[MasterAudio] Stream iniciado:', data);
+                    this.masterSampleRate = data.sample_rate || 48000;
+                });
+
+                this.socket.on('master_audio_stopped', (data) => {
+                    console.log('[MasterAudio] Stream detenido:', data);
                 });
 
                 this.socket.on('clients_update', (data) => {
@@ -1215,14 +1368,15 @@
                     return;
                 }
 
-                // ✅ FILTRO: Solo mostrar clientes reales (web o native/android)
+                // ✅ MEJORADO: Mostrar clientes reales (web, native, android) Y el maestro
                 const realClients = clientsData.filter(c => {
                     const type = c.type || 'web';
-                    return type === 'web' || type === 'native' || type === 'android';
+                    const isMaster = c.is_master || type === 'master';
+                    return isMaster || type === 'web' || type === 'native' || type === 'android';
                 });
 
                 if (realClients.length === 0) {
-                    container.innerHTML = '<div class="no-clients">Sin clientes reales conectados</div>';
+                    container.innerHTML = '<div class="no-clients">Sin clientes conectados</div>';
                     this.clientOrder = [];
                     return;
                 }
@@ -1259,15 +1413,17 @@
                     if (!item) {
                         item = this.createClientItem(client);
                     } else {
-                        // ensure class reflects type
-                        item.classList.remove('native', 'web');
-                        item.classList.add(client.type || 'web');
+                        // ensure class reflects type (incluir master)
+                        const isMaster = client.is_master || client.type === 'master';
+                        item.classList.remove('native', 'web', 'master');
+                        item.classList.add(isMaster ? 'master' : (client.type || 'web'));
                     }
                     this.updateClientItemUI(item, client);
                     if (this.selectedClientId === id) item.classList.add('selected');
                     fragment.appendChild(item);
-                    if (isNewItem) {
+                    if (isNewItem && !client.is_master && client.type !== 'master') {
                         // Start inactivity timer only on first appearance; user interaction resets it.
+                        // No aplicar al maestro
                         this.resetClientInactivityTimer(id);
                     }
                 }
@@ -1309,10 +1465,11 @@
             }
 
             renderClientsList(clientsData, container) {
-                // ✅ FILTRO: Solo mostrar clientes reales (web o native/android)
+                // ✅ MEJORADO: Mostrar clientes reales (web, native, android) Y el maestro
                 const realClients = clientsData.filter(c => {
                     const type = c.type || 'web';
-                    return type === 'web' || type === 'native' || type === 'android';
+                    const isMaster = c.is_master || type === 'master';
+                    return isMaster || type === 'web' || type === 'native' || type === 'android';
                 });
                 
                 const ordered = this.orderClients(realClients);
@@ -1777,6 +1934,157 @@
                     clientItem.classList.remove('inactive');
                 }
                 this.resetClientInactivityTimer(clientId);
+            }
+
+            // ============================================================================
+            // ✅ NUEVO: FUNCIONES DE AUDIO DEL CLIENTE MAESTRO
+            // ============================================================================
+
+            toggleMasterAudio(masterId, buttonElement, itemElement) {
+                if (this.masterAudioPlaying) {
+                    this.stopMasterAudio(buttonElement, itemElement);
+                } else {
+                    this.startMasterAudio(masterId, buttonElement, itemElement);
+                }
+            }
+
+            async startMasterAudio(masterId, buttonElement, itemElement) {
+                try {
+                    // Crear contexto de audio si no existe
+                    if (!this.masterAudioContext) {
+                        this.masterAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+                            sampleRate: 48000
+                        });
+                    }
+
+                    // Reanudar contexto si está suspendido (requiere interacción del usuario)
+                    if (this.masterAudioContext.state === 'suspended') {
+                        await this.masterAudioContext.resume();
+                    }
+
+                    this.masterSampleRate = this.masterAudioContext.sampleRate;
+                    this.masterAudioBuffer = [];
+                    this.masterNextPlayTime = this.masterAudioContext.currentTime + 0.1;
+
+                    // Crear ScriptProcessorNode para reproducción continua
+                    // (Nota: ScriptProcessorNode está deprecated pero AudioWorklet requiere HTTPS)
+                    const bufferSize = 2048;
+                    this.masterScriptProcessor = this.masterAudioContext.createScriptProcessor(bufferSize, 0, 2);
+                    
+                    this.masterScriptProcessor.onaudioprocess = (e) => {
+                        const outputL = e.outputBuffer.getChannelData(0);
+                        const outputR = e.outputBuffer.getChannelData(1);
+                        
+                        if (this.masterAudioBuffer.length > 0) {
+                            const chunk = this.masterAudioBuffer.shift();
+                            const samples = chunk.length / 2;
+                            
+                            for (let i = 0; i < outputL.length && i < samples; i++) {
+                                outputL[i] = chunk[i * 2] / 32767.0;
+                                outputR[i] = chunk[i * 2 + 1] / 32767.0;
+                            }
+                            
+                            // Rellenar con silencio si es necesario
+                            for (let i = samples; i < outputL.length; i++) {
+                                outputL[i] = 0;
+                                outputR[i] = 0;
+                            }
+                        } else {
+                            // Sin datos - silencio
+                            for (let i = 0; i < outputL.length; i++) {
+                                outputL[i] = 0;
+                                outputR[i] = 0;
+                            }
+                        }
+                    };
+
+                    this.masterScriptProcessor.connect(this.masterAudioContext.destination);
+
+                    // Pedir al servidor que inicie el streaming
+                    this.socket.emit('start_master_audio');
+
+                    this.masterAudioPlaying = true;
+                    
+                    // Actualizar UI
+                    buttonElement.classList.add('playing');
+                    buttonElement.querySelector('.play-icon').textContent = '⏹️';
+                    buttonElement.querySelector('.btn-text').textContent = 'Detener';
+                    itemElement.querySelector('.master-audio-status').textContent = '▶️ Reproduciendo';
+                    itemElement.querySelector('.master-audio-status').classList.add('active');
+
+                    console.log('[MasterAudio] ✅ Reproducción iniciada');
+
+                } catch (error) {
+                    console.error('[MasterAudio] ❌ Error iniciando audio:', error);
+                    alert('Error iniciando audio. Asegúrate de permitir el audio en el navegador.');
+                }
+            }
+
+            stopMasterAudio(buttonElement, itemElement) {
+                try {
+                    // Detener streaming del servidor
+                    this.socket.emit('stop_master_audio');
+
+                    // Desconectar y limpiar
+                    if (this.masterScriptProcessor) {
+                        this.masterScriptProcessor.disconnect();
+                        this.masterScriptProcessor = null;
+                    }
+
+                    this.masterAudioPlaying = false;
+                    this.masterAudioBuffer = [];
+
+                    // Actualizar UI
+                    if (buttonElement) {
+                        buttonElement.classList.remove('playing');
+                        buttonElement.querySelector('.play-icon').textContent = '▶️';
+                        buttonElement.querySelector('.btn-text').textContent = 'Escuchar';
+                    }
+                    if (itemElement) {
+                        itemElement.querySelector('.master-audio-status').textContent = 'Detenido';
+                        itemElement.querySelector('.master-audio-status').classList.remove('active');
+                    }
+
+                    console.log('[MasterAudio] ⏹️ Reproducción detenida');
+
+                } catch (error) {
+                    console.error('[MasterAudio] Error deteniendo audio:', error);
+                }
+            }
+
+            handleMasterAudioData(data) {
+                if (!this.masterAudioPlaying || !this.masterScriptProcessor) return;
+
+                try {
+                    // Decodificar datos de audio (int16 stereo)
+                    let audioBytes;
+                    
+                    if (data.audio instanceof ArrayBuffer) {
+                        audioBytes = new Int16Array(data.audio);
+                    } else if (typeof data.audio === 'string') {
+                        // Base64 encoded
+                        const binaryString = atob(data.audio);
+                        const len = binaryString.length;
+                        const bytes = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        audioBytes = new Int16Array(bytes.buffer);
+                    } else {
+                        return;
+                    }
+
+                    // Agregar al buffer
+                    this.masterAudioBuffer.push(audioBytes);
+
+                    // Limitar tamaño del buffer para evitar latencia excesiva
+                    while (this.masterAudioBuffer.length > 10) {
+                        this.masterAudioBuffer.shift();
+                    }
+
+                } catch (error) {
+                    console.error('[MasterAudio] Error procesando datos:', error);
+                }
             }
         }
 
