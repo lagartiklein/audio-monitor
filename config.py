@@ -20,9 +20,15 @@ DEFAULT_NUM_CHANNELS = 2  # Solo fallback; se usa el conteo real del dispositivo
 FORCE_MONO_CAPTURE = False
 
 # ============================================================================
-# ✅ FORMATO DE AUDIO
+# ✅ OPTIMIZACIONES DE LATENCIA WEB - NUEVO
 # ============================================================================
-USE_INT16_ENCODING = True   # ✅ True = -50% datos, False = Float32 original
+# Debouncing de cambios frecuentes (faders, pan, etc.)
+WEBSOCKET_PARAM_DEBOUNCE_MS = 50  # Agrupar cambios dentro de 50ms
+WEBSOCKET_BATCH_UPDATES = True      # Enviar cambios en lotes
+WEBSOCKET_LATENCY_LOG = False       # Log detallado de latencias
+
+# ✅ Formato de respuesta rápida
+WEBSOCKET_QUICK_RESPONSE = True  # Respuesta inmediata sin broadcast completo
 
 # ============================================================================
 # ✅ FASE 2: CONFIGURACIÓN ASYNC SEND

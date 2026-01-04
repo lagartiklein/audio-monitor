@@ -679,16 +679,18 @@ def handle_set_client_name(data):
 @socketio.on('update_gain')
 def handle_update_gain(data):
     """
-    Actualizar ganancia de un canal (para el cliente actual)
+    ✅ OPTIMIZADO: Actualizar ganancia de un canal (respuesta inmediata, sin sincronización)
     data: {
         'channel': int,
-        'gain': float
+        'gain': float,
+        'target_client_id': str (opcional, si no viene usa cliente actual)
     }
     """
-    client_id = request.sid
-    update_client_activity(client_id)
+    client_id = data.get('target_client_id') or request.sid
+    update_client_activity(request.sid)
     
     if not channel_manager:
+        emit('gain_updated', {'status': 'error', 'channel': data.get('channel')})
         return
     
     try:
@@ -698,34 +700,46 @@ def handle_update_gain(data):
         if channel is None or gain is None:
             return
         
-        # ✅ Actualizar en channel manager
+        channel = int(channel)
+        gain = float(gain)
+        
+        # ✅ Actualizar en channel manager (respuesta INMEDIATA)
         if client_id in channel_manager.subscriptions:
-            channel_manager.subscriptions[client_id]['gains'][int(channel)] = float(gain)
+            channel_manager.subscriptions[client_id]['gains'][channel] = gain
             
+            # ✅ Respuesta inmediata al cliente que solicitó (sin esperar broadcast)
+            emit('gain_updated', {
+                'channel': channel,
+                'gain': gain,
+                'client_id': client_id,
+                'timestamp': int(time.time() * 1000)
+            }, to=request.sid)
+            
+            # ✅ DEBUG: Latencia ultra-baja
             if config.DEBUG:
-                logger.debug(f"[WebSocket] 🎚️ {client_id[:8]} - Canal {channel}: {gain:.2f}")
-            
-            # ✅ NUEVO: Guardar en device_registry
-            _save_client_config_to_registry(client_id)
+                logger.debug(f"[WebSocket] ⚡ Gain CH{channel}: {gain:.2f} ({client_id[:8]})")
     
     except Exception as e:
         if config.DEBUG:
             logger.error(f"[WebSocket] Error update_gain: {e}")
+        emit('gain_updated', {'status': 'error', 'channel': data.get('channel')})
 
 
 @socketio.on('update_pan')
 def handle_update_pan(data):
     """
-    ✅ NUEVO: Actualizar panorama de un canal
+    ✅ OPTIMIZADO: Actualizar panorama de un canal (respuesta inmediata, sin sincronización)
     data: {
         'channel': int,
-        'pan': float (-1.0 a 1.0)
+        'pan': float (-1.0 a 1.0),
+        'target_client_id': str (opcional, si no viene usa cliente actual)
     }
     """
-    client_id = request.sid
-    update_client_activity(client_id)
+    client_id = data.get('target_client_id') or request.sid
+    update_client_activity(request.sid)
     
     if not channel_manager:
+        emit('pan_updated', {'status': 'error', 'channel': data.get('channel')})
         return
     
     try:
@@ -735,19 +749,29 @@ def handle_update_pan(data):
         if channel is None or pan is None:
             return
         
-        # ✅ Actualizar en channel manager
+        channel = int(channel)
+        pan = float(pan)
+        
+        # ✅ Actualizar en channel manager (respuesta INMEDIATA)
         if client_id in channel_manager.subscriptions:
-            channel_manager.subscriptions[client_id]['pans'][int(channel)] = float(pan)
+            channel_manager.subscriptions[client_id]['pans'][channel] = pan
             
+            # ✅ Respuesta inmediata al cliente que solicitó (sin esperar broadcast)
+            emit('pan_updated', {
+                'channel': channel,
+                'pan': pan,
+                'client_id': client_id,
+                'timestamp': int(time.time() * 1000)
+            }, to=request.sid)
+            
+            # ✅ DEBUG: Latencia ultra-baja
             if config.DEBUG:
-                logger.debug(f"[WebSocket] 🔊 {client_id[:8]} - Canal {channel} pan: {pan:.2f}")
-            
-            # ✅ NUEVO: Guardar en device_registry
-            _save_client_config_to_registry(client_id)
+                logger.debug(f"[WebSocket] ⚡ Pan CH{channel}: {pan:.2f} ({client_id[:8]})")
     
     except Exception as e:
         if config.DEBUG:
             logger.error(f"[WebSocket] Error update_pan: {e}")
+        emit('pan_updated', {'status': 'error', 'channel': data.get('channel')})
 
 
 @socketio.on('disconnect_client')

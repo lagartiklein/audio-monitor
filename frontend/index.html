@@ -1083,6 +1083,17 @@
                     this.socket.emit('get_clients');
                 });
 
+                // ✅ NUEVO: Listeners para confirmaciones rápidas (latencia ultra-baja)
+                this.socket.on('gain_updated', (data) => {
+                    if (config.DEBUG) console.log('[Gain Updated - Fast]', data);
+                    // La UI ya se actualizó, solo loguear confirmación del servidor
+                });
+
+                this.socket.on('pan_updated', (data) => {
+                    if (config.DEBUG) console.log('[Pan Updated - Fast]', data);
+                    // La UI ya se actualizó, solo loguear confirmación del servidor
+                });
+
                 // Auto refresh clients
                 setInterval(() => {
                     if (this.socket.connected) {
@@ -1465,21 +1476,23 @@
                 const channels = [...(client.channels || [])];
                 const index = channels.indexOf(channel);
 
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (index >= 0) {
                     channels.splice(index, 1);
                 } else {
                     channels.push(channel);
                 }
 
+                // Actualizar estado local primero (respuesta inmediata)
+                client.channels = channels;
+                client.active_channels = channels.length;
+                this.renderMixer(clientId);
+
+                // Enviar al servidor (no-blocking)
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
                     channels: channels
                 });
-
-                // Update local
-                client.channels = channels;
-                client.active_channels = channels.length;
-                this.renderMixer(clientId);
             }
 
             toggleSolo(clientId, channel) {
@@ -1489,68 +1502,77 @@
                 const solos = [...(client.solos || [])];
                 const index = solos.indexOf(channel);
 
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (index >= 0) {
                     solos.splice(index, 1);
                 } else {
                     solos.push(channel);
                 }
 
+                // Actualizar estado local primero (respuesta inmediata)
+                client.solos = solos;
+                client.has_solo = solos.length > 0;
+                this.renderMixer(clientId);
+
+                // Enviar al servidor (no-blocking)
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
                     solos: solos
                 });
-
-                client.solos = solos;
-                client.has_solo = solos.length > 0;
-                this.renderMixer(clientId);
             }
 
             togglePFL(clientId, channel) {
                 const client = this.clients[clientId];
                 if (!client) return;
 
-                // PFL is exclusive - only one channel at a time
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 const newPfl = client.pre_listen === channel ? null : channel;
 
+                // Actualizar estado local primero (respuesta inmediata)
+                client.pre_listen = newPfl;
+                this.renderMixer(clientId);
+
+                // Enviar al servidor (no-blocking)
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
                     pre_listen: newPfl
                 });
-
-                client.pre_listen = newPfl;
-                this.renderMixer(clientId);
             }
 
             updateGain(clientId, channel, db) {
                 const gain = this.dbToLinear(db);
                 
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    gains: { [channel]: gain }
-                });
-
-                // Update local
+                // ✅ OPTIMIZADO: Actualizar local inmediatamente (sin esperar servidor)
                 if (this.clients[clientId]) {
                     if (!this.clients[clientId].gains) {
                         this.clients[clientId].gains = {};
                     }
                     this.clients[clientId].gains[channel] = gain;
                 }
+                
+                // ✅ Enviar al servidor (no-blocking)
+                this.socket.emit('update_gain', {
+                    channel: channel,
+                    gain: gain,
+                    target_client_id: clientId
+                });
             }
 
             updatePan(clientId, channel, pan) {
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    pans: { [channel]: pan }
-                });
-
-                // Update local
+                // ✅ OPTIMIZADO: Actualizar local inmediatamente (sin esperar servidor)
                 if (this.clients[clientId]) {
                     if (!this.clients[clientId].pans) {
                         this.clients[clientId].pans = {};
                     }
                     this.clients[clientId].pans[channel] = pan;
                 }
+                
+                // ✅ Enviar al servidor (no-blocking)
+                this.socket.emit('update_pan', {
+                    channel: channel,
+                    pan: pan,
+                    target_client_id: clientId
+                });
             }
 
             selectAllChannels() {
@@ -1559,60 +1581,68 @@
                 const numChannels = this.deviceInfo.channels || 8;
                 const channels = Array.from({ length: numChannels }, (_, i) => i);
                 
-                this.socket.emit('update_client_mix', {
-                    target_client_id: this.selectedClientId,
-                    channels: channels
-                });
-
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (this.clients[this.selectedClientId]) {
                     this.clients[this.selectedClientId].channels = channels;
                     this.clients[this.selectedClientId].active_channels = channels.length;
                 }
                 this.renderMixer(this.selectedClientId);
+
+                // Enviar al servidor (no-blocking)
+                this.socket.emit('update_client_mix', {
+                    target_client_id: this.selectedClientId,
+                    channels: channels
+                });
             }
 
             selectNoChannels() {
                 if (!this.selectedClientId) return;
                 
-                this.socket.emit('update_client_mix', {
-                    target_client_id: this.selectedClientId,
-                    channels: []
-                });
-
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (this.clients[this.selectedClientId]) {
                     this.clients[this.selectedClientId].channels = [];
                     this.clients[this.selectedClientId].active_channels = 0;
                 }
                 this.renderMixer(this.selectedClientId);
+
+                // Enviar al servidor (no-blocking)
+                this.socket.emit('update_client_mix', {
+                    target_client_id: this.selectedClientId,
+                    channels: []
+                });
             }
 
             clearSolos() {
                 if (!this.selectedClientId) return;
                 
-                this.socket.emit('update_client_mix', {
-                    target_client_id: this.selectedClientId,
-                    solos: []
-                });
-
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (this.clients[this.selectedClientId]) {
                     this.clients[this.selectedClientId].solos = [];
                     this.clients[this.selectedClientId].has_solo = false;
                 }
                 this.renderMixer(this.selectedClientId);
+
+                // Enviar al servidor (no-blocking)
+                this.socket.emit('update_client_mix', {
+                    target_client_id: this.selectedClientId,
+                    solos: []
+                });
             }
 
             clearPFL() {
                 if (!this.selectedClientId) return;
                 
-                this.socket.emit('update_client_mix', {
-                    target_client_id: this.selectedClientId,
-                    pre_listen: null
-                });
-
+                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (this.clients[this.selectedClientId]) {
                     this.clients[this.selectedClientId].pre_listen = null;
                 }
                 this.renderMixer(this.selectedClientId);
+
+                // Enviar al servidor (no-blocking)
+                this.socket.emit('update_client_mix', {
+                    target_client_id: this.selectedClientId,
+                    pre_listen: null
+                });
             }
 
             // Utility functions

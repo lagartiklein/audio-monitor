@@ -1283,8 +1283,8 @@
       "user_agent": null
     },
     "first_seen": 1767497385.7275724,
-    "last_seen": 1767546380.4589078,
-    "reconnections": 669,
+    "last_seen": 1767546689.8296082,
+    "reconnections": 675,
     "configuration": {
       "channels": [],
       "gains": {},
