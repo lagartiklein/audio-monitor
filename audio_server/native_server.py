@@ -1,5 +1,5 @@
 # native_server.py - FASE 2: OPTIMIZADO CON ENVÍO ASÍNCRONO
-import socket, threading, time, json, struct, numpy as np, logging
+import socket, threading, time, json, struct, numpy as np, logging, os
 import select
 from queue import Queue, Empty, Full
 from audio_server.native_protocol import NativeAndroidProtocol
@@ -373,6 +373,13 @@ class NativeAudioServer:
         self.STATE_CACHE_TIMEOUT = getattr(config, 'RF_STATE_CACHE_TIMEOUT', 300)
         self.MAX_PERSISTENT_STATES = 50
         
+        # ✅ NUEVO: Referencia a websocket_server para broadcasts
+        self.websocket_server_ref = None
+        
+        # ✅ NUEVO: Persistencia en disco
+        self.STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'client_states.json')
+        self._load_persistent_states_from_disk()
+        
         self.sample_position_lock = threading.Lock()
         self.sample_position = 0
         
@@ -402,6 +409,62 @@ class NativeAudioServer:
         """✅ NUEVO: Establecer número de canales reales del dispositivo"""
         self.physical_channels = num_channels
         logger.info(f"[NativeServer] 📊 Canales físicos del dispositivo: {num_channels}")
+    
+    def _load_persistent_states_from_disk(self):
+        """✅ NUEVO: Cargar estado de clientes guardado en disco"""
+        try:
+            os.makedirs(os.path.dirname(self.STATE_FILE) or '.', exist_ok=True)
+            
+            if not os.path.exists(self.STATE_FILE):
+                logger.info(f"[NativeServer] 📁 Archivo de estados no existe: {self.STATE_FILE}")
+                return
+            
+            with open(self.STATE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f) or {}
+            
+            with self.persistent_lock:
+                for device_uuid, state in data.items():
+                    if isinstance(state, dict):
+                        self.persistent_state[device_uuid] = state
+            
+            count = len(self.persistent_state)
+            logger.info(f"[NativeServer] ✅ Estados de clientes cargados: {count} dispositivos")
+            
+        except Exception as e:
+            logger.warning(f"[NativeServer] ⚠️ Error cargando estados: {e}")
+    
+    def _save_persistent_states_to_disk(self):
+        """✅ NUEVO: Guardar estado de clientes en disco (thread-safe)"""
+        try:
+            os.makedirs(os.path.dirname(self.STATE_FILE) or '.', exist_ok=True)
+            
+            with self.persistent_lock:
+                data = dict(self.persistent_state)
+            
+            # Escribir a archivo temporal para evitar corrupción
+            tmp_path = self.STATE_FILE + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            # Renombrar atómicamente
+            os.replace(tmp_path, self.STATE_FILE)
+            
+            if config.DEBUG:
+                logger.debug(f"[NativeServer] 💾 Estados guardados: {len(data)} dispositivos")
+                
+        except Exception as e:
+            logger.error(f"[NativeServer] ❌ Error guardando estados: {e}")
+    
+    def _notify_web_clients_update(self):
+        """✅ NUEVO: Notificar a clientes web sobre cambios de estado (sincronización Android→Web)"""
+        try:
+            if self.websocket_server_ref and hasattr(self.websocket_server_ref, 'broadcast_clients_update'):
+                self.websocket_server_ref.broadcast_clients_update()
+                if config.DEBUG:
+                    logger.debug("[NativeServer] 📡 Notificación enviada a clientes web")
+        except Exception as e:
+            if config.DEBUG:
+                logger.debug(f"[NativeServer] ⚠️ Error notificando a web: {e}")
     
     def start(self):
         if self.running: 
@@ -500,6 +563,11 @@ class NativeAudioServer:
     
     def stop(self):
         self.running = False
+        
+        # ✅ NUEVO: Guardar estado antes de apagar
+        logger.info(f"[NativeServer] 💾 Guardando estado de clientes antes de apagar...")
+        self._save_persistent_states_to_disk()
+        
         with self.client_lock:
             for client in list(self.clients.values()):
                 client.close()
@@ -919,7 +987,30 @@ class NativeAudioServer:
                 )
 
                 if ok:
-                    # ✅ NUEVO: Persistir el estado para que sea global y durable (igual que en WebSocket)
+                    # ✅ NUEVO: Guardar estado en persistent_state del servidor (para GET_CLIENT_STATE)
+                    try:
+                        subscription = self.channel_manager.get_client_subscription(persistent_id)
+                        if subscription:
+                            with self.persistent_lock:
+                                self.persistent_state[persistent_id] = {
+                                    'channels': subscription.get('channels', []),
+                                    'gains': subscription.get('gains', {}),
+                                    'pans': subscription.get('pans', {}),
+                                    'mutes': subscription.get('mutes', {}),
+                                    'solos': list(subscription.get('solos', set())),
+                                    'pre_listen': subscription.get('pre_listen'),
+                                    'master_gain': subscription.get('master_gain', 1.0),
+                                    'timestamp': int(time.time() * 1000)
+                                }
+                            logger.debug(f"💾 Estado persistente guardado para {persistent_id[:15]}")
+                            
+                            # ✅ NUEVO: Guardar en disco para durabilidad después de reinicios
+                            self._save_persistent_states_to_disk()
+                    except Exception as e:
+                        if config.DEBUG:
+                            logger.debug(f"Error guardando estado persistente: {e}")
+
+                    # ✅ Persistir también en device_registry para durabilidad multi-sesión
                     try:
                         subscription = self.channel_manager.get_client_subscription(persistent_id)
                         device_uuid = None
@@ -953,8 +1044,64 @@ class NativeAudioServer:
             except Exception as e:
                 if config.DEBUG:
                     logger.error(f"❌ update_mix error: {e}")
+        
+        elif msg_type == 'get_client_state':
+            # ✅ NUEVO: Cliente solicita su estado guardado (para landscape o tras rotar)
+            try:
+                persistent_id = getattr(client, 'persistent_id', None) or client.id
+                
+                logger.debug(f"🔍 get_client_state solicitado por {persistent_id[:15]}")
+                logger.debug(f"   persistent_state keys: {list(self.persistent_state.keys())[:3]}")
+                
+                with self.persistent_lock:
+                    saved_state = self.persistent_state.get(persistent_id)
+                
+                if saved_state:
+                    logger.debug(f"📡 Estado encontrado para {persistent_id[:15]}")
+                    logger.debug(f"   Canales: {saved_state.get('channels', [])}")
+                    logger.debug(f"   Gains: {saved_state.get('gains', {})}")
+                    
+                    # Enviar estado guardado como mix_state
+                    response = NativeAndroidProtocol.create_control_packet(
+                        'mix_state',
+                        {
+                            'channels': saved_state.get('channels', []),
+                            'gains': {str(k): v for k, v in saved_state.get('gains', {}).items()},
+                            'pans': {str(k): v for k, v in saved_state.get('pans', {}).items()},
+                            'mutes': {str(k): v for k, v in saved_state.get('mutes', {}).items()},
+                            'solos': saved_state.get('solos', []),
+                            'pre_listen': saved_state.get('pre_listen'),
+                            'master_gain': saved_state.get('master_gain', 1.0),
+                        },
+                        client.rf_mode,
+                    )
+                    if response:
+                        client.send_bytes_sync(response)
+                        logger.info(f"✅ Estado recuperado y enviado para {persistent_id[:15]}")
+                    else:
+                        logger.warning(f"⚠️ Error creando response packet para {persistent_id[:15]}")
+                else:
+                    logger.debug(f"⚠️ No hay estado guardado para {persistent_id[:15]}, enviando canales vacíos")
+                    # Enviar mix_state vacío para que no quede colgado
+                    response = NativeAndroidProtocol.create_control_packet(
+                        'mix_state',
+                        {
+                            'channels': [],
+                            'gains': {},
+                            'pans': {},
+                            'mutes': {},
+                            'solos': [],
+                            'pre_listen': None,
+                            'master_gain': 1.0,
+                        },
+                        client.rf_mode,
+                    )
+                    if response:
+                        client.send_bytes_sync(response)
+            except Exception as e:
+                logger.error(f"❌ get_client_state error: {e}", exc_info=True)
     
-    def _notify_web_clients_update(self):
+    
         try:
             from audio_server import websocket_server
             websocket_server.broadcast_clients_update()

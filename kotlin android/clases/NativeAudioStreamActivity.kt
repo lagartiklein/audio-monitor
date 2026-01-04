@@ -72,10 +72,10 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private var isConnected = false
 
     private var isConnecting = false
-
     private var isMuted = false
 
     private var masterVolumeDb = 0f
+    private var volumeBeforeMute = 0f  // ✅ NUEVO: Guardar volumen previo al mute
 
     // Foreground Service
 
@@ -209,9 +209,10 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             initializeViews()
         }
 
-        initializeAudioComponents()
-
+        // ✅ CRÍTICO: Cargar preferencias ANTES de inicializar componentes de audio
         loadSessionPreferences()
+
+        initializeAudioComponents()
 
         setupVolumeSeekBarListener() // Configurar listener DESPUÉS de cargar preferencias
 
@@ -286,6 +287,33 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             initializeViewsLandscape()
             try {
                 ensureChannelConsole(lastKnownMaxChannels)
+                
+                // ✅ CORREGIDO: Aplicar estado en memoria del cliente ANTES de renderizar
+                if (isConnected) {
+                    val channels = audioClient.getPersistentChannels()
+                    val gains = audioClient.getPersistentGains()
+                    val pans = audioClient.getPersistentPans()
+                    
+                    Log.d(TAG, "📡 Aplicando estado en memoria: ${channels.size} canales")
+                    
+                    // Construir MixState desde el estado en memoria
+                    if (channels.isNotEmpty() || gains.isNotEmpty()) {
+                        val mixState = NativeAudioClient.MixState(
+                            channels = channels,
+                            gains = gains,
+                            pans = pans,
+                            mutes = audioClient.getPersistentMutes(),
+                            preListen = null,
+                            solos = emptyList(),
+                            masterGain = null
+                        )
+                        applyMixState(mixState)
+                    }
+                    
+                    // También solicitar del servidor como fallback por si hay cambios recientes
+                    Log.d(TAG, "📡 Solicitando estado actualizado del servidor...")
+                    audioClient.requestClientState()
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "⚠️ Error poblando consola en landscape: ${e.message}")
             }
@@ -293,8 +321,16 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             // 📱 PORTRAIT: Mostrar controles de conexión y volumen
             Log.d(TAG, "📱 Rotación a PORTRAIT - Inicializando controles")
             initializeViews()
-            // Restaurar el estado visual (valores de sesión, texto del volumen, etc.)
+            
+            // ✅ CORREGIDO: Restaurar IP y puerto cuando vuelve a portrait
             loadSessionPreferences()
+            
+            // ✅ FIX: Sincronizar UI con volumen actual
+            masterVolumeSeekBar?.setProgress(
+                (masterVolumeDb + 60).toInt(),
+                false
+            )
+            masterVolumeText?.text = String.format("%.0f dB", masterVolumeDb)
             // Reconfigurar listener del seekbar
             setupVolumeSeekBarListener()
         }
@@ -532,6 +568,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         try {
             val activeSet = mixState.channels.toSet()
 
+            Log.d(TAG, "🔍 applyMixState recibido:")
+            Log.d(TAG, "   Canales: ${mixState.channels}")
+            Log.d(TAG, "   Gains: ${mixState.gains}")
+            Log.d(TAG, "   Pans: ${mixState.pans}")
+            Log.d(TAG, "   Mutes: ${mixState.mutes}")
+            Log.d(TAG, "   ChannelViews existentes: ${channelViews.size}")
+
             // Actualizar copia local
             activeChannelsLocal.clear()
             activeChannelsLocal.addAll(activeSet)
@@ -571,18 +614,20 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                         val safe = if (linear <= 0f) 0.0001f else linear
                         val gainDb = (20f * kotlin.math.log10(safe)).coerceIn(-60f, 12f)
                         view.setGainDb(gainDb, fromServer = true)
+                        Log.d(TAG, "   Aplicado Ch$ch: gain=$gainDb dB")
                     }
 
                     val pan = mixState.pans[ch]
                     if (pan != null) {
                         view.setPanValue(pan.coerceIn(-1f, 1f), fromServer = true)
+                        Log.d(TAG, "   Aplicado Ch$ch: pan=${pan.coerceIn(-1f, 1f)}")
                     }
                 }
             }
 
             Log.d(TAG, "✅ MixState aplicado: ${activeSet.size} canales activos")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error aplicando mix_state: ${e.message}")
+            Log.e(TAG, "❌ Error aplicando mix_state: ${e.message}", e)
         }
     }
 
@@ -644,15 +689,23 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         isMuted = !isMuted
 
         if (isMuted) {
-
+            // ✅ NUEVO: Guardar volumen actual antes de mutear
+            volumeBeforeMute = masterVolumeDb
             audioRenderer.setMasterGain(-60f)
 
             muteButton?.text = "🔇 Audio OFF"
 
             muteButton?.setBackgroundColor(getColor(android.R.color.holo_red_dark))
         } else {
-
-            audioRenderer.setMasterGain(masterVolumeDb)
+            // ✅ NUEVO: Restaurar volumen guardado antes de mutear (NO usar masterVolumeDb actual)
+            audioRenderer.setMasterGain(volumeBeforeMute)
+            // ✅ IMPORTANTE: Actualizar masterVolumeDb al valor restaurado
+            masterVolumeDb = volumeBeforeMute
+            // ✅ Sincronizar seekbar sin disparar listener
+            masterVolumeSeekBar?.setProgress(
+                (volumeBeforeMute + 60).toInt(),
+                false
+            )
 
             muteButton?.text = "🔊 Audio ON"
 
@@ -1133,6 +1186,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         }
+
+        // ✅ NUEVO: Guardar volumen y preferencias al salir de la app
+        saveSessionPreferences()
     }
 
     override fun onDestroy() {

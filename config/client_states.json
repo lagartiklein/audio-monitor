@@ -1,0 +1,14 @@
+{
+  "00758099-115b-4860-8579-8f4cb3e739c4": {
+    "channels": [],
+    "gains": {},
+    "pans": {},
+    "mutes": {},
+    "solos": [],
+    "pre_listen": null,
+    "master_gain": 1.0,
+    "last_seen": 1767534822.076983,
+    "reconnection_count": 0,
+    "client_type": "native"
+  }
+}

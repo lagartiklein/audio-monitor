@@ -11,7 +11,7 @@ SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 # ✅ FASE 3: BLOCKSIZE optimizado para balance latencia/buffer
 # ⚠️ NUEVO: 256 samples = ~5.33ms (chunks mayores = menos overhead red, mejor sync)
 # (Aumentado para reducir jitter de red y overhead de paquetes)
-BLOCKSIZE = 128  # ⬆️ AUMENTADO: 128 → 256 para menos overhead de red
+BLOCKSIZE = 256  # ⬆️ AUMENTADO: 128 → 256 para menos overhead de red
 
 # ✅ CANALES POR DEFECTO
 DEFAULT_NUM_CHANNELS = 32  # Valor por defecto, pero se sobrescribe por el real del dispositivo

@@ -479,6 +479,44 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         ))
     }
 
+    // ✅ NUEVO: Solicitar estado guardado del cliente al servidor
+    fun requestClientState() {
+        try {
+            sendControlMessage("get_client_state", mapOf(
+                "device_uuid" to deviceUUID,
+                "timestamp" to System.currentTimeMillis()
+            ))
+            Log.d(TAG, "📡 Estado guardado solicitado al servidor para UUID: ${deviceUUID.take(12)}...")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error solicitando estado: ${e.message}", e)
+        }
+    }
+
+    // ✅ NUEVO: Getters públicos para acceder al estado persistente desde la Activity
+    fun getPersistentChannels(): List<Int> {
+        synchronized(subscriptionLock) {
+            return persistentChannels.toList()
+        }
+    }
+
+    fun getPersistentGains(): Map<Int, Float> {
+        synchronized(subscriptionLock) {
+            return persistentGains.toMap()
+        }
+    }
+
+    fun getPersistentPans(): Map<Int, Float> {
+        synchronized(subscriptionLock) {
+            return persistentPans.toMap()
+        }
+    }
+
+    fun getPersistentMutes(): Map<Int, Boolean> {
+        synchronized(subscriptionLock) {
+            return persistentMutes.toMap()
+        }
+    }
+
     private fun startReaderThread() {
         CoroutineScope(Dispatchers.IO).launch {
             setThreadPriority()
@@ -594,6 +632,9 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     CoroutineScope(Dispatchers.Main).launch {
                         onServerInfo?.invoke(serverInfo)
                     }
+                    
+                    // ✅ NUEVO: Solicitar estado guardado del cliente después de handshake
+                    requestClientState()
                 }
 
                 "heartbeat_response" -> {

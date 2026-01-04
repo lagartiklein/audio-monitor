@@ -136,7 +136,7 @@ class AudioStreamForegroundService : Service() {
             // ✅ Crear notificación ANTES de startForeground()
             val notification = createNotification(
                 "🔴 Transmitiendo",
-                "Monitor de audio activo"
+                "Monitor de audio activo - Toca para abrir"
             )
 
             // ✅ Iniciar foreground con tipo específico (requerido Android 14+)
@@ -162,7 +162,7 @@ class AudioStreamForegroundService : Service() {
             lockRenewalHandler.postDelayed(lockRenewalRunnable, RENEWAL_INTERVAL_MS)
             isRunning = true
 
-            Log.d(TAG, "✅ Servicio foreground iniciado correctamente")
+            Log.d(TAG, "✅ Servicio foreground iniciado - Notificación persistente visible")
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error iniciando servicio: ${e.message}", e)
@@ -174,6 +174,13 @@ class AudioStreamForegroundService : Service() {
         Log.d(TAG, "🛑 Deteniendo servicio foreground")
         releaseLocks()
         isRunning = false
+
+        // ✅ NUEVO: Cancelar notificación cuando se detiene el stream
+        try {
+            notificationManager?.cancel(NOTIFICATION_ID)
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Error cancelando notificación: ${e.message}")
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -258,15 +265,20 @@ class AudioStreamForegroundService : Service() {
 
     /**
      * ✅ Actualiza la notificación con nuevo estado
+     * La notificación permanece visible mientras isRunning = true
      */
     fun updateNotification(title: String, message: String) {
-        if (!isRunning) return
+        if (!isRunning) {
+            Log.d(TAG, "⚠️ Servicio no está corriendo, ignorando actualización de notificación")
+            return
+        }
 
         try {
             val notification = createNotification(title, message)
             notificationManager?.notify(NOTIFICATION_ID, notification)
+            Log.d(TAG, "🔔 Notificación actualizada: $title")
         } catch (e: Exception) {
-            Log.e(TAG, "Error actualizando notificación: ${e.message}")
+            Log.e(TAG, "❌ Error actualizando notificación: ${e.message}", e)
         }
     }
 
@@ -281,6 +293,8 @@ class AudioStreamForegroundService : Service() {
                 setShowBadge(false)
                 enableVibration(false)
                 setSound(null, null)
+                // ✅ NUEVO: No permitir que el usuario cancele el canal
+                // (La notificación solo desaparece cuando se detiene el stream)
             }
             notificationManager?.createNotificationChannel(channel)
             Log.d(TAG, "📢 Canal de notificación creado")
@@ -315,16 +329,22 @@ class AudioStreamForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(message)
             .setSmallIcon(R.drawable.logooficialdemo) // Tu icono de app
-            .setOngoing(true) // No se puede deslizar para cerrar
+            .setOngoing(true) // ✅ CRÍTICO: No se puede deslizar para cerrar
             .setContentIntent(openPendingIntent)
-            // ✅ NUEVO: Acción "Volver a la App"
+            
+            // ✅ NUEVO: Estilo mejorado (compatibilidad con notificaciones modernas)
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText(message)
+                .setBigContentTitle(title))
+            
+            // ✅ Acción "Volver a la App"
             .addAction(
                 android.R.drawable.ic_menu_view,
-                "Volver",
+                "Abrir",
                 openPendingIntent
             )
             // ✅ Acción "Pausar"
@@ -333,17 +353,36 @@ class AudioStreamForegroundService : Service() {
                 "Pausar",
                 pausePendingIntent
             )
-            // ✅ Acción "Desconectar"
+            // ✅ Acción "Desconectar" (destructiva)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "Desconectar",
                 disconnectPendingIntent
             )
+            
+            // ✅ Categoría y prioridad (compatibilidad Google Play)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+            
+            // ✅ NUEVO: Color de acento (más moderno en Android 5+)
+            .setColor(getColor(android.R.color.holo_blue_light))
+            
+            // ✅ NUEVO: Desactivar luz LED y sonidos (para no molestar)
+            .setLights(0, 0, 0)
+            .setSound(null)
+            .setVibrate(longArrayOf())
+            
+            // ✅ NUEVO: AutoCancel solo en ciertos casos
+            .setAutoCancel(false)
+
+        // ✅ NUEVO: Si es Android 12+, usar Material Design 3 colors
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setColorized(true)
+        }
+
+        return builder.build()
     }
 
     override fun onBind(intent: Intent?): IBinder {

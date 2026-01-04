@@ -277,6 +277,10 @@ class AudioServerApp:
 
             init_server(self.channel_manager, self.native_server)
             
+            # ✅ NUEVO: Inyectar referencia al websocket_server en native_server para broadcasts
+            from audio_server import websocket_server
+            self.native_server.websocket_server_ref = websocket_server
+            
             # ✅ NUEVO: Configurar callback de VU levels
             from audio_server.websocket_server import broadcast_audio_levels
             self.audio_capture.vu_callback = broadcast_audio_levels

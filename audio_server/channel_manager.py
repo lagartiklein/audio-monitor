@@ -33,8 +33,8 @@ class ChannelManager:
     """
 
     def __init__(self, num_channels):
-        # Limitar a máximo 32 canales
-        self.num_channels = min(32, num_channels)
+        # Usar el número de canales real de la interfaz
+        self.num_channels = num_channels
 
         self.subscriptions = {}  # client_id -> subscription_data
 
@@ -101,8 +101,8 @@ class ChannelManager:
             return self.device_channel_map[device_uuid]
         
         # Calcular canales disponibles
-        # Limitar a máximo 32 canales
-        channels_needed = min(physical_channels, self.num_channels - self.next_available_channel, 32 - self.next_available_channel)
+        # Asignar solo los canales realmente disponibles
+        channels_needed = min(physical_channels, self.num_channels - self.next_available_channel)
         
         if channels_needed <= 0:
             logger.warning(f"[ChannelManager] ⚠️ No hay canales disponibles para {device_uuid[:12]}")

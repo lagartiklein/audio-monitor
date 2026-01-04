@@ -1,13 +1,37 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <link rel="icon" type="image/png" href="../assets/icon.png">
-    <link rel="shortcut icon" href="../assets/icon.png" type="image/png">
+    <!-- ✅ PWA Meta Tags -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Fichatech Server - Monitoriza y gestiona audio profesional en tiempo real.">
     <meta name="author" content="Fichatech">
     <meta name="keywords" content="audio, monitor, fichatech, mixer, control, canales, servidor">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- ✅ PWA Theme & Colors -->
+    <meta name="theme-color" content="#58a6ff">
+    <meta name="msapplication-TileColor" content="#0d1117">
+    <meta name="msapplication-TileImage" content="/assets/icon-144.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Fichatech">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Fichatech Audio">
+    
+    <!-- ✅ Icons -->
+    <link rel="icon" type="image/png" href="/assets/icon.png">
+    <link rel="shortcut icon" href="/assets/icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/assets/icon-152.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/assets/icon-72.png">
+    <link rel="apple-touch-icon" sizes="96x96" href="/assets/icon-96.png">
+    <link rel="apple-touch-icon" sizes="128x128" href="/assets/icon-128.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/assets/icon-144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/assets/icon-152.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/assets/icon-192.png">
+    
+    <!-- ✅ PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
     <title>Fichatech - Audio Control</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
     <style>
@@ -966,6 +990,8 @@
 
                 this.socket.on('clients_update', (data) => {
                     const prevSelected = this.selectedClientId ? this.clients[this.selectedClientId] : null;
+                    const prevSignature = prevSelected ? this.mixStateSignature(prevSelected) : null;
+                    
                     if (data && Array.isArray(data.order)) {
                         this.clientOrder = data.order;
                         try {
@@ -974,19 +1000,41 @@
                             // ignore
                         }
                     }
+                    
+                    // ✅ Actualizar cache de clientes ANTES de comparar
+                    if (data.clients && Array.isArray(data.clients)) {
+                        data.clients.forEach(client => {
+                            const id = this.getClientId(client);
+                            if (id) this.clients[id] = client;
+                        });
+                    }
+                    
                     this.updateClientsList(data.clients);
 
-                    // If selected client's mix changed (from another controller), refresh mixer UI.
+                    // ✅ MEJORADO: Siempre refrescar mixer si el cliente seleccionado cambió
+                    // Esto permite sincronización bidireccional (nativo → web)
                     if (!this.editingClientId && this.selectedClientId) {
                         const nextSelected = this.clients[this.selectedClientId];
-                        if (prevSelected && nextSelected && this.mixStateSignature(prevSelected) !== this.mixStateSignature(nextSelected)) {
+                        const nextSignature = nextSelected ? this.mixStateSignature(nextSelected) : null;
+                        
+                        if (prevSignature !== nextSignature) {
+                            console.log('[Sync] Mixer actualizado por cambio externo (nativo/otro web)');
                             this.renderMixer(this.selectedClientId);
+                            
+                            // También actualizar el título con canales activos
+                            if (nextSelected) {
+                                const displayName = this.getDisplayName(nextSelected);
+                                document.getElementById('mixer-title-text').textContent = 
+                                    `${displayName} - ${nextSelected.active_channels || 0} canales`;
+                            }
                         }
                     }
                 });
 
                 this.socket.on('clients_list', (data) => {
                     const prevSelected = this.selectedClientId ? this.clients[this.selectedClientId] : null;
+                    const prevSignature = prevSelected ? this.mixStateSignature(prevSelected) : null;
+                    
                     if (data && Array.isArray(data.order)) {
                         this.clientOrder = data.order;
                         try {
@@ -995,11 +1043,23 @@
                             // ignore
                         }
                     }
+                    
+                    // ✅ Actualizar cache de clientes ANTES de comparar
+                    if (data.clients && Array.isArray(data.clients)) {
+                        data.clients.forEach(client => {
+                            const id = this.getClientId(client);
+                            if (id) this.clients[id] = client;
+                        });
+                    }
+                    
                     this.updateClientsList(data.clients);
 
                     if (!this.editingClientId && this.selectedClientId) {
                         const nextSelected = this.clients[this.selectedClientId];
-                        if (prevSelected && nextSelected && this.mixStateSignature(prevSelected) !== this.mixStateSignature(nextSelected)) {
+                        const nextSignature = nextSelected ? this.mixStateSignature(nextSelected) : null;
+                        
+                        if (prevSignature !== nextSignature) {
+                            console.log('[Sync] Mixer actualizado por clients_list');
                             this.renderMixer(this.selectedClientId);
                         }
                     }
@@ -1621,6 +1681,51 @@
                 this.resetClientInactivityTimer(clientId);
             }
         }
+
+        // ✅ PWA: Registrar Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    const registration = await navigator.serviceWorker.register('/sw.js', {
+                        scope: '/'
+                    });
+                    
+                    console.log('[PWA] ✅ Service Worker registrado:', registration.scope);
+                    
+                    // Detectar actualizaciones
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        console.log('[PWA] Nueva versión detectada...');
+                        
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // Nueva versión disponible
+                                console.log('[PWA] Nueva versión disponible. Recarga para actualizar.');
+                                
+                                // Mostrar notificación de actualización (opcional)
+                                if (confirm('Nueva versión disponible. ¿Actualizar ahora?')) {
+                                    window.location.reload();
+                                }
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.log('[PWA] Error registrando Service Worker:', error);
+                }
+            });
+        }
+
+        // ✅ PWA: Detectar modo de instalación
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            window.deferredPrompt = e;
+            console.log('[PWA] App instalable disponible');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('[PWA] ✅ App instalada exitosamente');
+            window.deferredPrompt = null;
+        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
