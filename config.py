@@ -9,12 +9,15 @@ DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 
 # ✅ FASE 3: BLOCKSIZE optimizado para balance latencia/buffer
-# ⚠️ NUEVO: 256 samples = ~5.33ms (chunks mayores = menos overhead red, mejor sync)
-# (Aumentado para reducir jitter de red y overhead de paquetes)
-BLOCKSIZE = 256  # ⬆️ AUMENTADO: 128 → 256 para menos overhead de red
+# 128 samples @ 48kHz ≈ 2.67ms; bajar más reduce latencia pero aumenta jitter/CPU
+BLOCKSIZE = 128
 
 # ✅ CANALES POR DEFECTO
-DEFAULT_NUM_CHANNELS = 32  # Valor por defecto, pero se sobrescribe por el real del dispositivo
+DEFAULT_NUM_CHANNELS = 2  # Solo fallback; se usa el conteo real del dispositivo
+
+# ✅ MODO MONO ULTRA-BAJA LATENCIA
+# Captura solo el primer canal y transmite en mono; el renderer nativo se encarga del estéreo
+FORCE_MONO_CAPTURE = False
 
 # ============================================================================
 # ✅ FORMATO DE AUDIO
@@ -47,6 +50,7 @@ NATIVE_MAX_CLIENTS = 10
 # ============================================================================
 VU_UPDATE_INTERVAL = 100
 VU_PEAK_DECAY = 0.95
+VU_ENABLED = False  # ⚠️ DESACTIVADO para ultra-baja latencia
 
 # ============================================================================
 # ✅ OPTIMIZACIONES DE SOCKET - FIXED
@@ -81,7 +85,7 @@ MAINTENANCE_INTERVAL = 5.0  # ⚠️ REDUCIDO: 10s → 5s para limpieza más fre
 # ============================================================================
 # NATIVE HEARTBEAT - OPTIMIZADO
 # ============================================================================
-NATIVE_HEARTBEAT_INTERVAL = 3000  # ⚠️ REDUCIDO: 5s → 3s para detectar desconexiones 40% más rápido
+NATIVE_HEARTBEAT_INTERVAL = 5000  # ⚠️ AUMENTADO: 3s → 5s para procesar menos en servidor
 NATIVE_HEARTBEAT_TIMEOUT = 60  # Timeout después de 60 segundos sin respuesta
 
 # ============================================================================

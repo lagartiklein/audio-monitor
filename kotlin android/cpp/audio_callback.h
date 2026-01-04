@@ -35,16 +35,17 @@
 // ✅ OPTIMIZADO: Buffer circular con mínima contención y operaciones vectorizadas
 class AudioCallback : public oboe::AudioStreamDataCallback {
 private:
-    // ✅ OPTIMIZACIÓN LATENCIA: Buffer aumentado para evitar saturación sin lag
-    static constexpr int BUFFER_SIZE_FRAMES = 2048;      // ⬆️ AUMENTADO: 1024 → 2048 (~43ms @ 48kHz)
-    static constexpr int TARGET_BUFFER_FRAMES = 64;       // ⬇️ REDUCIDO: 128 → 64 (~1.33ms target latency)
-    static constexpr int DROP_THRESHOLD = 1536;           // 75% del nuevo buffer (más tolerancia)
-    static constexpr int SILENCE_TIMEOUT_MS = 5000;      // Timeout de silencio
-    static constexpr int CORRUPTION_CHECK_INTERVAL = 200; // Menos frecuente para mejor perf
+    // ✅ v4.0 SINGLE STREAM MODE: Buffer optimizado para UN SOLO stream mezclado
+    // Con un solo stream ya no hay race conditions, podemos usar buffer más pequeño
+    static constexpr int BUFFER_SIZE_FRAMES = 1024;       // ~21ms @ 48kHz (suficiente para single stream)
+    static constexpr int TARGET_BUFFER_FRAMES = 128;      // ~2.67ms target latency (más seguro)
+    static constexpr int DROP_THRESHOLD = 768;            // 75% - empezar a limpiar antes de saturar
+    static constexpr int SILENCE_TIMEOUT_MS = 5000;       // Timeout de silencio
+    static constexpr int CORRUPTION_CHECK_INTERVAL = 500; // Menos frecuente (single stream más estable)
 
     // Buffer circular que almacena muestras en formato float interleaved
     std::vector<float> circularBuffer;
-    
+
     // ✅ OPTIMIZACIÓN: Mutex solo para operaciones de reset, no para R/W normal
     std::mutex resetMutex;
 
@@ -52,7 +53,7 @@ private:
     std::atomic<int> writePos{0};
     std::atomic<int> readPos{0};
     std::atomic<int> availableFrames{0};
-    
+
     int channelCount = 2;
     int bufferSizeSamples = 0;  // Cache para evitar multiplicaciones
 
@@ -72,8 +73,8 @@ public:
         circularBuffer.resize(bufferSizeSamples, 0.0f);
         lastAudioTime = getCurrentTimeMillis();
         LOGD("✅ AudioCallback ULTRA-LOW-LATENCY: %d canales, buffer %d frames (~%dms)",
-                channels, BUFFER_SIZE_FRAMES,
-                BUFFER_SIZE_FRAMES * 1000 / 48000);
+             channels, BUFFER_SIZE_FRAMES,
+             BUFFER_SIZE_FRAMES * 1000 / 48000);
     }
 
     /**
@@ -90,7 +91,7 @@ public:
 
         auto *outputBuffer = static_cast<float *>(audioData);
         (void)audioStream;
-        
+
         const int samplesNeeded = numFrames * channelCount;
         callbackCount++;
 
@@ -114,12 +115,12 @@ public:
             available = availableFrames.load(std::memory_order_acquire);
             currentReadPos = readPos.load(std::memory_order_acquire);
         }
-        
+
         // 3) Underrun: no hay datos (caso raro, optimizar path común)
         if (UNLIKELY(available == 0)) {
             std::memset(outputBuffer, 0, samplesNeeded * sizeof(float));
             underrunCount++;
-            
+
             int64_t silentTime = getCurrentTimeMillis() - lastAudioTime.load();
             if (silentTime > SILENCE_TIMEOUT_MS && wasSilent.load()) {
                 int64_t timeSinceReset = getCurrentTimeMillis() - lastResetTime.load();
@@ -132,7 +133,7 @@ public:
             wasSilent.store(true);
             return oboe::DataCallbackResult::Continue;
         }
-        
+
         // Validar posición (raramente falla)
         if (UNLIKELY(currentReadPos < 0 || currentReadPos >= bufferSizeSamples)) {
             LOGE("💥 readPos corrupto: %d", currentReadPos);
@@ -152,11 +153,11 @@ public:
 
         // 6) ✅ OPTIMIZADO: Copia vectorizada con memcpy
         int samplesInFirstPart = std::min(samplesToPlay, bufferSizeSamples - currentReadPos);
-        
+
         // Primera parte (hasta el final del buffer)
-        std::memcpy(outputBuffer, &circularBuffer[currentReadPos], 
+        std::memcpy(outputBuffer, &circularBuffer[currentReadPos],
                     samplesInFirstPart * sizeof(float));
-        
+
         // Segunda parte (wrap-around si es necesario)
         int samplesRemaining = samplesToPlay - samplesInFirstPart;
         if (UNLIKELY(samplesRemaining > 0)) {
@@ -201,7 +202,7 @@ public:
                     readPos.store(newRP, std::memory_order_release);
                     availableFrames.fetch_sub(excess, std::memory_order_release);
                     dropCount.fetch_add(excess);
-                    
+
                     if (excess > 256) {
                         LOGD("🗑️ Drop preventivo: %d frames", excess);
                     }
@@ -231,22 +232,27 @@ public:
         if (UNLIKELY(freeFrames < numFrames)) {
             // ✅ CRITICAL FIX: Usar mutex para drop - readPos se está leyendo desde callback simultáneamente
             std::lock_guard<std::mutex> lock(resetMutex);
-            
+
             available = availableFrames.load(std::memory_order_acquire);
             freeFrames = BUFFER_SIZE_FRAMES - available;
-            
-            if (UNLIKELY(freeFrames < numFrames) && available > 100) {
-                // ✅ FIX: Cleanly drop solo 20% (aún menos agresivo para mejor sync)
-                int framesToClear = (available * 2) / 10;  // 20% en lugar de 30% anterior
+
+            if (UNLIKELY(freeFrames < numFrames) && available > TARGET_BUFFER_FRAMES * 2) {
+                // ✅ v4.0 SINGLE STREAM: Drop más suave - solo el exceso sobre target
+                int excessFrames = available - TARGET_BUFFER_FRAMES;
+                int framesToClear = std::min(excessFrames, numFrames);  // Solo lo necesario
+                
                 if (framesToClear > 0) {
-                    LOGW("🗑️ Buffer saturado (%d frames), limpiando %d", available, framesToClear);
-                    
+                    // Log solo si es significativo (evitar spam)
+                    if (framesToClear > 100) {
+                        LOGD("📦 Buffer ajustado: %d frames (target: %d)", available, TARGET_BUFFER_FRAMES);
+                    }
+
                     int currentRP = readPos.load(std::memory_order_acquire);
                     int newRP = (currentRP + framesToClear * channelCount) % bufferSizeSamples;
                     readPos.store(newRP, std::memory_order_release);
                     availableFrames.fetch_sub(framesToClear, std::memory_order_release);
                     dropCount.fetch_add(framesToClear);
-                    
+
                     freeFrames = BUFFER_SIZE_FRAMES - availableFrames.load();
                 }
             }
@@ -264,20 +270,20 @@ public:
 
         // 4) ✅ OPTIMIZADO FASE 2: Escritura vectorizada con memcpy y prefetch
         int currentWP = writePos.load(std::memory_order_acquire);
-        
+
         // Prefetch destino
         PREFETCH_WRITE(&circularBuffer[currentWP]);
-        
+
         int samplesInFirstPart = std::min(samplesToWrite, bufferSizeSamples - currentWP);
-        
+
         // Primera parte
         std::memcpy(&circularBuffer[currentWP], data, samplesInFirstPart * sizeof(float));
-        
+
         // Segunda parte (wrap-around) - raro
         int samplesRemaining = samplesToWrite - samplesInFirstPart;
         if (UNLIKELY(samplesRemaining > 0)) {
             PREFETCH_WRITE(&circularBuffer[0]);
-            std::memcpy(&circularBuffer[0], data + samplesInFirstPart, 
+            std::memcpy(&circularBuffer[0], data + samplesInFirstPart,
                         samplesRemaining * sizeof(float));
         }
 
@@ -285,11 +291,11 @@ public:
         int newWP = (currentWP + samplesToWrite) % bufferSizeSamples;
         writePos.store(newWP, std::memory_order_release);
         availableFrames.fetch_add(framesToWrite, std::memory_order_release);
-        
+
         // 6) Verificación de consistencia (raramente falla)
         if (UNLIKELY(availableFrames.load() > BUFFER_SIZE_FRAMES)) {
             LOGE("💥 CORRUPCIÓN: availableFrames=%d > MAX=%d",
-                    availableFrames.load(), BUFFER_SIZE_FRAMES);
+                 availableFrames.load(), BUFFER_SIZE_FRAMES);
             std::lock_guard<std::mutex> lock(resetMutex);
             forceResetInternal();
             return 0;
@@ -305,7 +311,7 @@ public:
         int avail = availableFrames.load();
         int rp = readPos.load();
         int wp = writePos.load();
-        
+
         if (avail < 0 || avail > BUFFER_SIZE_FRAMES) {
             LOGE("❌ availableFrames fuera de rango: %d", avail);
             return false;

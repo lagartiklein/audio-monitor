@@ -632,7 +632,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     CoroutineScope(Dispatchers.Main).launch {
                         onServerInfo?.invoke(serverInfo)
                     }
-                    
+
                     // ✅ NUEVO: Solicitar estado guardado del cliente después de handshake
                     requestClientState()
                 }

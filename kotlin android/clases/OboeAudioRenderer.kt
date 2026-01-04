@@ -320,7 +320,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
         var peak = 0f
         val audioSize = audioData.size
         val limit = audioSize - (audioSize % 4)
-        
+
         var i = 0
         while (i < limit) {
             // Bloque de 4 samples para mejor vectorización
@@ -328,19 +328,19 @@ class OboeAudioRenderer(private val context: Context? = null) {
             val s1 = audioData[i + 1]
             val s2 = audioData[i + 2]
             val s3 = audioData[i + 3]
-            
+
             // Left channel
             val l0 = s0 * leftGain
             val l1 = s1 * leftGain
             val l2 = s2 * leftGain
             val l3 = s3 * leftGain
-            
+
             // Right channel
             val r0 = s0 * rightGain
             val r1 = s1 * rightGain
             val r2 = s2 * rightGain
             val r3 = s3 * rightGain
-            
+
             // ✅ OPTIMIZADO: Soft clip sin branches (tanh-approximation)
             val baseIdx = i * 2
             stereoBuffer[baseIdx] = fastSoftClip(l0)
@@ -351,24 +351,24 @@ class OboeAudioRenderer(private val context: Context? = null) {
             stereoBuffer[baseIdx + 5] = fastSoftClip(r2)
             stereoBuffer[baseIdx + 6] = fastSoftClip(l3)
             stereoBuffer[baseIdx + 7] = fastSoftClip(r3)
-            
+
             // Stats (menos frecuente para mejor perf)
             val abs0 = abs(s0 * linearGain)
             if (abs0 > peak) peak = abs0
             sumSquares += s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3
-            
+
             i += 4
         }
-        
+
         // Resto de samples
         while (i < audioSize) {
             val sample = audioData[i]
             val left = sample * leftGain
             val right = sample * rightGain
-            
+
             stereoBuffer[i * 2] = fastSoftClip(left)
             stereoBuffer[i * 2 + 1] = fastSoftClip(right)
-            
+
             val absSample = abs(sample * linearGain)
             if (absSample > peak) peak = absSample
             sumSquares += sample * sample
@@ -433,7 +433,178 @@ class OboeAudioRenderer(private val context: Context? = null) {
             releaseBuffer(stereoBuffer)
         }
     }
-    
+
+    /**
+     * ✅ NUEVO: Renderizar múltiples canales mezclados en UN SOLO stream
+     * Evita race conditions al mezclar todos los canales ANTES de escribir a Oboe
+     * 
+     * @param channelDataMap Mapa de channelNumber -> FloatArray de audio
+     * @param samplePosition Posición de muestra para sincronización
+     */
+    fun renderMixedChannels(
+        channelDataMap: Map<Int, FloatArray>,
+        samplePosition: Long
+    ) {
+        if (!isInitialized || channelDataMap.isEmpty()) {
+            return
+        }
+
+        // Encontrar el tamaño máximo de buffer
+        val maxSamples = channelDataMap.values.maxOfOrNull { it.size } ?: return
+        val stereoBufferSize = maxSamples * 2  // Estéreo
+
+        // ✅ Adquirir un buffer del pool
+        val mixedBuffer = acquireBuffer(stereoBufferSize)
+        
+        // Inicializar el buffer de mezcla a ceros
+        mixedBuffer.fill(0f)
+
+        try {
+            // Mezclar todos los canales
+            channelDataMap.forEach { (channel, audioData) ->
+                val state = channelStates.getOrPut(channel) { ChannelState() }
+
+                // Ignorar canales inactivos o silenciados
+                if (!state.isActive || state.gainDb <= -60f) {
+                    return@forEach
+                }
+
+                // Calcular ganancia total (canal + master)
+                val totalGainDb = state.gainDb + masterGainDb
+                val linearGain = dbToLinear(totalGainDb)
+
+                // Panorama optimizado
+                val panRad = ((state.pan + 1f) * Math.PI / 4).toFloat()
+                val leftGain = cos(panRad) * linearGain
+                val rightGain = sin(panRad) * linearGain
+
+                // ✅ Mezclar (acumular) este canal
+                var sumSquares = 0f
+                var peak = 0f
+                val audioSize = audioData.size.coerceAtMost(maxSamples)
+
+                // Procesamiento en bloques de 4 (SIMD-friendly)
+                val limit = audioSize - (audioSize % 4)
+                var i = 0
+
+                while (i < limit) {
+                    val s0 = audioData[i]
+                    val s1 = audioData.getOrNull(i + 1) ?: 0f
+                    val s2 = audioData.getOrNull(i + 2) ?: 0f
+                    val s3 = audioData.getOrNull(i + 3) ?: 0f
+
+                    // Left channel
+                    val l0 = s0 * leftGain
+                    val l1 = s1 * leftGain
+                    val l2 = s2 * leftGain
+                    val l3 = s3 * leftGain
+
+                    // Right channel
+                    val r0 = s0 * rightGain
+                    val r1 = s1 * rightGain
+                    val r2 = s2 * rightGain
+                    val r3 = s3 * rightGain
+
+                    // Acumular al buffer mezclado con soft clip
+                    val baseIdx = i * 2
+                    mixedBuffer[baseIdx] += fastSoftClip(l0)
+                    mixedBuffer[baseIdx + 1] += fastSoftClip(r0)
+                    mixedBuffer[baseIdx + 2] += fastSoftClip(l1)
+                    mixedBuffer[baseIdx + 3] += fastSoftClip(r1)
+                    mixedBuffer[baseIdx + 4] += fastSoftClip(l2)
+                    mixedBuffer[baseIdx + 5] += fastSoftClip(r2)
+                    mixedBuffer[baseIdx + 6] += fastSoftClip(l3)
+                    mixedBuffer[baseIdx + 7] += fastSoftClip(r3)
+
+                    // Stats
+                    val abs0 = abs(s0 * linearGain)
+                    if (abs0 > peak) peak = abs0
+                    sumSquares += s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3
+
+                    i += 4
+                }
+
+                // Resto de samples
+                while (i < audioSize) {
+                    val sample = audioData[i]
+                    val left = sample * leftGain
+                    val right = sample * rightGain
+
+                    mixedBuffer[i * 2] += fastSoftClip(left)
+                    mixedBuffer[i * 2 + 1] += fastSoftClip(right)
+
+                    val absSample = abs(sample * linearGain)
+                    if (absSample > peak) peak = absSample
+                    sumSquares += sample * sample
+                    i++
+                }
+
+                state.peakLevel = peak
+                state.rmsLevel = sqrt(sumSquares / audioSize)
+                state.packetsReceived++
+                totalPacketsReceived++
+            }
+
+            // ✅ ESCRIBIR UNA SOLA VEZ al stream único de Oboe
+            val masterStreamHandle = getOrCreateStream(0)  // Stream maestro en canal 0
+            if (masterStreamHandle != 0L) {
+                try {
+                    val written = nativeWriteAudio(masterStreamHandle, mixedBuffer)
+
+                    if (written < stereoBufferSize) {
+                        val dropped = (stereoBufferSize - written) / 2
+                        totalPacketsDropped += dropped
+
+                        if (dropped > 100) {
+                            Log.d(TAG, "🗑️ Mixed Drop: $dropped frames")
+                        }
+
+                        val streamState = streamHandles[0]
+                        if (streamState != null) {
+                            streamState.consecutiveFailures++
+
+                            // Estrategia de recuperación
+                            when (streamState.consecutiveFailures) {
+                                1 -> nativeClearBuffer(masterStreamHandle)
+                                3 -> {
+                                    nativeStopStream(masterStreamHandle)
+                                    nativeStartStream(masterStreamHandle)
+                                }
+                                5 -> destroyStream(0)
+                            }
+                        }
+                    } else {
+                        streamHandles[0]?.let {
+                            it.consecutiveFailures = 0
+                            it.lastWriteTime = System.currentTimeMillis()
+                        }
+                    }
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error escribiendo stream mezclado: ${e.message}")
+                    totalPacketsDropped += stereoBufferSize / 2
+
+                    streamHandles[0]?.let { streamState ->
+                        streamState.consecutiveFailures++
+                        val timeSinceLastClear = System.currentTimeMillis() - streamState.lastClearTime
+
+                        if (timeSinceLastClear > 500) {
+                            try {
+                                nativeClearBuffer(masterStreamHandle)
+                                streamState.lastClearTime = System.currentTimeMillis()
+                            } catch (ignored: Exception) {
+                                streamState.consecutiveFailures = MAX_WRITE_FAILURES
+                            }
+                        }
+                    }
+                }
+            }
+
+        } finally {
+            releaseBuffer(mixedBuffer)
+        }
+    }
+
     /**
      * ✅ OPTIMIZADO: Soft clip sin branches usando aproximación matemática
      * x / (1 + |x|) da un clip suave similar pero sin branches

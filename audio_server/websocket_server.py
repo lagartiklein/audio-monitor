@@ -222,14 +222,15 @@ def cleanup_initial_state():
     # Limpiar estados persistentes expirados
     cleanup_expired_web_states()
 
-    # Limpiar clientes web desconectados
+    # Limpiar clientes web desconectados (timeout más agresivo)
+    web_client_timeout = getattr(config, 'WEB_CLIENT_TIMEOUT', 10.0)
     with web_clients_lock:
         disconnected_clients = [
             client_id for client_id, client_info in web_clients.items()
-            if time.time() - client_info['last_activity'] > WEB_STATE_CACHE_TIMEOUT
+            if time.time() - client_info['last_activity'] > web_client_timeout
         ]
         for client_id in disconnected_clients:
-            logger.info(f"[WebSocket] 🗑️ Eliminando cliente desconectado: {client_id[:8]}")
+            logger.info(f"[WebSocket] 🗑️ Cliente web zombie desconectado: {client_id[:8]}")
             del web_clients[client_id]
 
 
@@ -333,30 +334,9 @@ def handle_connect(auth=None):
                 except Exception as e:
                     logger.error(f"[WebSocket] Error restaurando config de device_registry: {e}")
 
-        # Si no se restauró desde device_registry, intentar restaurar desde web_persistent_state (legacy)
-        if not restored_from_registry:
-            persistent_id = web_device_uuid or f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
-            with web_persistent_lock:
-                if persistent_id in web_persistent_state:
-                    saved_state = web_persistent_state[persistent_id]
-                    logger.info(f"[WebSocket] 💾 Estado persistente encontrado para {str(persistent_id)[:20]}")
-                    try:
-                        channel_manager.subscribe_client(
-                            client_id,
-                            saved_state.get('channels', []),
-                            gains=saved_state.get('gains', {}),
-                            pans=saved_state.get('pans', {}),
-                            client_type="web",
-                            device_uuid=web_device_uuid
-                        )
-                        logger.info(f"[WebSocket] ✅ Cliente resuscrito automáticamente: {len(saved_state.get('channels', []))} canales")
-                        emit('auto_resubscribed', {
-                            'channels': saved_state.get('channels', []),
-                            'gains': saved_state.get('gains', {}),
-                            'pans': saved_state.get('pans', {})
-                        })
-                    except Exception as e:
-                        logger.error(f"[WebSocket] Error resuscrbiendo: {e}")
+        # ✅ CONFIGURACIÓN DE SESIÓN: No restaurar desde web_persistent_state (legacy)
+        # Las configuraciones se pierden al desconectar - no hay auto-restauración entre sesiones
+
 
         # ✅ Enviar lista de clientes conectados (nativos + web)
         clients_info = get_all_clients_info()
@@ -391,29 +371,8 @@ def handle_disconnect():
     """Cliente web desconectado"""
     client_id = request.sid
     
-    # ✅ Generar persistent_id y guardar estado antes de desuscribir
-    # ✅ Usar el mismo persistent_id que en connect (preferir device_uuid)
-    web_device_uuid = None
-    with web_clients_lock:
-        if client_id in web_clients:
-            web_device_uuid = web_clients[client_id].get('device_uuid')
-
-    persistent_id = web_device_uuid or f"{request.remote_addr}_{request.headers.get('User-Agent', 'Unknown')}".replace(' ', '_')[:100]
-    if channel_manager:
-        subscription = channel_manager.get_client_subscription(client_id)
-        if subscription:
-            with web_persistent_lock:
-                web_persistent_state[persistent_id] = {
-                    'channels': subscription.get('channels', []),
-                    'gains': subscription.get('gains', {}),
-                    'pans': subscription.get('pans', {}),
-                    'mutes': subscription.get('mutes', {}),
-                    'solos': list(subscription.get('solos', set())),
-                    'pre_listen': subscription.get('pre_listen'),
-                    'master_gain': subscription.get('master_gain', 1.0),
-                    'saved_at': time.time()
-                }
-                logger.info(f"[WebSocket] 💾 Estado guardado para reconexión: {str(persistent_id)[:20]}")
+    # ✅ CONFIGURACIÓN DE SESIÓN: No guardar estado persistente
+    # Las configuraciones de clientes web se pierden al desconectar (solo durante la sesión)
     
     # ✅ Remover de tracking
     with web_clients_lock:
@@ -518,19 +477,8 @@ def handle_subscribe(data):
         
         logger.info(f"[WebSocket] 📡 {client_id[:8]} suscrito: {len(channels)} canales")
         
-        # ✅ Guardar en device_registry inmediatamente
-        if web_device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
-            try:
-                config_to_save = {
-                    'channels': channels,
-                    'gains': gains_int,
-                    'pans': pans_int,
-                    'timestamp': int(time.time() * 1000)
-                }
-                channel_manager.device_registry.update_configuration(web_device_uuid, config_to_save)
-                logger.debug(f"[WebSocket] 💾 Configuración guardada en device_registry")
-            except Exception as e:
-                logger.debug(f"[WebSocket] Error guardando en device_registry: {e}")
+        # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry
+        # Las configuraciones solo persisten en memoria durante la sesión actual
         
         # ✅ Notificar a otros clientes
         broadcast_clients_update()
@@ -589,31 +537,8 @@ def handle_update_client_mix(data):
             
             logger.info(f"[WebSocket] 🎛️ Mezcla actualizada para {target_client_id[:15]}")
             
-            # ✅ NUEVO: Guardar configuración en device_registry para persistencia
-            try:
-                subscription = channel_manager.get_client_subscription(target_client_id)
-                device_uuid = subscription.get('device_uuid') if subscription else None
-                
-                if device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
-                    # Preparar configuración para guardar
-                    config_to_save = {
-                        'channels': subscription.get('channels', []),
-                        'gains': subscription.get('gains', {}),
-                        'pans': subscription.get('pans', {}),
-                        'mutes': subscription.get('mutes', {}),
-                        'solos': list(subscription.get('solos', set())),
-                        'pre_listen': subscription.get('pre_listen'),
-                        'master_gain': subscription.get('master_gain', 1.0),
-                        'timestamp': int(time.time() * 1000)
-                    }
-                    
-                    channel_manager.device_registry.update_configuration(
-                        device_uuid,
-                        config_to_save
-                    )
-                    logger.debug(f"[WebSocket] 💾 Configuración guardada en device_registry: {device_uuid[:12]}")
-            except Exception as e:
-                logger.debug(f"[WebSocket] Error guardando config en device_registry: {e}")
+            # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry
+            # Las configuraciones solo persisten en memoria durante la sesión actual
             
             # ✅ Broadcast a todos (incluye el cambio)
             broadcast_clients_update()
@@ -935,7 +860,9 @@ def _save_client_config_to_registry(client_id):
         
         device_uuid = subscription.get('device_uuid')
         
-        if device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+        # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry
+        # Las configuraciones solo persisten en memoria durante la sesión actual
+        if False:  # DISABLED FOR SESSION-ONLY CONFIG
             # Preparar configuración para guardar
             config_to_save = {
                 'channels': subscription.get('channels', []),

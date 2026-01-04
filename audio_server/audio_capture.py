@@ -440,7 +440,7 @@ class AudioCapture:
 
         self.actual_channels = channels
 
-        self.physical_channels = channels  # ✅ NUEVO: Guardar canales reales
+        self.physical_channels = channels  # ✅ Guardar canales reales capturados
 
         self.running = True
 
@@ -448,21 +448,21 @@ class AudioCapture:
 
         
 
-        print(f"[RF] ✅ Captura RF DIRECTA iniciada: {channels} canales (rellenado a {config.DEFAULT_NUM_CHANNELS})")
+        print(f"[RF] ✅ Captura RF DIRECTA iniciada: {channels} canal(es) (sin relleno artificial)")
 
         print(f"{'='*70}\n")
 
         
 
-        # ✅ NUEVO: Retornar siempre DEFAULT_NUM_CHANNELS (48) aunque el dispositivo tenga menos
+        # ✅ Retornar la cantidad real de canales capturados
 
-        return config.DEFAULT_NUM_CHANNELS
+        return self.actual_channels
 
     
 
     def _audio_callback(self, indata, frames, time_info, status):
 
-        """✅ Callback optimizado - usa memoryview sin copias + VU meters + relleno de canales"""
+        """✅ Callback optimizado - usa memoryview sin copias + VU meters"""
 
         if status:
 
@@ -486,14 +486,7 @@ class AudioCapture:
 
         
 
-        # ✅ NUEVO: Rellenar audio con ceros si hay menos canales que DEFAULT_NUM_CHANNELS (ahora 32)
         audio_to_send = indata
-        if self.physical_channels < config.DEFAULT_NUM_CHANNELS:
-            # Crear array con 32 canales rellenados con ceros
-            padded_audio = np.zeros((frames, config.DEFAULT_NUM_CHANNELS), dtype=np.float32)
-            # Copiar los canales reales
-            padded_audio[:, :self.physical_channels] = indata[:, :self.physical_channels]
-            audio_to_send = padded_audio
 
         
 

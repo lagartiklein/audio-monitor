@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
@@ -19,8 +18,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.cepalabsfree.fichatech.R
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import org.json.JSONObject
+import android.graphics.Color
 
 /**
  * ✅ Foreground Service para streaming de audio RF
@@ -39,7 +37,6 @@ class AudioStreamForegroundService : Service() {
 
         // Actions para control desde notificación
         const val ACTION_START = "com.cepalabsfree.fichatech.START_STREAM"
-        const val ACTION_STOP = "com.cepalabsfree.fichatech.STOP_STREAM"
         const val ACTION_DISCONNECT = "com.cepalabsfree.fichatech.DISCONNECT_STREAM"
         const val ACTION_CHANNEL_MONITOR_UPDATE = "com.cepalabsfree.fichatech.CHANNEL_MONITOR_UPDATE"
 
@@ -66,10 +63,6 @@ class AudioStreamForegroundService : Service() {
 
     // Instancia de OboeAudioRenderer para monitoreo y procesamiento de audio
     private lateinit var oboeAudioRenderer: OboeAudioRenderer
-
-    // Callbacks para comunicación con Activity
-    var onStopRequested: (() -> Unit)? = null
-    var onDisconnectRequested: (() -> Unit)? = null
 
     inner class AudioStreamBinder : Binder() {
         fun getService(): AudioStreamForegroundService = this@AudioStreamForegroundService
@@ -98,7 +91,7 @@ class AudioStreamForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "🎵 Servicio de streaming creado")
-        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
         // ✅ Usar singleton para compartir instancia con activity
         oboeAudioRenderer = OboeAudioRenderer.getInstance(this)
@@ -107,22 +100,14 @@ class AudioStreamForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "📡 onStartCommand: ${intent?.action}")
-
         when (intent?.action) {
             ACTION_START -> {
                 startForegroundService()
             }
-            ACTION_STOP -> {
-                onStopRequested?.invoke()
-                updateNotification("⏸️ Pausado", "Transmisión pausada")
-            }
             ACTION_DISCONNECT -> {
-                onDisconnectRequested?.invoke()
                 stopForegroundService()
             }
         }
-
-        // START_STICKY: el servicio se reinicia si Android lo mata
         return START_STICKY
     }
 
@@ -136,7 +121,7 @@ class AudioStreamForegroundService : Service() {
             // ✅ Crear notificación ANTES de startForeground()
             val notification = createNotification(
                 "🔴 Transmitiendo",
-                "Monitor de audio activo - Toca para abrir"
+                "Monitor de audio activo."
             )
 
             // ✅ Iniciar foreground con tipo específico (requerido Android 14+)
@@ -163,6 +148,44 @@ class AudioStreamForegroundService : Service() {
             isRunning = true
 
             Log.d(TAG, "✅ Servicio foreground iniciado - Notificación persistente visible")
+
+            // ✅ NUEVO: Programar validación periódica de que la notificación sigue siendo visible
+            // Este check garantiza que si la notificación se removió, se reinicia inmediatamente
+            monitorHandler.postDelayed(object : Runnable {
+                override fun run() {
+                    if (isRunning) {
+                        try {
+                            // Intentar actualizar la notificación para validar que sigue en foreground
+                            val notification = createNotification(
+                                "🔴 Transmitiendo",
+                                "Monitor de audio activo."
+                            )
+                            notificationManager?.notify(NOTIFICATION_ID, notification)
+                        } catch (_: Exception) {
+                            Log.w(TAG, "⚠️ Validación: notificación removida, intentando reinstaurar")
+                            try {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                    startForeground(
+                                        NOTIFICATION_ID,
+                                        createNotification("🔴 Transmitiendo", "Monitor de audio activo."),
+                                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                                    )
+                                } else {
+                                    startForeground(
+                                        NOTIFICATION_ID,
+                                        createNotification("🔴 Transmitiendo", "Monitor de audio activo.")
+                                    )
+                                }
+                                Log.d(TAG, "✅ Notificación reinstaurada tras validación")
+                            } catch (retryError: Exception) {
+                                Log.e(TAG, "❌ Error reinstaurando notificación: ${retryError.message}")
+                            }
+                        }
+                        // Programar siguiente validación cada 5 segundos
+                        monitorHandler.postDelayed(this, 5000L)
+                    }
+                }
+            }, 5000L)
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error iniciando servicio: ${e.message}", e)
@@ -195,7 +218,7 @@ class AudioStreamForegroundService : Service() {
     private fun acquireLocks() {
         try {
             // ✅ WifiLock - Mantiene WiFi en full performance (sin timeout directo, renovado manualmente)
-            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val wifiManager = getSystemService(WIFI_SERVICE) as WifiManager
             wifiLock = wifiManager.createWifiLock(
                 WifiManager.WIFI_MODE_FULL_LOW_LATENCY ,
                 "FichaTech:AudioStreamRF"
@@ -205,7 +228,7 @@ class AudioStreamForegroundService : Service() {
             }
 
             // ✅ WakeLock - Mantiene CPU activa (con timeout)
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "FichaTech:AudioStreamCPU"
@@ -266,6 +289,7 @@ class AudioStreamForegroundService : Service() {
     /**
      * ✅ Actualiza la notificación con nuevo estado
      * La notificación permanece visible mientras isRunning = true
+     * ✅ NUEVO: Incluye lógica defensiva para reiniciar foreground si fue removido accidentalmente
      */
     fun updateNotification(title: String, message: String) {
         if (!isRunning) {
@@ -275,8 +299,30 @@ class AudioStreamForegroundService : Service() {
 
         try {
             val notification = createNotification(title, message)
-            notificationManager?.notify(NOTIFICATION_ID, notification)
-            Log.d(TAG, "🔔 Notificación actualizada: $title")
+
+            // ✅ Intentar actualizar notificación
+            try {
+                notificationManager?.notify(NOTIFICATION_ID, notification)
+                Log.d(TAG, "🔔 Notificación actualizada: $title")
+            } catch (e: Exception) {
+                // Si falla, puede ser porque se removió el foreground
+                // Intentar reiniciar foreground
+                Log.w(TAG, "⚠️ Error actualizando notificación, intentando reiniciar foreground: ${e.message}")
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        startForeground(
+                            NOTIFICATION_ID,
+                            notification,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
+                    Log.d(TAG, "✅ Foreground reiniciado tras error de notificación")
+                } catch (retryError: Exception) {
+                    Log.e(TAG, "❌ Error reiniciando foreground: ${retryError.message}", retryError)
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error actualizando notificación: ${e.message}", e)
         }
@@ -302,7 +348,7 @@ class AudioStreamForegroundService : Service() {
     }
 
     private fun createNotification(title: String, message: String): Notification {
-        // Intent para abrir la activity al tocar la notificación
+        // Intent para abrir la actividad principal al hacer click en la notificación
         val openIntent = Intent(this, NativeAudioStreamActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -310,72 +356,25 @@ class AudioStreamForegroundService : Service() {
             this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        // Intent para desconectar
-        val disconnectIntent = Intent(this, AudioStreamForegroundService::class.java).apply {
-            action = ACTION_DISCONNECT
-        }
-        val disconnectPendingIntent = PendingIntent.getService(
-            this, 1, disconnectIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // ✅ NUEVO: Intent para pausar/reanudar
-        val pauseIntent = Intent(this, AudioStreamForegroundService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val pausePendingIntent = PendingIntent.getService(
-            this, 2, pauseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(message)
-            .setSmallIcon(R.drawable.logooficialdemo) // Tu icono de app
-            .setOngoing(true) // ✅ CRÍTICO: No se puede deslizar para cerrar
+            .setSmallIcon(R.drawable.logooficialdemo)
+            .setOngoing(true)
             .setContentIntent(openPendingIntent)
-            
-            // ✅ NUEVO: Estilo mejorado (compatibilidad con notificaciones modernas)
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText(message)
-                .setBigContentTitle(title))
-            
-            // ✅ Acción "Volver a la App"
-            .addAction(
-                android.R.drawable.ic_menu_view,
-                "Abrir",
-                openPendingIntent
-            )
-            // ✅ Acción "Pausar"
-            .addAction(
-                android.R.drawable.ic_media_pause,
-                "Pausar",
-                pausePendingIntent
-            )
-            // ✅ Acción "Desconectar" (destructiva)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Desconectar",
-                disconnectPendingIntent
-            )
-            
-            // ✅ Categoría y prioridad (compatibilidad Google Play)
+            // Fondo negro transparente
+            .setColor(Color.BLACK)
+            .setColorized(true)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message).setBigContentTitle(title))
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            
-            // ✅ NUEVO: Color de acento (más moderno en Android 5+)
-            .setColor(getColor(android.R.color.holo_blue_light))
-            
-            // ✅ NUEVO: Desactivar luz LED y sonidos (para no molestar)
             .setLights(0, 0, 0)
             .setSound(null)
             .setVibrate(longArrayOf())
-            
-            // ✅ NUEVO: AutoCancel solo en ciertos casos
             .setAutoCancel(false)
+            .setSubText("")
 
         // ✅ NUEVO: Si es Android 12+, usar Material Design 3 colors
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -402,5 +401,37 @@ class AudioStreamForegroundService : Service() {
             oboeAudioRenderer.stop()
         }
         super.onDestroy()
+    }
+
+    /**
+     * ✅ CRÍTICO: Proteger contra deslizar la app de recientes
+     * Si el usuario elimina la app de recientes, el sistema llama a onTaskRemoved()
+     * Aquí reiniciamos el servicio para mantener la notificación persistente
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d(TAG, "⚠️ Aplicación eliminada de recientes - Reiniciando servicio foreground")
+
+        // ✅ Reiniciar el servicio después de un pequeño delay
+        // para darle tiempo al sistema de estabilizarse
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!isRunning) {
+                Log.d(TAG, "🔄 Reiniciando servicio foreground tras onTaskRemoved")
+                val restartIntent = Intent(this, AudioStreamForegroundService::class.java).apply {
+                    action = ACTION_START
+                }
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(restartIntent)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        startService(restartIntent)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error reiniciando servicio: ${e.message}", e)
+                }
+            }
+        }, 500L) // 500ms delay
+
+        super.onTaskRemoved(rootIntent)
     }
 }

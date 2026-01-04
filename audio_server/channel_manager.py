@@ -465,9 +465,10 @@ class ChannelManager:
 
         sub['last_update'] = time.time()
 
-        # ✅ MEJORADO: Persistir estado por dispositivo (sin restricción de sesión para persistencia permanente)
+        # ✅ CONFIGURACIÓN DE SESIÓN: No persistir estado en device_registry
+        # Las configuraciones solo persisten en memoria durante la sesión actual
         device_uuid = sub.get('device_uuid')
-        if device_uuid and self.device_registry:
+        if False:  # DISABLED FOR SESSION-ONLY CONFIG
             try:
                 self.device_registry.update_configuration(
                     device_uuid,

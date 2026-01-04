@@ -1236,7 +1236,8 @@ class NativeAudioServer:
             client.subscribed_channels = set(channels)
             
             try:
-                if client.send_bytes_direct(packet_bytes):
+                # ✅ ULTRA-BAJA LATENCIA: Envío síncrono directo (sin cola async)
+                if client.send_bytes_sync(packet_bytes):
                     sent += 1
                 else:
                     if client.consecutive_send_failures >= client.max_consecutive_failures:

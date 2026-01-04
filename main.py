@@ -203,11 +203,6 @@ class AudioServerApp:
 
             
 
-            # ✅ NUEVO: Forzar mínimo DEFAULT_NUM_CHANNELS (48) incluso si el dispositivo tiene menos
-            num_channels = max(num_channels, config.DEFAULT_NUM_CHANNELS)
-
-            
-
             # ✅ NUEVO: Inicializar Device Registry
             device_registry = init_device_registry(
                 persistence_file=os.path.join(os.path.dirname(__file__), "config", "devices.json")
@@ -281,9 +276,9 @@ class AudioServerApp:
             from audio_server import websocket_server
             self.native_server.websocket_server_ref = websocket_server
             
-            # ✅ NUEVO: Configurar callback de VU levels
-            from audio_server.websocket_server import broadcast_audio_levels
-            self.audio_capture.vu_callback = broadcast_audio_levels
+            # ✅ VU METERS DESACTIVADOS para ultra-baja latencia
+            if not getattr(config, 'VU_ENABLED', False):
+                self.audio_capture.vu_callback = None
 
             
 
