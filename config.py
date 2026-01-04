@@ -1,5 +1,5 @@
 # config.py
-# ⚡ CONFIGURACIÓN ULTRA-BAJA LATENCIA RF + WEB - FIXED
+# ⚡ CONFIGURACIÓN ULTRA-BAJA LATENCIA RF + WEB - FASE 3 OPTIMIZADA
 # ✅ Prevención de saturación WiFi y fugas de memoria
 
 # ============================================================================
@@ -7,15 +7,24 @@
 # ============================================================================
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
-BLOCKSIZE = 64  # ✅ ~2.67ms latencia mínima
+
+# ✅ FASE 3: BLOCKSIZE optimizado para batching eficiente
+# 128 samples = ~2.67ms (balance entre latencia y overhead de red)
+BLOCKSIZE = 128  # ⬆️ Incrementado de 64 para mejor throughput
 
 # ✅ CANALES POR DEFECTO
-DEFAULT_NUM_CHANNELS = 32  # Limitar a 32 canales por compatibilidad protocolo
+DEFAULT_NUM_CHANNELS = 32  # Valor por defecto, pero se sobrescribe por el real del dispositivo
 
 # ============================================================================
 # ✅ FORMATO DE AUDIO
 # ============================================================================
 USE_INT16_ENCODING = True   # ✅ True = -50% datos, False = Float32 original
+
+# ============================================================================
+# ✅ FASE 2: CONFIGURACIÓN ASYNC SEND
+# ============================================================================
+SEND_QUEUE_SIZE = 8          # Máximo 8 paquetes encolados por cliente
+SEND_THREAD_COUNT = 1        # 1 hilo de envío por cliente
 
 # ============================================================================
 # COLAS (MaaDO DIRECTO PARA RF)
@@ -100,7 +109,7 @@ WEB_BINARY_MODE = True
 # ============================================================================
 # SEGURIDAD Y LÍMITES
 # ============================================================================
-MAX_CHANNELS_PER_CLIENT = 32
+MAX_CHANNELS_PER_CLIENT = 128  # O elimina este límite si no es necesario
 MAX_GAIN_VALUE = 10.0
 MAX_MASTER_GAIN = 5.0
 NATIVE_HEARTBEAT_TIMEOUT = 120

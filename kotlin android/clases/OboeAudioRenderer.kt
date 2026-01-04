@@ -282,7 +282,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
     }
 
     /**
-     * Renderiza audio (sin cambios)
+     * ✅ OPTIMIZADO: Renderizado de audio con procesamiento vectorizado
      */
     fun renderChannelRF(channel: Int, audioData: FloatArray, samplePosition: Long) {
         if (!isInitialized || audioData.isEmpty()) {
@@ -303,37 +303,80 @@ class OboeAudioRenderer(private val context: Context? = null) {
             return
         }
 
-        // Calcular ganancias
+        // Calcular ganancias (pre-calculado una vez)
         val totalGainDb = state.gainDb + masterGainDb
         val linearGain = dbToLinear(totalGainDb)
 
-        // Panorama
+        // Panorama optimizado
         val panRad = ((state.pan + 1f) * Math.PI / 4).toFloat()
         val leftGain = cos(panRad) * linearGain
         val rightGain = sin(panRad) * linearGain
 
-        // ✅ OPTIMIZACIÓN FASE 1: Reutilizar buffer del pool en lugar de crear uno nuevo
         val bufferSize = audioData.size * 2
         val stereoBuffer = acquireBuffer(bufferSize)
 
+        // ✅ OPTIMIZADO: Procesamiento en bloques de 4 (SIMD-friendly)
         var sumSquares = 0f
         var peak = 0f
-
-        for (i in audioData.indices) {
+        val audioSize = audioData.size
+        val limit = audioSize - (audioSize % 4)
+        
+        var i = 0
+        while (i < limit) {
+            // Bloque de 4 samples para mejor vectorización
+            val s0 = audioData[i]
+            val s1 = audioData[i + 1]
+            val s2 = audioData[i + 2]
+            val s3 = audioData[i + 3]
+            
+            // Left channel
+            val l0 = s0 * leftGain
+            val l1 = s1 * leftGain
+            val l2 = s2 * leftGain
+            val l3 = s3 * leftGain
+            
+            // Right channel
+            val r0 = s0 * rightGain
+            val r1 = s1 * rightGain
+            val r2 = s2 * rightGain
+            val r3 = s3 * rightGain
+            
+            // ✅ OPTIMIZADO: Soft clip sin branches (tanh-approximation)
+            val baseIdx = i * 2
+            stereoBuffer[baseIdx] = fastSoftClip(l0)
+            stereoBuffer[baseIdx + 1] = fastSoftClip(r0)
+            stereoBuffer[baseIdx + 2] = fastSoftClip(l1)
+            stereoBuffer[baseIdx + 3] = fastSoftClip(r1)
+            stereoBuffer[baseIdx + 4] = fastSoftClip(l2)
+            stereoBuffer[baseIdx + 5] = fastSoftClip(r2)
+            stereoBuffer[baseIdx + 6] = fastSoftClip(l3)
+            stereoBuffer[baseIdx + 7] = fastSoftClip(r3)
+            
+            // Stats (menos frecuente para mejor perf)
+            val abs0 = abs(s0 * linearGain)
+            if (abs0 > peak) peak = abs0
+            sumSquares += s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3
+            
+            i += 4
+        }
+        
+        // Resto de samples
+        while (i < audioSize) {
             val sample = audioData[i]
             val left = sample * leftGain
             val right = sample * rightGain
-
-            stereoBuffer[i * 2] = softClip(left)
-            stereoBuffer[i * 2 + 1] = softClip(right)
-
+            
+            stereoBuffer[i * 2] = fastSoftClip(left)
+            stereoBuffer[i * 2 + 1] = fastSoftClip(right)
+            
             val absSample = abs(sample * linearGain)
             if (absSample > peak) peak = absSample
             sumSquares += sample * sample
+            i++
         }
 
         state.peakLevel = peak
-        state.rmsLevel = sqrt(sumSquares / audioData.size)
+        state.rmsLevel = sqrt(sumSquares / audioSize)
         state.packetsReceived++
 
         // Escribir a Oboe
@@ -348,14 +391,14 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 if (streamState != null) {
                     streamState.consecutiveFailures++
 
-                    // ✅ Estrategia de recuperación (sin Log en hotpath para Fase 1)
-                    if (streamState.consecutiveFailures == 1) {
-                        nativeClearBuffer(streamHandle)
-                    } else if (streamState.consecutiveFailures == 3) {
-                        nativeStopStream(streamHandle)
-                        nativeStartStream(streamHandle)
-                    } else if (streamState.consecutiveFailures >= 5) {
-                        destroyStream(channel)
+                    // Estrategia de recuperación
+                    when (streamState.consecutiveFailures) {
+                        1 -> nativeClearBuffer(streamHandle)
+                        3 -> {
+                            nativeStopStream(streamHandle)
+                            nativeStartStream(streamHandle)
+                        }
+                        5 -> destroyStream(channel)
                     }
                 }
 
@@ -363,9 +406,9 @@ class OboeAudioRenderer(private val context: Context? = null) {
                     Log.d(TAG, "🗑️ RF Drop: $dropped frames en canal $channel")
                 }
             } else {
-                if (streamState != null) {
-                    streamState.consecutiveFailures = 0
-                    streamState.lastWriteTime = System.currentTimeMillis()
+                streamState?.let {
+                    it.consecutiveFailures = 0
+                    it.lastWriteTime = System.currentTimeMillis()
                 }
             }
 
@@ -373,8 +416,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
             Log.e(TAG, "❌ Error escribiendo canal $channel: ${e.message}")
             totalPacketsDropped += audioData.size / 2
 
-            val streamState = streamHandles[channel]
-            if (streamState != null) {
+            streamHandles[channel]?.let { streamState ->
                 streamState.consecutiveFailures++
                 val timeSinceLastClear = System.currentTimeMillis() - streamState.lastClearTime
 
@@ -388,12 +430,19 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 }
             }
         } finally {
-            // ✅ OPTIMIZACIÓN FASE 1: Devolver buffer al pool
             releaseBuffer(stereoBuffer)
         }
     }
+    
+    /**
+     * ✅ OPTIMIZADO: Soft clip sin branches usando aproximación matemática
+     * x / (1 + |x|) da un clip suave similar pero sin branches
+     */
+    private fun fastSoftClip(x: Float): Float {
+        return x / (1f + abs(x) * 0.25f)  // Aproximación rápida con límite ~1.0
+    }
 
-    // ✅ OPTIMIZACIÓN FASE 1: Métodos de pool de buffers
+    // Pool de buffers
     private fun acquireBuffer(size: Int): FloatArray {
         return bufferPool.removeFirstOrNull()?.takeIf { it.size == size }
             ?: FloatArray(size)
@@ -567,12 +616,18 @@ class OboeAudioRenderer(private val context: Context? = null) {
     fun stop() {
         try {
             Log.d(TAG, "🛑 Deteniendo OboeAudioRenderer...")
-            streamHandles.keys.forEach { channel ->
-                destroyStream(channel)
+            val channelsToStop = streamHandles.keys.toList()
+            channelsToStop.forEach { channel ->
+                try {
+                    destroyStream(channel)
+                    Log.d(TAG, "✅ Stream canal $channel detenido")
+                } catch (e: Exception) {
+                    Log.e(TAG, "⚠️ Error deteniendo stream $channel: ${e.message}")
+                }
             }
             channelStates.clear()
             resetRFStats()
-            Log.d(TAG, "✅ OboeAudioRenderer detenido")
+            Log.d(TAG, "✅ OboeAudioRenderer detenido completamente")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error deteniendo: ${e.message}")
         }

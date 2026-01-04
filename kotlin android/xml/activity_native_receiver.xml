@@ -3,11 +3,15 @@
     android:id="@+id/native_audio_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#000000"
+
     android:fillViewport="true">
+
     <LinearLayout
         android:id="@+id/native_audio_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:orientation="vertical"
         android:padding="0dp"
         android:paddingBottom="0dp">
@@ -17,7 +21,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="#000000"
-            android:padding="16dp"
+            android:padding="0dp"
             android:layout_marginBottom="16dp"
             android:elevation="4dp">
 
@@ -25,7 +29,7 @@
                 android:id="@+id/statusText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="⭕ Fichatech Monitor"
+                android:text="FICHATECH MONITOR"
                 android:textColor="#ffffff"
                 android:textSize="20sp"
                 android:textStyle="bold"
@@ -33,15 +37,6 @@
                 android:padding="12dp"/>
 
 
-            <TextView
-                android:id="@+id/webControlText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Sistema de monitoreo Wifi"
-                android:textColor="#cccccc"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:padding="4dp"/>
 
         </LinearLayout>
 
@@ -52,7 +47,7 @@
             android:orientation="vertical"
             android:background="#000000"
             android:padding="16dp"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="10dp"
             android:elevation="4dp">
 
             <TextView
@@ -128,8 +123,8 @@
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="#ffffff"
-                android:backgroundTint="#ff4444"
                 android:padding="14dp"
+                android:backgroundTint="@android:color/holo_red_light"
                 android:elevation="4dp"/>
 
         </LinearLayout>
@@ -234,7 +229,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="12dp">
+                android:layout_marginTop="70dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -284,5 +279,3 @@
     </LinearLayout>
 
 </ScrollView>
-
-

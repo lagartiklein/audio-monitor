@@ -395,6 +395,23 @@
             box-shadow: 0 0 0 1px var(--yellow);
         }
 
+        /* Channel recognition states */
+        .channel-strip.recognized {
+            border: 2px solid var(--green) !important;
+            box-shadow: 0 0 12px rgba(63, 185, 80, 0.6) !important;
+            opacity: 1 !important;
+        }
+
+        .channel-strip.unrecognized {
+            border: 2px solid var(--red) !important;
+            opacity: 0.65 !important;
+        }
+
+        .channel-strip.active.recognized {
+            border: 2px solid var(--green) !important;
+            box-shadow: 0 0 12px rgba(63, 185, 80, 0.6) !important;
+        }
+
         .channel-number {
             font-weight: 700;
             font-size: 0.85rem;
@@ -409,6 +426,11 @@
         .channel-strip.active .channel-number {
             color: var(--green);
             background: rgba(63, 185, 80, 0.1);
+        }
+
+        .channel-strip.recognized .channel-number {
+            color: var(--green);
+            font-weight: 800;
         }
 
         /* Channel Buttons */
@@ -455,50 +477,6 @@
             color: white;
         }
 
-        /* VU Meter */
-        .vu-meter {
-            width: 24px;
-            height: 140px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .vu-fill {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(to top, 
-                var(--green) 0%, 
-                var(--green) 60%, 
-                var(--yellow) 60%, 
-                var(--yellow) 85%, 
-                var(--red) 85%);
-            transition: height 0.08s linear;
-            height: 0%;
-        }
-
-        .vu-scale {
-            position: absolute;
-            right: 2px;
-            width: 4px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 2px 0;
-            pointer-events: none;
-        }
-
-        .vu-tick {
-            width: 100%;
-            height: 1px;
-            background: var(--border-color);
-        }
-
         /* Fader Section */
         .fader-section {
             display: flex;
@@ -509,7 +487,7 @@
         }
 
         .fader-wrapper {
-            height: 120px;
+            height: 200px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -556,6 +534,7 @@
             width: 100%;
             text-align: center;
             font-family: 'SF Mono', 'Consolas', monospace;
+            transition: color 0.15s ease, text-shadow 0.15s ease;
         }
 
         /* Pan Control */
@@ -600,6 +579,8 @@
             font-size: 0.65rem;
             color: var(--text-secondary);
             font-weight: 600;
+            transition: color 0.15s ease;
+        }
         }
 
         /* No client selected */
@@ -1314,7 +1295,7 @@
                     return;
                 }
 
-                const numChannels = Math.min(32, this.deviceInfo.channels || 8);
+                const numChannels = this.deviceInfo.channels || 8;
                 const gains = client.gains || {};
                 const pans = client.pans || {};
                 const activeChannels = client.channels || [];
@@ -1332,7 +1313,12 @@
 
                     const strip = document.createElement('div');
                     strip.className = 'channel-strip';
-                    if (isActive) strip.classList.add('active');
+                    if (isActive) {
+                        strip.classList.add('active');
+                        strip.classList.add('recognized');
+                    } else {
+                        strip.classList.add('unrecognized');
+                    }
                     if (isPfl) strip.classList.add('pfl-active');
                     if (isSolo) strip.classList.add('solo-active');
 
@@ -1343,10 +1329,6 @@
                             <button class="channel-btn on-btn ${isActive ? 'active' : ''}" data-channel="${i}">ON</button>
                             <button class="channel-btn solo ${isSolo ? 'active' : ''}" data-channel="${i}">SOLO</button>
                             <button class="channel-btn pfl ${isPfl ? 'active' : ''}" data-channel="${i}">PFL</button>
-                        </div>
-
-                        <div class="vu-meter">
-                            <div class="vu-fill" data-channel="${i}"></div>
                         </div>
 
                         <div class="fader-section">
@@ -1380,12 +1362,28 @@
                     const fader = strip.querySelector('.fader');
                     fader.addEventListener('input', (e) => {
                         const db = parseFloat(e.target.value);
+                        // Update display immediately for smooth feedback
+                        const dbDisplay = document.querySelector(`.db-display[data-channel="${i}"]`);
+                        if (dbDisplay) {
+                            dbDisplay.textContent = this.formatDb(db);
+                        }
+                    });
+                    fader.addEventListener('change', (e) => {
+                        const db = parseFloat(e.target.value);
                         this.updateGain(clientId, i, db);
                     });
 
                     // Pan slider
                     const panSlider = strip.querySelector('.pan-slider');
                     panSlider.addEventListener('input', (e) => {
+                        const pan = parseInt(e.target.value) / 100;
+                        // Update display immediately for smooth feedback
+                        const panValue = document.querySelector(`.pan-value[data-channel="${i}"]`);
+                        if (panValue) {
+                            panValue.textContent = this.formatPan(pan);
+                        }
+                    });
+                    panSlider.addEventListener('change', (e) => {
                         const pan = parseInt(e.target.value) / 100;
                         this.updatePan(clientId, i, pan);
                     });
@@ -1471,12 +1469,6 @@
                     gains: { [channel]: gain }
                 });
 
-                // Update display
-                const dbDisplay = document.querySelector(`.db-display[data-channel="${channel}"]`);
-                if (dbDisplay) {
-                    dbDisplay.textContent = this.formatDb(db);
-                }
-
                 // Update local
                 if (this.clients[clientId]) {
                     if (!this.clients[clientId].gains) {
@@ -1492,12 +1484,6 @@
                     pans: { [channel]: pan }
                 });
 
-                // Update display
-                const panValue = document.querySelector(`.pan-value[data-channel="${channel}"]`);
-                if (panValue) {
-                    panValue.textContent = this.formatPan(pan);
-                }
-
                 // Update local
                 if (this.clients[clientId]) {
                     if (!this.clients[clientId].pans) {
@@ -1510,7 +1496,7 @@
             selectAllChannels() {
                 if (!this.selectedClientId || !this.deviceInfo) return;
                 
-                const numChannels = Math.min(32, this.deviceInfo.channels || 8);
+                const numChannels = this.deviceInfo.channels || 8;
                 const channels = Array.from({ length: numChannels }, (_, i) => i);
                 
                 this.socket.emit('update_client_mix', {
@@ -1597,10 +1583,7 @@
                     const level = levels[channel];
                     const rmsPercent = level.rms_percent || 0;
                     
-                    const vuFill = document.querySelector(`.vu-fill[data-channel="${channel}"]`);
-                    if (vuFill) {
-                        vuFill.style.height = `${Math.min(100, rmsPercent)}%`;
-                    }
+
                 }
             }
 

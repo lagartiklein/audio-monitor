@@ -17,8 +17,21 @@ add_compile_options(
         -Wextra
 )
 
+# ✅ FASE 3: Habilitar NEON SIMD para ARM
+# IMPORTANTE: -mfpu=neon solo para ARM 32-bit (armeabi-v7a)
+# ARM64 (arm64-v8a) tiene NEON siempre disponible
+if(${ANDROID_ABI} STREQUAL "armeabi-v7a")
+    add_compile_options(-mfpu=neon)
+    add_compile_definitions(HAS_NEON=1)
+    message(STATUS "✅ NEON SIMD habilitado para ${ANDROID_ABI} (32-bit)")
+elseif(${ANDROID_ABI} STREQUAL "arm64-v8a")
+    # ARM64 tiene NEON built-in, no necesita -mfpu
+    add_compile_definitions(HAS_NEON=1)
+    message(STATUS "✅ NEON SIMD disponible para ${ANDROID_ABI} (64-bit, always enabled)")
+endif()
+
 # Flags de optimización por tipo de build
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -ftree-vectorize -DNDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -DDEBUG")
 
 # CRÍTICO: Flags de linker para 16KB alignment

@@ -1,5 +1,5 @@
-// audio_callback.h - FIXED: Recuperación automática de saturación
-// Callback para Oboe con protección contra deadlocks
+// audio_callback.h - ULTRA LOW LATENCY VERSION - FASE 2 OPTIMIZADO
+// Callback para Oboe con buffer circular optimizado, prefetch y mínima contención
 
 #ifndef FICHATECH_AUDIO_CALLBACK_H
 #define FICHATECH_AUDIO_CALLBACK_H
@@ -12,6 +12,19 @@
 #include <chrono>
 #include <atomic>
 
+// ✅ FASE 2: Prefetch para mejor rendimiento de caché L1/L2
+#if defined(__GNUC__) || defined(__clang__)
+#define PREFETCH_READ(addr)  __builtin_prefetch((addr), 0, 3)
+#define PREFETCH_WRITE(addr) __builtin_prefetch((addr), 1, 3)
+#define LIKELY(x)   __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define PREFETCH_READ(addr)
+#define PREFETCH_WRITE(addr)
+#define LIKELY(x)   (x)
+#define UNLIKELY(x) (x)
+#endif
+
 // Macros de log para Android; facilitan escribir mensajes con niveles
 #define LOG_TAG "AudioCallback"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -19,167 +32,169 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 // Clase que implementa AudioStreamDataCallback de Oboe.
-// Esta clase gestiona un buffer circular en memoria donde se escribe audio
-// desde la parte de producción y se lee desde el callback de audio (consumo).
+// ✅ OPTIMIZADO: Buffer circular con mínima contención y operaciones vectorizadas
 class AudioCallback : public oboe::AudioStreamDataCallback {
 private:
-    // Constantes de configuración del buffer y de recuperación
-    static constexpr int BUFFER_SIZE_FRAMES = 2048;      // Tamaño del buffer en frames (no en muestras). ~42 ms a 48 kHz
-    static constexpr int TARGET_BUFFER_FRAMES = 128;     // Tamaño objetivo de buffer en frames para latencia baja (~2.7 ms)
-    static constexpr int DROP_THRESHOLD = 1536;          // Umbral (en frames) a partir del cual empezamos a dropear para evitar overflow (75% de BUFFER_SIZE_FRAMES)
-    static constexpr int SILENCE_TIMEOUT_MS = 5000;      // Tiempo en ms de silencio sostenido tras el cual intentamos un reset automático (5 s)
-    static constexpr int CORRUPTION_CHECK_INTERVAL = 100; // Cada cuántos callbacks verificamos si hay corrupción interna
+    // ✅ OPTIMIZACIÓN LATENCIA: Buffer más pequeño para menor latencia
+    static constexpr int BUFFER_SIZE_FRAMES = 1024;      // Reducido de 2048 (~21ms @ 48kHz)
+    static constexpr int TARGET_BUFFER_FRAMES = 96;      // ~2ms target latency
+    static constexpr int DROP_THRESHOLD = 768;           // 75% del buffer
+    static constexpr int SILENCE_TIMEOUT_MS = 5000;      // Timeout de silencio
+    static constexpr int CORRUPTION_CHECK_INTERVAL = 200; // Menos frecuente para mejor perf
 
-    // Buffer circular que almacena muestras en formato float interleaved (canal0, canal1, canal0, canal1, ...)
+    // Buffer circular que almacena muestras en formato float interleaved
     std::vector<float> circularBuffer;
-    // Mutex para proteger accesos concurrentes entre el hilo que escribe y el callback de audio
-    std::mutex bufferMutex;
+    
+    // ✅ OPTIMIZACIÓN: Mutex solo para operaciones de reset, no para R/W normal
+    std::mutex resetMutex;
 
-    // Punteros/índices dentro del buffer circular (en muestras, no en frames)
-    int writePos = 0; // índice de la siguiente posición donde se escribirá una muestra
-    int readPos = 0;  // índice de la siguiente muestra que se leerá en el callback
-
-    // Contador de frames disponibles (en frames, no en muestras). Atómico para lectura segura sin lock en getters.
+    // ✅ OPTIMIZACIÓN: Índices atómicos para acceso lock-free en casos simples
+    std::atomic<int> writePos{0};
+    std::atomic<int> readPos{0};
     std::atomic<int> availableFrames{0};
-    int channelCount = 2; // número de canales (por defecto stereo)
+    
+    int channelCount = 2;
+    int bufferSizeSamples = 0;  // Cache para evitar multiplicaciones
 
-    // Estadísticas y contadores atómicos para inspección y recuperación
-    std::atomic<int> underrunCount{0};         // cuántas veces no había audio para reproducir
-    std::atomic<int> dropCount{0};             // cuántos frames se descartaron por overflow
-    std::atomic<int64_t> lastAudioTime{0};     // timestamp (ms) del último audio válido recibido
-    std::atomic<bool> wasSilent{false};        // flag que indica si estábamos en estado de silencio prolongado
-
-    // Contadores para detección de corrupción y resets
-    std::atomic<int> callbackCount{0};         // cuántos callbacks se han ejecutado (para chequeos periódicos)
-    std::atomic<int> resetCount{0};            // cuántos resets forzados se han hecho
-    std::atomic<int64_t> lastResetTime{0};     // timestamp (ms) del último reset
+    // Estadísticas atómicas
+    std::atomic<int> underrunCount{0};
+    std::atomic<int> dropCount{0};
+    std::atomic<int64_t> lastAudioTime{0};
+    std::atomic<bool> wasSilent{false};
+    std::atomic<int> callbackCount{0};
+    std::atomic<int> resetCount{0};
+    std::atomic<int64_t> lastResetTime{0};
 
 public:
-    // Constructor: inicializa el buffer en función de canales y marca el tiempo actual
+    // Constructor: inicializa el buffer con tamaño optimizado
     explicit AudioCallback(int channels) : channelCount(channels) {
-        // Reservamos espacio: BUFFER_SIZE_FRAMES * channelCount muestras
-        circularBuffer.resize(BUFFER_SIZE_FRAMES * channelCount, 0.0f);
+        bufferSizeSamples = BUFFER_SIZE_FRAMES * channelCount;
+        circularBuffer.resize(bufferSizeSamples, 0.0f);
         lastAudioTime = getCurrentTimeMillis();
-        // Log informativo indicando la configuración
-        LOGD("✅ AudioCallback RF: %d canales, buffer %d frames (~%dms)",
+        LOGD("✅ AudioCallback ULTRA-LOW-LATENCY: %d canales, buffer %d frames (~%dms)",
                 channels, BUFFER_SIZE_FRAMES,
                 BUFFER_SIZE_FRAMES * 1000 / 48000);
     }
 
     /**
-     * Método que implementa el callback de Oboe: se llama en el hilo de audio cada vez
-     * que el sistema pide datos para reproducir. Debe ser extremadamente eficiente y
-     * no bloquear por mucho tiempo.
-     *
-     * Retorna DataCallbackResult::Continue para seguir reproduciendo.
+     * ✅ OPTIMIZADO FASE 2: Callback de audio con mínima latencia
+     * - Usa memcpy vectorizado en lugar de loop sample-by-sample
+     * - Prefetch para mejor cache hit rate
+     * - Branch prediction hints
+     * - Reduce operaciones en hot path
      */
     oboe::DataCallbackResult onAudioReady(
             oboe::AudioStream *audioStream,
             void *audioData,
             int32_t numFrames) override {
 
-        // 'audioData' apunta a un buffer donde debemos escribir las muestras float a reproducir.
         auto *outputBuffer = static_cast<float *>(audioData);
-        // Evita advertencia de parámetro no usado (el stream no se necesita aquí)
         (void)audioStream;
-        // Calculamos cuántas muestras (floats) son necesarias: frames * canales
+        
         const int samplesNeeded = numFrames * channelCount;
-
-        // Bloqueamos el mutex para asegurar coherencia del buffer circular durante la lectura
-        std::lock_guard<std::mutex> lock(bufferMutex);
-
-        // Incrementamos el contador de callbacks (usado para chequeos periódicos)
         callbackCount++;
 
-        // 1) Validación periódica de sanidad interna para detectar corrupción de índices
-        if (callbackCount % CORRUPTION_CHECK_INTERVAL == 0) {
+        // 1) Validación periódica (menos frecuente para mejor perf)
+        if (UNLIKELY((callbackCount % CORRUPTION_CHECK_INTERVAL) == 0)) {
             if (!validateBufferState()) {
-                // Si detectamos corrupción, hacemos un reset forzado y devolvemos silencio
                 LOGE("💥 Corrupción detectada, reseteando...");
-                forceReset();
+                std::lock_guard<std::mutex> lock(resetMutex);
+                forceResetInternal();
                 std::memset(outputBuffer, 0, samplesNeeded * sizeof(float));
                 return oboe::DataCallbackResult::Continue;
             }
         }
 
-        // 2) Manejo de buffer vacío (underrun): si no hay frames disponibles, devolvemos silencio
-        if (availableFrames == 0) {
-            // Rellenamos con ceros (silencio)
+        // 2) Obtener frames disponibles (lectura atómica)
+        int available = availableFrames.load(std::memory_order_acquire);
+        
+        // 3) Underrun: no hay datos (caso raro, optimizar path común)
+        if (UNLIKELY(available == 0)) {
             std::memset(outputBuffer, 0, samplesNeeded * sizeof(float));
             underrunCount++;
-
-            // Calculamos cuánto tiempo ha pasado desde el último audio válido
-            int64_t silentTime = getCurrentTimeMillis() - lastAudioTime;
-
-            // Si estuvo en silencio y supera el timeout, intentamos un reset automático
-            if (silentTime > SILENCE_TIMEOUT_MS && wasSilent) {
-                int64_t timeSinceLastReset = getCurrentTimeMillis() - lastResetTime;
-
-                // Evitamos hacer resets muy seguidos: al menos 10s entre resets
-                if (timeSinceLastReset > 10000) {
-                    // casteamos a long long para cumplir el especificador %lld en el log
-                    LOGW("🔄 Silencio prolongado (%lldms), reseteando buffer", (long long)silentTime);
-                    forceReset();
+            
+            int64_t silentTime = getCurrentTimeMillis() - lastAudioTime.load();
+            if (silentTime > SILENCE_TIMEOUT_MS && wasSilent.load()) {
+                int64_t timeSinceReset = getCurrentTimeMillis() - lastResetTime.load();
+                if (timeSinceReset > 10000) {
+                    LOGW("🔄 Silencio prolongado (%lldms), reseteando", (long long)silentTime);
+                    std::lock_guard<std::mutex> lock(resetMutex);
+                    forceResetInternal();
                 }
             }
-
-            // Marcamos que estábamos en silencio
-            wasSilent = true;
+            wasSilent.store(true);
             return oboe::DataCallbackResult::Continue;
         }
 
-        // 3) Validación adicional: asegurarnos de que readPos esté dentro del rango del vector
-        if (readPos >= static_cast<int>(circularBuffer.size())) {
-            LOGE("💥 readPos corrupto: %d >= %zu", readPos, circularBuffer.size());
-            forceReset();
+        // 4) Obtener posición de lectura actual
+        int currentReadPos = readPos.load(std::memory_order_acquire);
+        
+        // Validar posición (raramente falla)
+        if (UNLIKELY(currentReadPos < 0 || currentReadPos >= bufferSizeSamples)) {
+            LOGE("💥 readPos corrupto: %d", currentReadPos);
+            std::lock_guard<std::mutex> lock(resetMutex);
+            forceResetInternal();
             std::memset(outputBuffer, 0, samplesNeeded * sizeof(float));
             return oboe::DataCallbackResult::Continue;
         }
 
-        // 4) Reproducimos audio copiando desde el buffer circular al buffer de salida
-        // Determinamos cuántos frames podemos reproducir: mínimo entre los disponibles y lo pedido
-        int framesToPlay = std::min(availableFrames.load(), numFrames);
+        // 5) Calcular cuántos frames reproducir
+        int framesToPlay = std::min(available, numFrames);
         int samplesToPlay = framesToPlay * channelCount;
 
-        // Copiamos muestras de forma segura haciendo wrap-around con el módulo del tamaño del vector
-        for (int i = 0; i < samplesToPlay; i++) {
-            outputBuffer[i] = circularBuffer[readPos];
-            readPos = (readPos + 1) % static_cast<int>(circularBuffer.size());
+        // ✅ FASE 2: Prefetch de datos del buffer circular
+        PREFETCH_READ(&circularBuffer[currentReadPos]);
+        PREFETCH_WRITE(outputBuffer);
+
+        // 6) ✅ OPTIMIZADO: Copia vectorizada con memcpy
+        int samplesInFirstPart = std::min(samplesToPlay, bufferSizeSamples - currentReadPos);
+        
+        // Primera parte (hasta el final del buffer)
+        std::memcpy(outputBuffer, &circularBuffer[currentReadPos], 
+                    samplesInFirstPart * sizeof(float));
+        
+        // Segunda parte (wrap-around si es necesario)
+        int samplesRemaining = samplesToPlay - samplesInFirstPart;
+        if (UNLIKELY(samplesRemaining > 0)) {
+            // Prefetch del inicio del buffer para wrap-around
+            PREFETCH_READ(&circularBuffer[0]);
+            std::memcpy(outputBuffer + samplesInFirstPart, &circularBuffer[0],
+                        samplesRemaining * sizeof(float));
         }
 
-        // Si no alcanzamos a llenar el buffer de salida, rellenamos el resto con ceros (silencio)
-        if (samplesToPlay < samplesNeeded) {
+        // Padding con ceros si no hay suficientes datos (raro)
+        if (UNLIKELY(samplesToPlay < samplesNeeded)) {
             std::memset(outputBuffer + samplesToPlay, 0,
-                    (samplesNeeded - samplesToPlay) * sizeof(float));
+                        (samplesNeeded - samplesToPlay) * sizeof(float));
         }
 
-        // Reducimos el contador de frames disponibles en la cantidad reproducida
-        availableFrames -= framesToPlay;
+        // 7) Actualizar posición de lectura (atómico)
+        int newReadPos = (currentReadPos + samplesToPlay) % bufferSizeSamples;
+        readPos.store(newReadPos, std::memory_order_release);
+        availableFrames.fetch_sub(framesToPlay, std::memory_order_release);
 
-        // 5) Si hemos reproducido frames válidos, actualizamos el timestamp del último audio válido
-        if (framesToPlay > 0) {
-            lastAudioTime = getCurrentTimeMillis();
+        // 8) Actualizar timestamp si reproducimos algo
+        if (LIKELY(framesToPlay > 0)) {
+            lastAudioTime.store(getCurrentTimeMillis());
+            if (UNLIKELY(wasSilent.load())) {
+                LOGD("🔊 Audio recuperado después de %d underruns", underrunCount.load());
+                wasSilent.store(false);
+            }
         }
 
-        // Si veníamos de silencio y ahora reproducimos, registramos recuperación
-        if (wasSilent && framesToPlay > 0) {
-            LOGD("🔊 Audio recuperado después de %d underruns", underrunCount.load());
-            wasSilent = false;
-        }
-
-        // 6) Lógica preventiva para drops cuando el buffer crece demasiado (evitar latencia excesiva)
-        if (availableFrames > DROP_THRESHOLD) {
-            // Calculamos exceso respecto al target
-            int excess = availableFrames - TARGET_BUFFER_FRAMES;
+        // 9) Drop preventivo si el buffer crece demasiado (raro)
+        int currentAvailable = availableFrames.load();
+        if (UNLIKELY(currentAvailable > DROP_THRESHOLD)) {
+            int excess = currentAvailable - TARGET_BUFFER_FRAMES;
             if (excess > 0) {
-                // Ajustamos readPos para descartar los frames más antiguos y reducir latencia
-                readPos = (readPos + excess * channelCount) % static_cast<int>(circularBuffer.size());
-                availableFrames -= excess;
-                dropCount += excess;
-
+                int currentRP = readPos.load();
+                int newRP = (currentRP + excess * channelCount) % bufferSizeSamples;
+                readPos.store(newRP, std::memory_order_release);
+                availableFrames.fetch_sub(excess, std::memory_order_release);
+                dropCount.fetch_add(excess);
+                
                 if (excess > 256) {
-                    LOGD("🗑️ Drop preventivo: %d frames (quedan: %d)",
-                            excess, availableFrames.load());
+                    LOGD("🗑️ Drop preventivo: %d frames", excess);
                 }
             }
         }
@@ -188,91 +203,102 @@ public:
     }
 
     /**
-     * Método público para escribir audio en el buffer circular.
-     * Recibe un puntero a floats interleaved y el número de frames a escribir.
-     * Devuelve cuántos frames realmente escribió (podría escribir menos si el buffer está lleno).
+     * ✅ OPTIMIZADO FASE 2: Escritura de audio con operaciones vectorizadas y prefetch
      */
     int writeAudio(const float *data, int numFrames) {
-        // Protegemos la escritura con el mismo mutex que usa el callback lector
-        std::lock_guard<std::mutex> lock(bufferMutex);
-
-        // Actualizamos el timestamp de actividad (estamos recibiendo audio ahora)
-        lastAudioTime = getCurrentTimeMillis();
+        lastAudioTime.store(getCurrentTimeMillis());
 
         const int samplesTotal = numFrames * channelCount;
 
-        // 1) Calculamos espacio libre real en frames
-        int freeFrames = BUFFER_SIZE_FRAMES - availableFrames;
+        // ✅ FASE 2: Prefetch de datos entrantes
+        PREFETCH_READ(data);
 
-        // 2) Si no hay espacio suficiente, aplicamos estrategia de clearing agresiva
-        if (freeFrames < numFrames) {
-            // Eliminamos el 75% del contenido actual para recuperar espacio (estrategia de emergencia)
-            int framesToClear = (availableFrames * 3) / 4;
+        // 1) Obtener frames disponibles y calcular espacio libre
+        int available = availableFrames.load(std::memory_order_acquire);
+        int freeFrames = BUFFER_SIZE_FRAMES - available;
 
+        // 2) Si no hay espacio suficiente, hacer drop agresivo (raro)
+        if (UNLIKELY(freeFrames < numFrames)) {
+            int framesToClear = (available * 3) / 4;
             if (framesToClear > 0) {
-                LOGW("🗑️ Buffer saturado (%d frames), limpiando %d frames",
-                        availableFrames.load(), framesToClear);
-
-                // Avanzamos readPos para descartar frames antiguos y ajustar availableFrames
-                readPos = (readPos + framesToClear * channelCount) % static_cast<int>(circularBuffer.size());
-                availableFrames -= framesToClear;
-                dropCount += framesToClear;
-
-                // Recalculamos el espacio libre tras limpiar
-                freeFrames = BUFFER_SIZE_FRAMES - availableFrames;
+                LOGW("🗑️ Buffer saturado (%d frames), limpiando %d", available, framesToClear);
+                
+                int currentRP = readPos.load(std::memory_order_acquire);
+                int newRP = (currentRP + framesToClear * channelCount) % bufferSizeSamples;
+                readPos.store(newRP, std::memory_order_release);
+                availableFrames.fetch_sub(framesToClear, std::memory_order_release);
+                dropCount.fetch_add(framesToClear);
+                
+                freeFrames = BUFFER_SIZE_FRAMES - availableFrames.load();
             }
         }
 
-        // 3) Determinamos cuántos frames podemos escribir con seguridad
+        // 3) Calcular cuántos frames escribir (caso normal: todos)
         int framesToWrite = std::min(numFrames, freeFrames);
-
-        // 4) Si no hay nada que escribir, informamos y descartamos
-        if (framesToWrite <= 0) {
-            LOGW("❌ Buffer completamente lleno, descartando %d frames", numFrames);
-            dropCount += numFrames;
+        if (UNLIKELY(framesToWrite <= 0)) {
+            LOGW("❌ Buffer lleno, descartando %d frames", numFrames);
+            dropCount.fetch_add(numFrames);
             return 0;
         }
 
         int samplesToWrite = framesToWrite * channelCount;
 
-        // 5) Escritura segura en el buffer circular (con wrap-around)
-        for (int i = 0; i < samplesToWrite; i++) {
-            circularBuffer[writePos] = data[i];
-            writePos = (writePos + 1) % static_cast<int>(circularBuffer.size());
+        // 4) ✅ OPTIMIZADO FASE 2: Escritura vectorizada con memcpy y prefetch
+        int currentWP = writePos.load(std::memory_order_acquire);
+        
+        // Prefetch destino
+        PREFETCH_WRITE(&circularBuffer[currentWP]);
+        
+        int samplesInFirstPart = std::min(samplesToWrite, bufferSizeSamples - currentWP);
+        
+        // Primera parte
+        std::memcpy(&circularBuffer[currentWP], data, samplesInFirstPart * sizeof(float));
+        
+        // Segunda parte (wrap-around) - raro
+        int samplesRemaining = samplesToWrite - samplesInFirstPart;
+        if (UNLIKELY(samplesRemaining > 0)) {
+            PREFETCH_WRITE(&circularBuffer[0]);
+            std::memcpy(&circularBuffer[0], data + samplesInFirstPart, 
+                        samplesRemaining * sizeof(float));
         }
 
-        // 6) Actualizamos el contador de frames disponibles solo con lo que realmente escribimos
-        availableFrames += framesToWrite;
-
-        // 7) Verificación post-escritura para detectar inconsistencia
-        if (availableFrames > BUFFER_SIZE_FRAMES) {
+        // 5) Actualizar posición de escritura
+        int newWP = (currentWP + samplesToWrite) % bufferSizeSamples;
+        writePos.store(newWP, std::memory_order_release);
+        availableFrames.fetch_add(framesToWrite, std::memory_order_release);
+        
+        // 6) Verificación de consistencia (raramente falla)
+        if (UNLIKELY(availableFrames.load() > BUFFER_SIZE_FRAMES)) {
             LOGE("💥 CORRUPCIÓN: availableFrames=%d > MAX=%d",
                     availableFrames.load(), BUFFER_SIZE_FRAMES);
-            forceReset();
+            std::lock_guard<std::mutex> lock(resetMutex);
+            forceResetInternal();
             return 0;
         }
 
-        // Devolvemos la cantidad de frames escritos (puede ser menor a numFrames)
         return framesToWrite;
     }
 
     /**
-     * Validación del estado interno del buffer: verifica rangos de contadores e índices.
-     * Retorna true si todo está dentro de rango, false si detecta inconsistencia.
+     * Validación del estado interno del buffer
      */
     bool validateBufferState() {
-        if (availableFrames < 0 || availableFrames > BUFFER_SIZE_FRAMES) {
-            LOGE("❌ availableFrames fuera de rango: %d", availableFrames.load());
+        int avail = availableFrames.load();
+        int rp = readPos.load();
+        int wp = writePos.load();
+        
+        if (avail < 0 || avail > BUFFER_SIZE_FRAMES) {
+            LOGE("❌ availableFrames fuera de rango: %d", avail);
             return false;
         }
 
-        if (readPos < 0 || readPos >= static_cast<int>(circularBuffer.size())) {
-            LOGE("❌ readPos fuera de rango: %d", readPos);
+        if (rp < 0 || rp >= bufferSizeSamples) {
+            LOGE("❌ readPos fuera de rango: %d", rp);
             return false;
         }
 
-        if (writePos < 0 || writePos >= static_cast<int>(circularBuffer.size())) {
-            LOGE("❌ writePos fuera de rango: %d", writePos);
+        if (wp < 0 || wp >= bufferSizeSamples) {
+            LOGE("❌ writePos fuera de rango: %d", wp);
             return false;
         }
 
@@ -280,33 +306,30 @@ public:
     }
 
     /**
-     * Reset forzado del buffer: limpia contenidos y reinicia índices y contadores.
-     * Útil cuando se detecta corrupción o se desea recuperar de estados inválidos.
+     * Reset interno (sin lock, usar solo cuando ya se tiene el lock)
      */
-    void forceReset() {
-        // Llenamos con ceros el buffer y reiniciamos posiciones y contadores.
+    void forceResetInternal() {
         std::fill(circularBuffer.begin(), circularBuffer.end(), 0.0f);
-        writePos = 0;
-        readPos = 0;
-        availableFrames = 0;
-        underrunCount = 0;
-        dropCount = 0;
-        wasSilent = false;
+        writePos.store(0, std::memory_order_release);
+        readPos.store(0, std::memory_order_release);
+        availableFrames.store(0, std::memory_order_release);
+        underrunCount.store(0);
+        dropCount.store(0);
+        wasSilent.store(false);
         resetCount++;
-        lastResetTime = getCurrentTimeMillis();
-
+        lastResetTime.store(getCurrentTimeMillis());
         LOGW("🔄 Buffer reseteado (reset #%d)", resetCount.load());
     }
 
     /**
-     * Versión pública de limpieza que adquiere el lock y llama a forceReset.
+     * Versión pública de limpieza
      */
     void clear() {
-        std::lock_guard<std::mutex> lock(bufferMutex);
-        forceReset();
+        std::lock_guard<std::mutex> lock(resetMutex);
+        forceResetInternal();
     }
 
-    // Getters sencillos para inspeccionar estado desde fuera (seguros y rápidos)
+    // Getters para estadísticas
     int getAvailableFrames() const {
         return availableFrames.load();
     }

@@ -15,7 +15,7 @@ import kotlin.math.max
 
 /**
  * ✅ ChannelView v2.0 - API 36 Compatible
- * 
+ *
  * CARACTERÍSTICAS:
  * - Sincronización bidireccional con servidor
  * - Debounce inteligente para evitar spam de red
@@ -43,7 +43,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     private var channelIndex: Int = 0
     private var currentGainDb = 0f
     private var currentPan = 0f
-    
+
     // ✅ Flag para evitar loops de sincronización
     private var isUpdatingFromServer = false
 
@@ -63,6 +63,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     private var lastSentGainDb = 0f
     private var lastSentPan = 0f
 
+    private var thumbTouchRadius = 12f // Radio de detección del thumb (en píxeles)
+    private val thumbTouchRadiusDefault = 12f
+    private val thumbTouchRadiusExpanded = 36f // Puedes ajustar este valor para más o menos margen
+    private var thumbTouchRadiusPan = 12f // Radio de detección del thumb de pan (en píxeles)
+    private val thumbTouchRadiusPanDefault = 12f
+    private val thumbTouchRadiusPanExpanded = 36f // Puedes ajustar este valor para más o menos margen
+
     init {
         initView(context)
     }
@@ -72,7 +79,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         channelIndex = safe - 1
         channelLabel.text = "CH $safe"
     }
-    
+
     fun getChannelIndex(): Int = channelIndex
 
     /**
@@ -80,10 +87,10 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
      */
     fun activateChannel(active: Boolean, fromServer: Boolean = false) {
         if (isActive == active) return
-        
+
         isActive = active
         updateUIState()
-        
+
         // Solo notificar si NO viene del servidor (evita loops)
         if (!fromServer && !isUpdatingFromServer) {
             onActiveChanged?.invoke(channelIndex, active)
@@ -215,15 +222,15 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
      */
     fun updateFromServerState(active: Boolean, gainDb: Float? = null, pan: Float? = null) {
         isUpdatingFromServer = true
-        
+
         if (isActive != active) {
             isActive = active
             updateUIState()
         }
-        
+
         gainDb?.let { setGainDbInternal(it) }
         pan?.let { setPanValueInternal(it) }
-        
+
         isUpdatingFromServer = false
     }
 
@@ -265,7 +272,6 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
         root.setBackgroundResource(backgroundColor)
 
-        channelLabel.setTextColor(resources.getColor(textColor, null))
 
         powerButton.setBackgroundColor(resources.getColor(powerButtonColor, null))
 
@@ -284,39 +290,104 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
 
     /**
-     * Configura los touch listeners en los sliders para evitar interferencia con scroll
-     * Usa requestDisallowInterceptTouchEvent para que el parent (ScrollView) no interfiera
+     * ✅ Configura los touch listeners en los sliders SOLO para el thumb
+     * - Solo permite interacción directa sobre el thumb
+     * - Rechaza touches sobre el track
+     * - Bloquea scroll cuando se toca el thumb
      */
     private fun setupSliderTouchHandling() {
-        volumeSlider.setOnTouchListener { _, event ->
+        volumeSlider.setOnTouchListener { view, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    isSliderTouched = true
-                    parent?.requestDisallowInterceptTouchEvent(true)
+                    thumbTouchRadius = thumbTouchRadiusExpanded // Agranda el área de touch de volumen
+                    if (isPointOnThumb(volumeSlider, event)) {
+                        isSliderTouched = true
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        false
+                    } else {
+                        thumbTouchRadius = thumbTouchRadiusDefault
+                        true
+                    }
                 }
-
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     isSliderTouched = false
                     parent?.requestDisallowInterceptTouchEvent(false)
+                    thumbTouchRadius = thumbTouchRadiusDefault // <-- Restaurar tamaño normal al soltar
+                    false // Permitir que el slider procese el evento normalmente
+                }
+                else -> {
+                    if (isSliderTouched) false else true
                 }
             }
-            false // Permitir que el slider procese el evento normalmente
         }
-
-        panSlider.setOnTouchListener { _, event ->
+        panSlider.setOnTouchListener { view, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    isSliderTouched = true
-                    parent?.requestDisallowInterceptTouchEvent(true)
+                    thumbTouchRadiusPan = thumbTouchRadiusPanExpanded // Agranda el área de touch de pan
+                    if (isPointOnThumbPan(panSlider, event)) {
+                        isSliderTouched = true
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        false
+                    } else {
+                        thumbTouchRadiusPan = thumbTouchRadiusPanDefault
+                        true
+                    }
                 }
-
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     isSliderTouched = false
                     parent?.requestDisallowInterceptTouchEvent(false)
+                    thumbTouchRadiusPan = thumbTouchRadiusPanDefault // <-- Restaurar tamaño normal al soltar
+                    false // Permitir que el slider procese el evento normalmente
+                }
+                else -> {
+                    if (isSliderTouched) false else true
                 }
             }
-            false // Permitir que el slider procese el evento normalmente
         }
+    }
+
+    private fun isPointOnThumb(slider: Slider, event: MotionEvent): Boolean {
+        val thumbRadius = thumbTouchRadius
+
+        // Obtener la posición del thumb
+        val trackPosition = slider.trackSidePadding
+        val trackWidth = slider.width - (trackPosition * 2)
+        val valueRange = slider.valueTo - slider.valueFrom
+        val normalizedValue = (slider.value - slider.valueFrom) / valueRange
+        val thumbX = trackPosition + (normalizedValue * trackWidth)
+
+        // Obtener coordenadas del toque
+        val touchX = event.x
+        val touchY = event.y
+
+        // Calcular distancia al thumb
+        val deltaX = touchX - thumbX
+        val deltaY = touchY - slider.height / 2f
+        val distance = kotlin.math.sqrt((deltaX * deltaX) + (deltaY * deltaY))
+
+        return distance <= thumbRadius
+    }
+
+    private fun isPointOnThumbPan(slider: Slider, event: MotionEvent): Boolean {
+        val thumbRadius = thumbTouchRadiusPan
+
+        // Obtener la posición del thumb
+        val trackPosition = slider.trackSidePadding
+        val trackWidth = slider.width - (trackPosition * 2)
+        val valueRange = slider.valueTo - slider.valueFrom
+        val normalizedValue = (slider.value - slider.valueFrom) / valueRange
+        val thumbX = trackPosition + (normalizedValue * trackWidth)
+
+        // Obtener coordenadas del toque
+        val touchX = event.x
+        val touchY = event.y
+
+        // Calcular distancia al thumb
+        val deltaX = touchX - thumbX
+        val deltaY = touchY - slider.height / 2f
+        val distance = kotlin.math.sqrt((deltaX * deltaX) + (deltaY * deltaY))
+
+        return distance <= thumbRadius
     }
 
     /**

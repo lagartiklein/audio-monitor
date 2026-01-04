@@ -253,6 +253,18 @@ h1 {
     opacity: 1;
 }
 
+/* Channel recognition states */
+.channel-strip.recognized {
+    border: 2px solid #10b981 !important;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.6) !important;
+    opacity: 1 !important;
+}
+
+.channel-strip.unrecognized {
+    border: 2px solid #ef4444 !important;
+    opacity: 0.65 !important;
+}
+
 /* Channel Number */
 .channel-number {
     font-size: 1.05em;

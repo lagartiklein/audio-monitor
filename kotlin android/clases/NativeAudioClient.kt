@@ -16,7 +16,7 @@ import org.json.JSONArray
 
 /**
  * ✅ NativeAudioClient v3.0 - API 36 Compatible
- * 
+ *
  * CARACTERÍSTICAS:
  * - Singleton thread-safe con deviceUUID inmutable
  * - Auto-reconexión con backoff exponencial
@@ -33,7 +33,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         // Timeouts optimizados para API 36
         private const val CONNECT_TIMEOUT = 5000
         private const val READ_TIMEOUT = 8000
-        
+
         // Protocolo binario
         private const val HEADER_SIZE = 16
         private const val MAGIC_NUMBER = 0xA1D10A7C.toInt()
@@ -60,18 +60,54 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         // Heartbeat keep-alive
         private const val HEARTBEAT_INTERVAL_MS = 5000L
         private const val HEARTBEAT_TIMEOUT_MS = 15000L
+        
+        // ✅ OPTIMIZACIÓN LATENCIA: Constante para división Int16->Float
+        private const val INVERSE_32768 = 1f / 32768f
+        
+        // ✅ OPTIMIZACIÓN LATENCIA: Buffers pre-alocados para evitar GC
+        private val shortBufferPool = ArrayDeque<ShortArray>()
+        private val floatBufferPool = ArrayDeque<FloatArray>()
+        private const val MAX_POOLED_BUFFERS = 4
+        
+        private fun acquireShortBuffer(size: Int): ShortArray {
+            return synchronized(shortBufferPool) {
+                shortBufferPool.removeFirstOrNull()?.takeIf { it.size >= size }
+            } ?: ShortArray(size)
+        }
+        
+        private fun releaseShortBuffer(buffer: ShortArray) {
+            synchronized(shortBufferPool) {
+                if (shortBufferPool.size < MAX_POOLED_BUFFERS) {
+                    shortBufferPool.addLast(buffer)
+                }
+            }
+        }
+        
+        private fun acquireFloatBuffer(size: Int): FloatArray {
+            return synchronized(floatBufferPool) {
+                floatBufferPool.removeFirstOrNull()?.takeIf { it.size >= size }
+            } ?: FloatArray(size)
+        }
+        
+        private fun releaseFloatBuffer(buffer: FloatArray) {
+            synchronized(floatBufferPool) {
+                if (floatBufferPool.size < MAX_POOLED_BUFFERS) {
+                    floatBufferPool.addLast(buffer)
+                }
+            }
+        }
 
         // Singleton thread-safe
         @Volatile private var instance: NativeAudioClient? = null
         private val instanceLock = Any()
-        
+
         fun getInstance(deviceUUID: String): NativeAudioClient {
-            instance?.let { 
-                if (it.deviceUUID == deviceUUID) return it 
+            instance?.let {
+                if (it.deviceUUID == deviceUUID) return it
             }
-            
+
             return synchronized(instanceLock) {
-                instance?.let { 
+                instance?.let {
                     if (it.deviceUUID == deviceUUID) return@synchronized it
                     Log.w(TAG, "⚠️ Reemplazando cliente con nuevo deviceUUID")
                     it.forceClose()
@@ -79,7 +115,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                 NativeAudioClient(deviceUUID).also { instance = it }
             }
         }
-        
+
         fun releaseInstance() {
             synchronized(instanceLock) {
                 instance?.forceClose()
@@ -97,8 +133,8 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
     private var serverPort = 5101
 
     // Buffer pre-alocado para network I/O
-    private val networkBuffer = ByteBuffer.allocateDirect(8192).apply { 
-        order(ByteOrder.nativeOrder()) 
+    private val networkBuffer = ByteBuffer.allocateDirect(8192).apply {
+        order(ByteOrder.nativeOrder())
     }
 
     private val _shouldStop = AtomicBoolean(false)
@@ -112,7 +148,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
     private var persistentPans = emptyMap<Int, Float>()
     private var persistentMutes = emptyMap<Int, Boolean>()
     private val subscriptionLock = Any()
-    
+
     private var reconnectJob: Job? = null
     private var heartbeatJob: Job? = null
     private var currentReconnectDelay = RECONNECT_DELAY_MS
@@ -176,8 +212,8 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
             Log.d(TAG, "✅ Conectado RF (ID: ${clientId.take(8)})")
 
-            withContext(Dispatchers.Main) { 
-                onConnectionStatus?.invoke(true, "ONLINE") 
+            withContext(Dispatchers.Main) {
+                onConnectionStatus?.invoke(true, "ONLINE")
             }
 
             // Re-suscribir con estado completo
@@ -218,14 +254,14 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
             while (!_shouldStop.get() && _isConnected.get()) {
                 delay(HEARTBEAT_INTERVAL_MS)
-                
+
                 val timeSinceLastResponse = System.currentTimeMillis() - lastHeartbeatResponse.get()
                 if (timeSinceLastResponse > HEARTBEAT_TIMEOUT_MS) {
                     Log.w(TAG, "💔 Heartbeat timeout (${timeSinceLastResponse}ms)")
                     handleConnectionLost("Heartbeat timeout")
                     break
                 }
-                
+
                 if (_isConnected.get()) {
                     sendControlMessage("heartbeat", mapOf(
                         "timestamp" to System.currentTimeMillis(),
@@ -259,7 +295,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
     private fun startAutoReconnect() {
         reconnectJob?.cancel()
-        
+
         reconnectJob = CoroutineScope(Dispatchers.IO).launch {
             var attempt = 1
 
@@ -295,18 +331,18 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
         _shouldStop.set(true)
         rfMode = false
-        
+
         heartbeatJob?.cancel()
         reconnectJob?.cancel()
         closeResources()
-        
+
         _isConnected.set(false)
 
-        CoroutineScope(Dispatchers.Main).launch { 
-            onConnectionStatus?.invoke(false, "⚫ OFFLINE") 
+        CoroutineScope(Dispatchers.Main).launch {
+            onConnectionStatus?.invoke(false, "⚫ OFFLINE")
         }
     }
-    
+
     private fun forceClose() {
         _shouldStop.set(true)
         rfMode = false
@@ -359,7 +395,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         mutes: Map<Int, Boolean>
     ) {
         if (!_isConnected.get()) return
-        
+
         CoroutineScope(Dispatchers.IO).launch {
             sendControlMessage("subscribe", mapOf(
                 "client_id" to clientId,
@@ -397,7 +433,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
             "device_uuid" to deviceUUID,
             "timestamp" to System.currentTimeMillis()
         )
-        
+
         channels?.let { data["channels"] = it }
         gains?.let { data["gains"] = it.mapKeys { e -> e.key.toString() } }
         pans?.let { data["pans"] = it.mapKeys { e -> e.key.toString() } }
@@ -453,7 +489,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
                     consecutiveMagicErrors = 0
 
-                    val maxPayload = if (header.msgType == MSG_TYPE_CONTROL) 
+                    val maxPayload = if (header.msgType == MSG_TYPE_CONTROL)
                         MAX_CONTROL_PAYLOAD else MAX_AUDIO_PAYLOAD
 
                     if (header.payloadLength < 0 || header.payloadLength > maxPayload) {
@@ -519,22 +555,22 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                         "is_reconnection" to json.optBoolean("is_reconnection", false),
                         "web_controlled" to json.optBoolean("web_controlled", true)
                     )
-                    CoroutineScope(Dispatchers.Main).launch { 
-                        onServerInfo?.invoke(serverInfo) 
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onServerInfo?.invoke(serverInfo)
                     }
                 }
-                
+
                 "heartbeat_response" -> {
                     lastHeartbeatResponse.set(System.currentTimeMillis())
                 }
-                
+
                 "subscription_confirmed" -> {
                     Log.d(TAG, "✅ Suscripción confirmada")
                 }
-                
+
                 "mix_state" -> {
                     val mixState = parseMixState(json)
-                    
+
                     // Actualizar estado local
                     synchronized(subscriptionLock) {
                         persistentChannels = mixState.channels
@@ -542,12 +578,12 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                         persistentPans = mixState.pans
                         persistentMutes = mixState.mutes
                     }
-                    
-                    CoroutineScope(Dispatchers.Main).launch { 
-                        onMixState?.invoke(mixState) 
+
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onMixState?.invoke(mixState)
                     }
                 }
-                
+
                 "control_update" -> {
                     // Sincronización de controles desde web o servidor
                     val update = parseControlUpdate(json)
@@ -583,10 +619,10 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
             gains = parseFloatMap(json.optJSONObject("gains")),
             pans = parseFloatMap(json.optJSONObject("pans")),
             mutes = parseBoolMap(json.optJSONObject("mutes")),
-            preListen = if (json.has("pre_listen") && !json.isNull("pre_listen")) 
+            preListen = if (json.has("pre_listen") && !json.isNull("pre_listen"))
                 json.optInt("pre_listen") else null,
             solos = solos,
-            masterGain = if (json.has("master_gain") && !json.isNull("master_gain")) 
+            masterGain = if (json.has("master_gain") && !json.isNull("master_gain"))
                 json.optDouble("master_gain", 1.0).toFloat() else null
         )
     }
@@ -642,6 +678,9 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         }
     }
 
+    /**
+     * ✅ OPTIMIZADO: Decodificación de audio con buffers reutilizables y menos allocations
+     */
     private fun decodeAudioPayload(payload: ByteArray, flags: Int): FloatAudioData? {
         if (payload.size < 12) return null
 
@@ -650,48 +689,87 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
             val samplePosition = buffer.long
             val channelMask = buffer.int
 
-            val activeChannels = mutableListOf<Int>()
-            for (i in 0 until 32) {
-                if ((channelMask and (1 shl i)) != 0) {
-                    activeChannels.add(i)
+            // ✅ OPTIMIZADO: Usar Integer.bitCount para contar canales activos
+            val numActiveChannels = Integer.bitCount(channelMask)
+            if (numActiveChannels == 0) return null
+            
+            // ✅ OPTIMIZADO: Construir lista de canales activos más eficientemente
+            val activeChannels = ArrayList<Int>(numActiveChannels)
+            var mask = channelMask
+            var channelIndex = 0
+            while (mask != 0) {
+                if ((mask and 1) != 0) {
+                    activeChannels.add(channelIndex)
                 }
+                mask = mask ushr 1
+                channelIndex++
             }
-
-            if (activeChannels.isEmpty()) return null
 
             val remainingBytes = payload.size - 12
             val isInt16 = (flags and FLAG_INT16) != 0
 
-            val floatArray: FloatArray = if (isInt16) {
+            val floatArray: FloatArray
+            var shortArrayToRelease: ShortArray? = null
+            
+            if (isInt16) {
                 val shortCount = remainingBytes / 2
-                if (shortCount % activeChannels.size != 0) return null
+                if (shortCount % numActiveChannels != 0) return null
 
                 val shortBuffer = buffer.asShortBuffer()
-                val shortArray = ShortArray(shortCount)
-                shortBuffer.get(shortArray)
+                val shortArray = acquireShortBuffer(shortCount)
+                shortArrayToRelease = shortArray
+                shortBuffer.get(shortArray, 0, shortCount)
 
-                FloatArray(shortCount) { i ->
-                    shortArray[i].toFloat() / 32768.0f
+                // ✅ OPTIMIZADO: Loop desenrollado para conversión Int16->Float
+                floatArray = acquireFloatBuffer(shortCount)
+                var i = 0
+                val limit = shortCount - (shortCount % 4)
+                
+                // Procesar en bloques de 4 (SIMD-friendly)
+                while (i < limit) {
+                    floatArray[i] = shortArray[i] * INVERSE_32768
+                    floatArray[i + 1] = shortArray[i + 1] * INVERSE_32768
+                    floatArray[i + 2] = shortArray[i + 2] * INVERSE_32768
+                    floatArray[i + 3] = shortArray[i + 3] * INVERSE_32768
+                    i += 4
                 }
+                // Resto
+                while (i < shortCount) {
+                    floatArray[i] = shortArray[i] * INVERSE_32768
+                    i++
+                }
+                
+                // Devolver buffer al pool
+                releaseShortBuffer(shortArray)
+                shortArrayToRelease = null
             } else {
                 val floatCount = remainingBytes / 4
-                if (floatCount % activeChannels.size != 0) return null
+                if (floatCount % numActiveChannels != 0) return null
 
                 val floatBuffer = buffer.asFloatBuffer()
-                val result = FloatArray(floatCount)
-                floatBuffer.get(result)
-                result
+                floatArray = acquireFloatBuffer(floatCount)
+                floatBuffer.get(floatArray, 0, floatCount)
             }
 
-            val samplesPerChannel = floatArray.size / activeChannels.size
-            if (samplesPerChannel == 0) return null
+            val samplesPerChannel = floatArray.size / numActiveChannels
+            if (samplesPerChannel == 0) {
+                releaseFloatBuffer(floatArray)
+                return null
+            }
 
-            val audioData = Array(activeChannels.size) { FloatArray(samplesPerChannel) }
-            for (s in 0 until samplesPerChannel) {
-                for (c in activeChannels.indices) {
-                    audioData[c][s] = floatArray[s * activeChannels.size + c]
+            // ✅ OPTIMIZADO: Desentrelazado más eficiente
+            val audioData = Array(numActiveChannels) { FloatArray(samplesPerChannel) }
+            for (c in 0 until numActiveChannels) {
+                val channelData = audioData[c]
+                var srcIndex = c
+                for (s in 0 until samplesPerChannel) {
+                    channelData[s] = floatArray[srcIndex]
+                    srcIndex += numActiveChannels
                 }
             }
+            
+            // Devolver buffer al pool (el audioData es nuevo, no del pool)
+            releaseFloatBuffer(floatArray)
 
             return FloatAudioData(samplePosition, activeChannels, audioData, samplesPerChannel)
         } catch (e: Exception) {
@@ -706,7 +784,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
             try {
                 val message = buildJsonMessage(type, data)
                 val messageBytes = message.toByteArray(Charsets.UTF_8)
-                
+
                 val header = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN)
                 header.putInt(MAGIC_NUMBER)
                 header.putShort(PROTOCOL_VERSION.toShort())
@@ -801,9 +879,9 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
             if (javaClass != other?.javaClass) return false
             other as FloatAudioData
             return samplePosition == other.samplePosition &&
-                   activeChannels == other.activeChannels &&
-                   audioData.contentDeepEquals(other.audioData) &&
-                   samplesPerChannel == other.samplesPerChannel
+                    activeChannels == other.activeChannels &&
+                    audioData.contentDeepEquals(other.audioData) &&
+                    samplesPerChannel == other.samplesPerChannel
         }
 
         override fun hashCode(): Int {
@@ -824,7 +902,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         val solos: List<Int>,
         val masterGain: Float?
     )
-    
+
     data class ControlUpdate(
         val source: String,
         val channel: Int,
@@ -833,6 +911,6 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         val active: Boolean?,
         val mute: Boolean?
     )
-    
+
     private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 }

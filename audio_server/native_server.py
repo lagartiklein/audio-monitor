@@ -1,11 +1,18 @@
-# native_server.py - FIXED
+# native_server.py - FASE 2: OPTIMIZADO CON ENVÍO ASÍNCRONO
 import socket, threading, time, json, struct, numpy as np, logging
+import select
+from queue import Queue, Empty, Full
 from audio_server.native_protocol import NativeAndroidProtocol
 from collections import defaultdict
 import config
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL), format='[RF-SERVER] %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ✅ FASE 2: Configuración de colas asíncronas
+SEND_QUEUE_SIZE = 8  # Paquetes máximos en cola por cliente
+SEND_THREAD_COUNT = 2  # Threads de envío
+
 
 class NativeClient:
     def __init__(self, client_id: str, sock: socket.socket, address: tuple, persistent_id: str = None):
@@ -25,15 +32,22 @@ class NativeClient:
         self.packets_dropped = 0
         self.connection_time = time.time()
         self.reconnection_count = 0
-        self.consecutive_send_failures = 0  # ✅ NUEVO: Contador de fallos
-        self.max_consecutive_failures = 5   # ✅ NUEVO: Límite de fallos
+        self.consecutive_send_failures = 0
+        self.max_consecutive_failures = 5
+        
+        # ✅ FASE 2: Cola de envío asíncrono por cliente
+        self.send_queue = Queue(maxsize=SEND_QUEUE_SIZE)
+        self.send_thread = None
+        self.send_running = True
         
         # Socket optimizado
         try:
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config.SOCKET_SNDBUF)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config.SOCKET_RCVBUF)
-            self.socket.settimeout(5.0)  # ✅ REDUCIDO: 5s (era 30s)
+            self.socket.settimeout(5.0)
+            # ✅ FASE 2: Socket no bloqueante para envío
+            self.socket.setblocking(False)
             
             if config.TCP_KEEPALIVE:
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -44,6 +58,9 @@ class NativeClient:
                     
         except Exception as e:
             logger.warning(f"⚠️ Socket options: {e}")
+        
+        # ✅ FASE 2: Iniciar thread de envío asíncrono
+        self._start_send_thread()
     
     def update_activity(self): 
         self.last_activity = time.time()
@@ -51,6 +68,78 @@ class NativeClient:
     def update_heartbeat(self): 
         self.last_heartbeat = time.time()
         self.update_activity()
+    
+    # ✅ FASE 2: Thread de envío asíncrono por cliente
+    def _start_send_thread(self):
+        """Iniciar thread dedicado para envío no bloqueante"""
+        self.send_thread = threading.Thread(
+            target=self._send_loop, 
+            daemon=True,
+            name=f"send-{self.id[:8]}"
+        )
+        self.send_thread.start()
+    
+    def _send_loop(self):
+        """Loop de envío asíncrono - NO BLOQUEA el hilo principal"""
+        while self.send_running and self.status == 1:
+            try:
+                # Esperar paquete con timeout
+                data = self.send_queue.get(timeout=0.5)
+                if data is None:  # Señal de parada
+                    break
+                
+                # Envío con select para no bloquear
+                self._send_with_select(data)
+                self.send_queue.task_done()
+                
+            except Empty:
+                continue
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"Send loop error {self.id[:8]}: {e}")
+    
+    def _send_with_select(self, data: bytes) -> bool:
+        """✅ FASE 2: Envío no bloqueante con select"""
+        if self.status == 0 or not data or not self.socket:
+            return False
+        
+        try:
+            total_sent = 0
+            data_len = len(data)
+            
+            while total_sent < data_len:
+                # Esperar que socket esté listo para escribir (max 100ms)
+                _, writable, errors = select.select([], [self.socket], [self.socket], 0.1)
+                
+                if errors:
+                    self.consecutive_send_failures += 1
+                    return False
+                
+                if writable:
+                    try:
+                        sent = self.socket.send(data[total_sent:])
+                        if sent == 0:
+                            self.consecutive_send_failures += 1
+                            return False
+                        total_sent += sent
+                    except (BlockingIOError, socket.error):
+                        continue
+                else:
+                    # Timeout - socket no disponible
+                    self.consecutive_send_failures += 1
+                    self.packets_dropped += 1
+                    return False
+            
+            self.packets_sent += 1
+            self.consecutive_send_failures = 0
+            self.update_activity()
+            return True
+            
+        except Exception as e:
+            if config.DEBUG:
+                logger.debug(f"Send error {self.id[:8]}: {e}")
+            self.consecutive_send_failures += 1
+            return False
     
     def is_alive(self, timeout: float = 30.0) -> bool:
         """✅ FIXED: Verificar que el cliente está REALMENTE vivo"""
@@ -96,47 +185,65 @@ class NativeClient:
             return False
     
     def send_bytes_direct(self, data: bytes) -> bool:
-        """✅ FIXED: Envío con verificación y timeout"""
+        """✅ FASE 2: Envío asíncrono via cola - NO BLOQUEA"""
         if self.status == 0 or not data:
             return False
         
-        # ✅ Verificar socket antes de enviar
         if not self._is_socket_alive():
             self.status = 0
             self.consecutive_send_failures += 1
             return False
         
         try:
-            # ✅ Enviar con timeout explícito
-            original_timeout = self.socket.gettimeout()
-            self.socket.settimeout(0.1)  # 100ms timeout para envío
-            
+            # ✅ FASE 2: Encolar sin bloquear - descarta si cola llena
+            self.send_queue.put_nowait(data)
+            return True
+        except Full:
+            # Cola llena - descartar paquete más antiguo y encolar nuevo
+            try:
+                self.send_queue.get_nowait()  # Descartar antiguo
+                self.packets_dropped += 1
+            except Empty:
+                pass
+            try:
+                self.send_queue.put_nowait(data)
+                return True
+            except Full:
+                self.packets_dropped += 1
+                return False
+    
+    def send_bytes_sync(self, data: bytes) -> bool:
+        """Envío síncrono para mensajes de control (handshake, etc)"""
+        if self.status == 0 or not data:
+            return False
+        
+        if not self._is_socket_alive():
+            self.status = 0
+            return False
+        
+        try:
+            # Temporalmente bloquear socket para envío síncrono
+            self.socket.setblocking(True)
+            self.socket.settimeout(1.0)
             try:
                 self.socket.sendall(data)
                 self.packets_sent += 1
-                self.consecutive_send_failures = 0  # ✅ Reset en éxito
+                self.consecutive_send_failures = 0
                 self.update_activity()
                 return True
             finally:
-                self.socket.settimeout(original_timeout)
+                self.socket.setblocking(False)
                 
         except socket.timeout:
-            logger.warning(f"⚠️ Timeout enviando a {self.id[:15]}")
             self.consecutive_send_failures += 1
-            self.packets_dropped += 1
             return False
-            
         except (BrokenPipeError, ConnectionError, OSError) as e:
             logger.warning(f"⚠️ Conexión perdida con {self.id[:15]}: {e}")
             self.status = 0
-            self.consecutive_send_failures += 1
             return False
-            
         except Exception as e:
             if config.DEBUG:
-                logger.warning(f"⚠️ {self.id[:15]} - Error envío: {e}")
-            self.consecutive_send_failures += 1
-            self.packets_dropped += 1
+                logger.warning(f"⚠️ {self.id[:15]} - Error envío sync: {e}")
             return False
     
     def send_audio_android(self, audio_data, sample_position: int) -> bool:
@@ -203,7 +310,8 @@ class NativeClient:
             if not packet:
                 return False
 
-            return self.send_bytes_direct(packet)
+            # ✅ FASE 2: Mensajes de control síncronos (garantizados)
+            return self.send_bytes_sync(packet)
 
         except Exception as e:
             if config.DEBUG:
@@ -211,14 +319,25 @@ class NativeClient:
             return False
     
     def close(self):
-        """✅ IMPROVED: Cierre más robusto"""
+        """✅ FASE 2: Cierre con limpieza de thread de envío"""
         connection_duration = time.time() - self.connection_time
         logger.info(f"🔌 {self.id[:15]} - Duración: {connection_duration:.1f}s, "
                    f"Enviados: {self.packets_sent}, Perdidos: {self.packets_dropped}, "
                    f"Reconexiones: {self.reconnection_count}")
         self.status = 0
         
-        # ✅ Cerrar socket de forma más agresiva
+        # ✅ FASE 2: Detener thread de envío
+        self.send_running = False
+        try:
+            self.send_queue.put_nowait(None)  # Señal de parada
+        except:
+            pass
+        
+        # Esperar que termine el thread (con timeout)
+        if self.send_thread and self.send_thread.is_alive():
+            self.send_thread.join(timeout=0.5)
+        
+        # Cerrar socket
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
         except:
@@ -229,7 +348,6 @@ class NativeClient:
         except:
             pass
         
-        # ✅ Invalidar el socket
         self.socket = None
 
 
@@ -247,13 +365,16 @@ class NativeAudioServer:
         self.persistent_state = defaultdict(dict)
         self.persistent_lock = threading.Lock()
         self.STATE_CACHE_TIMEOUT = getattr(config, 'RF_STATE_CACHE_TIMEOUT', 300)
-        self.MAX_PERSISTENT_STATES = 50  # ✅ NUEVO: Límite máximo
+        self.MAX_PERSISTENT_STATES = 50
         
         self.sample_position_lock = threading.Lock()
         self.sample_position = 0
         
-        # ✅ NUEVO: Información del dispositivo de audio
-        self.physical_channels = 0  # Canales reales del dispositivo
+        self.physical_channels = 0
+        
+        # ✅ FASE 2: Cache de paquetes por grupo de canales
+        self._packet_cache = {}  # {frozenset(channels): (packet_bytes, sample_position)}
+        self._cache_lock = threading.Lock()
         
         self.stats = {
             'packets_sent': 0,
@@ -261,7 +382,9 @@ class NativeAudioServer:
             'clients_connected': 0,
             'clients_disconnected': 0,
             'clients_reconnected': 0,
-            'clients_zombie_killed': 0,  # ✅ NUEVO
+            'clients_zombie_killed': 0,
+            'cache_hits': 0,  # ✅ FASE 2: Estadísticas de cache
+            'cache_misses': 0,
             'bytes_sent': 0,
             'uptime': 0,
             'cached_states': 0
@@ -659,7 +782,8 @@ class NativeAudioServer:
             )
             
             if response:
-                client.send_bytes_direct(response)
+                # ✅ FASE 2: Handshake siempre síncrono
+                client.send_bytes_sync(response)
 
             # ✅ NUEVO: Enviar estado completo de mezcla para que el Android aplique
             try:
@@ -682,7 +806,8 @@ class NativeAudioServer:
                 client.rf_mode
             )
             if response:
-                client.send_bytes_direct(response)
+                # ✅ FASE 2: Heartbeat síncrono
+                client.send_bytes_sync(response)
 
         elif msg_type == 'update_mix':
             # ✅ Permitir que el cliente Android controle su propia mezcla (ON/gain/pan)
@@ -784,14 +909,16 @@ class NativeAudioServer:
             if not packet:
                 return
             
+            # ✅ FASE 2: Snapshot de clientes y envío síncrono
             with self.client_lock:
-                for client_id, client in list(self.clients.items()):
-                    if client.status == 1 and client.is_alive():
-                        try:
-                            client.send_bytes_direct(packet)
-                        except Exception as e:
-                            if config.DEBUG:
-                                logger.debug(f"Error enviando control_update a {client_id[:12]}: {e}")
+                active_clients = [(cid, c) for cid, c in self.clients.items() if c.status == 1 and c.is_alive()]
+            
+            for client_id, client in active_clients:
+                try:
+                    client.send_bytes_sync(packet)
+                except Exception as e:
+                    if config.DEBUG:
+                        logger.debug(f"Error enviando control_update a {client_id[:12]}: {e}")
             
             logger.debug(f"📢 Control broadcast: ch={channel}, source={source}")
             
@@ -817,7 +944,7 @@ class NativeAudioServer:
             return False
     
     def on_audio_data(self, audio_data):
-        """✅ IMPROVED: Envío con verificación de zombies"""
+        """✅ FASE 2: Envío optimizado con cache de paquetes y menos contención"""
         if not self.running:
             return
         
@@ -827,46 +954,84 @@ class NativeAudioServer:
         samples = audio_data.shape[0]
         current_position = self.increment_sample_position(samples)
         
+        # ✅ FASE 2: Tomar snapshot de clientes con lock mínimo
         with self.client_lock:
-            clients_to_remove = []
-            sent = 0
+            active_clients = [
+                (client_id, client, self.channel_manager.get_client_subscription(client_id))
+                for client_id, client in self.clients.items()
+                if client.status == 1
+            ]
+        
+        if not active_clients:
+            return
+        
+        # ✅ FASE 2: Limpiar cache del frame anterior
+        self._packet_cache.clear()
+        
+        clients_to_remove = []
+        sent = 0
+        
+        # ✅ FASE 2: Procesar sin lock global
+        for client_id, client, subscription in active_clients:
+            if not client.is_alive():
+                clients_to_remove.append(client_id)
+                continue
             
-            for client_id, client in list(self.clients.items()):
-                # ✅ Verificar si está vivo ANTES de enviar
-                if not client.is_alive():
-                    clients_to_remove.append(client_id)
-                    continue
-                
-                subscription = self.channel_manager.get_client_subscription(client_id)
-                if not subscription:
-                    continue
-                
-                channels = subscription.get('channels', [])
-                if not channels:
-                    continue
-                
-                client.subscribed_channels = set(channels)
-                
-                try:
-                    if client.send_audio_android(audio_data, current_position):
-                        sent += 1
-                    else:
-                        # ✅ Si falla el envío, verificar si debe eliminarse
-                        if client.consecutive_send_failures >= client.max_consecutive_failures:
-                            clients_to_remove.append(client_id)
-                        self.update_stats(packets_dropped=1)
-                except Exception as e:
-                    if config.DEBUG:
-                        logger.error(f"❌ Envío {client_id[:15]}: {e}")
-                    clients_to_remove.append(client_id)
+            if not subscription:
+                continue
             
+            channels = subscription.get('channels', [])
+            if not channels:
+                continue
+            
+            # ✅ FASE 2: Usar cache de paquetes por grupo de canales
+            channel_key = frozenset(channels)
+            
+            cached = self._packet_cache.get(channel_key)
+            if cached:
+                packet_bytes = cached
+                self.update_stats(cache_hits=1)
+            else:
+                # Crear paquete y cachear
+                valid_channels = sorted([ch for ch in channels if ch < audio_data.shape[1]])
+                if not valid_channels:
+                    continue
+                    
+                packet_bytes = NativeAndroidProtocol.create_audio_packet(
+                    audio_data, valid_channels, current_position, 0, client.rf_mode
+                )
+                
+                if packet_bytes:
+                    self._packet_cache[channel_key] = packet_bytes
+                    self.update_stats(cache_misses=1)
+                else:
+                    continue
+            
+            client.subscribed_channels = set(channels)
+            
+            try:
+                if client.send_bytes_direct(packet_bytes):
+                    sent += 1
+                else:
+                    if client.consecutive_send_failures >= client.max_consecutive_failures:
+                        clients_to_remove.append(client_id)
+                    self.update_stats(packets_dropped=1)
+            except Exception as e:
+                if config.DEBUG:
+                    logger.error(f"❌ Envío {client_id[:15]}: {e}")
+                clients_to_remove.append(client_id)
+        
+        # ✅ FASE 2: Limpiar clientes muertos con lock
+        if clients_to_remove:
             for client_id in clients_to_remove:
-                client = self.clients.get(client_id)
-                preserve = client.auto_reconnect if client else False
-                self._disconnect_client(client_id, preserve_state=preserve)
-            
-            if sent > 0:
-                self.update_stats(packets_sent=sent)
+                with self.client_lock:
+                    client = self.clients.get(client_id)
+                if client:
+                    preserve = client.auto_reconnect
+                    self._disconnect_client(client_id, preserve_state=preserve)
+        
+        if sent > 0:
+            self.update_stats(packets_sent=sent)
     
     def _disconnect_client(self, client_id: str, preserve_state: bool = False):
         with self.client_lock:

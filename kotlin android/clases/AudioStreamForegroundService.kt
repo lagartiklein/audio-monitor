@@ -136,7 +136,7 @@ class AudioStreamForegroundService : Service() {
             // ✅ Crear notificación ANTES de startForeground()
             val notification = createNotification(
                 "🔴 Transmitiendo",
-                "Streaming de audio activo"
+                "Monitor de audio activo"
             )
 
             // ✅ Iniciar foreground con tipo específico (requerido Android 14+)

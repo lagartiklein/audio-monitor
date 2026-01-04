@@ -17,9 +17,12 @@ import android.os.Looper
 import android.os.Process
 import android.util.Log
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.cepalabsfree.fichatech.R
 import java.util.UUID
@@ -185,6 +188,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         // Eliminar ocultamiento automático de la barra de estado
         // No llamar a hideSystemUI ni en onWindowFocusChanged
         setupEdgeToEdgeInsets()
+        hideSystemBars()
 
         configureAudioSystemForLowLatency()
 
@@ -236,7 +240,16 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     }
 
     // Evita recreación de la actividad al cambiar de orientación
-
+    private fun hideSystemBars() {
+        // Ocultar las barras del sistema (status bar y navigation bar)
+        val windowInsetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController?.let {
+            // Ocultar barras de estado y navegación
+            it.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            // Comportamiento: las barras reaparecen cuando el usuario interactúa
+            it.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
 
         super.onConfigurationChanged(newConfig)
@@ -271,6 +284,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             setupVolumeSeekBarListener()
         }
 
+        if (newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            hideSystemUI()
+        }
     }
 
     private fun configureAudioSystemForLowLatency() {
@@ -323,24 +339,25 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         muteButton?.setOnClickListener { toggleMute() }
 
-        // ✅ NUEVO: Listener para recrear streams (long press en latency)
-
-        latencyText?.setOnLongClickListener {
-            if (isConnected) {
-
-                audioRenderer.recreateAllStreams()
-
-                showToast("🔄 Recreando streams de audio...")
-            }
-
-            true
-        }
-
         statusText?.text = "FICHATECH MONITOR"
 
         connectButton?.text = "Conectar"
 
         muteButton?.text = "🔊 Audio ON"
+
+        // ✅ Actualizar estado de conexión después de inicializar vistas
+        statusText?.text = if (isConnected) "Recibiendo" else "FICHATECH MONITOR"
+
+        statusText?.setTextColor(if (isConnected) getColor(android.R.color.holo_green_light) else getColor(android.R.color.holo_orange_light))
+
+        connectButton?.text = if (isConnected) "Desconectar" else "Conectar"
+
+        connectButton?.setBackgroundColor(if (isConnected) getColor(android.R.color.holo_green_dark) else getColor(android.R.color.holo_red_light))
+
+        muteButton?.text = "🔊 Audio ON"
+
+        // ✅ Actualizar estado de conexión después de inicializar vistas
+        updateConnectionStatus(isConnected, if (isConnected) "Recibiendo" else "OFFLINE")
     }
 
     // Configurar el listener del SeekBar DESPUÉS de cargar preferencias
@@ -385,7 +402,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun initializeAudioComponents() {
         // Usar instancia singleton con UUID del dispositivo
         audioClient = NativeAudioClient.getInstance(getDeviceUUID())
-        
+
         // Configurar callbacks
         audioClient.onAudioData = { audioData -> handleAudioData(audioData) }
         audioClient.onConnectionStatus = { connected, message ->
@@ -400,12 +417,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         // ✅ NUEVO: Callback para sincronización de controles desde servidor/web
         audioClient.onControlSync = { update ->
             handleControlSync(update)
         }
-        
+
         // Solo conectar si no está conectado
         if (!audioClient.isConnected()) {
             connectToServer()
@@ -422,7 +439,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         // Verificar estado de auriculares
         handleHeadsetConnection(isHeadphonesConnected())
     }
-    
+
     /**
      * ✅ NUEVO: Manejar sincronización de controles desde servidor/web
      * Actualiza UI sin disparar callbacks al servidor (evita loops)
@@ -431,27 +448,27 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         runOnUiThread {
             val channel = update.channel
             if (channel < 0) return@runOnUiThread
-            
+
             val view = channelViews[channel] ?: return@runOnUiThread
-            
+
             // Actualizar desde servidor (fromServer=true evita loops)
             update.active?.let { active ->
                 view.activateChannel(active, fromServer = true)
                 audioRenderer.setChannelActive(channel, active)
                 if (active) activeChannelsLocal.add(channel) else activeChannelsLocal.remove(channel)
             }
-            
+
             update.gain?.let { gain ->
                 val gainDb = (20f * kotlin.math.log10(gain.coerceAtLeast(0.0001f))).coerceIn(-60f, 12f)
                 view.setGainDb(gainDb, fromServer = true)
                 audioRenderer.updateChannelGain(channel, gainDb)
             }
-            
+
             update.pan?.let { pan ->
                 view.setPanValue(pan, fromServer = true)
                 audioRenderer.updateChannelPan(channel, pan)
             }
-            
+
             Log.d(TAG, "🔄 Control sync: ch=$channel, source=${update.source}")
         }
     }
@@ -507,7 +524,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                     }
                 }
             }
-            
+
             Log.d(TAG, "✅ MixState aplicado: ${activeSet.size} canales activos")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error aplicando mix_state: ${e.message}")
@@ -619,7 +636,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         connectButton?.text = "🔄 Conectando..."
 
-        statusText?.text = "🔄 Buscando señal..."
+        updateStatusText(true)
 
         lifecycleScope.launch {
             try {
@@ -646,7 +663,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
                     connectButton?.isEnabled = true
 
-                    connectButton?.text = if (isConnected) "🔴 Desconectar" else "⚫ Conectar"
+                    connectButton?.text = if (isConnected) "Desconectar" else "Conectar"
                 }
             }
         }
@@ -664,17 +681,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 webControlText?.setTextColor(getColor(android.R.color.holo_green_light))
             }
 
-            // ✅ NUEVO: Mostrar versión del servidor
-
+            // ✅ Mostrar versión del servidor (sin referencias a recreación de streams)
             val serverVersion = info["server_version"] as? String
 
             if (serverVersion != null) {
-
                 infoText?.text =
-                    "• Servidor: $serverVersion\n" +
-                            "• Canales gestionados desde WEB\n" +
-                            "• Auto-recreación de streams: HABILITADA\n" +
-                            "• Mantén presionado la latencia para recrear streams"
+
+                            "•Verifica radio optimo de trabajo.\n" +
+                            "•Los Canales son gestionados desde WEB, vía wifi\n" +
+                            "•Motor Oboe Transmitiendo en modo Ultra baja latencia ."
             }
 
             val maxChannels =
@@ -695,7 +710,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun ensureChannelConsole(maxChannels: Int) {
         if (channelStripContainer == null) return
 
-        val count = maxChannels.coerceIn(1, 32)
+        val count = maxChannels.coerceIn(1, Int.MAX_VALUE)
 
         if (channelViews.size == count) {
             return
@@ -770,7 +785,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 scheduleDebounceUpdate()
             }
 
-            val lp = LinearLayout.LayoutParams(widthPx, LinearLayout.LayoutParams.WRAP_CONTENT)
+            val lp = LinearLayout.LayoutParams(widthPx, LinearLayout.LayoutParams.MATCH_PARENT)
             lp.marginEnd = gapPx
             view.layoutParams = lp
 
@@ -800,25 +815,55 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (connected == headphonesConnected) return
         headphonesConnected = connected
         audioManager.mode = AudioManager.MODE_NORMAL
-        if (connected) {
-            audioManager.isSpeakerphoneOn = false
-            if (wasMutedByHeadphoneLoss && isMuted) {
-                toggleMute()
-                showToast("Auriculares conectados: audio reanudado automáticamente")
+
+        try {
+            if (connected) {
+                // ✅ Auriculares CONECTADOS
+                audioManager.isSpeakerphoneOn = false
+                Log.d(TAG, "🎧 Auriculares detectados")
+
+                if (wasMutedByHeadphoneLoss && isMuted) {
+                    // Si fue apagado por pérdida de auriculares, reabre
+                    toggleMute()
+                    wasMutedByHeadphoneLoss = false
+                    showToast("🎧 Audio reanudado en auriculares")
+                } else {
+                    showToast("🎧 Auriculares detectados")
+                }
+            } else {
+                // ✅ Auriculares DESCONECTADOS - CAMBIO IMPORTANTE
+                audioManager.isSpeakerphoneOn = true
+                Log.d(TAG, "📢 Auriculares desconectados")
+
+                // ✅ CRÍTICO: Reiniciar streams Oboe para cambio de dispositivo
+                if (isConnected) {
+                    try {
+                        Log.d(TAG, "🔄 Reiniciando streams para parlante...")
+                        audioRenderer.stop()  // Detiene streams actuales
+                        Thread.sleep(100)     // Pequeño delay para que se cierren
+                        Log.d(TAG, "✅ Streams reiniciados para parlante")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "⚠️ Error reiniciando streams: ${e.message}")
+                    }
+
+                    if (isMuted && wasMutedByHeadphoneLoss) {
+                        // Si audio fue apagado por auriculares anteriormente, reabre
+                        toggleMute()
+                        wasMutedByHeadphoneLoss = false
+                        Log.d(TAG, "✅ Audio restaurado a parlante desde mute previo")
+                        showToast("📢 Audio restaurado en parlante")
+                    } else if (!isMuted) {
+                        // Audio está ON, simplemente continúa en parlante
+                        Log.d(TAG, "📢 Cambiando a parlante - audio mantiene nivel")
+                        showToast("📢 Audio en parlante (volumen mantiene nivel)")
+                    }
+                } else {
+                    // No está conectado a servidor
+                    showToast("📢 Dispositivo: parlante")
+                }
             }
-            // Recrear streams de audio automáticamente al conectar audífonos
-            audioRenderer.recreateAllStreams()
-            showToast("Streams de audio recreados (auriculares conectados)")
-        } else {
-            audioManager.isSpeakerphoneOn = true
-            if (isConnected && !isMuted) {
-                wasMutedByHeadphoneLoss = true
-                toggleMute()
-                showToast("Auriculares desconectados: stream sigue pero audio OFF en altavoz")
-            }
-            // Recrear streams de audio automáticamente al volver a parlante
-            audioRenderer.recreateAllStreams()
-            showToast("Streams de audio recreados (parlante)")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error en cambio de auriculares: ${e.message}")
         }
     }
 
@@ -830,23 +875,29 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed) return@runOnUiThread
 
             if (connected) {
+                // ✅ NUEVO: Resetear canales visuales al reconectar
+                channelViews.forEach { (ch, view) ->
+                    view.activateChannel(false)  // Estado inicial OFF
+                    view.setGainDb(0f)            // Ganancia neutral
+                    view.setPanValue(0f)          // Pan centrado
+                }
 
-                statusText?.text = "🔴 $message"
+                statusText?.text = "$message"
 
                 statusText?.setTextColor(getColor(android.R.color.holo_green_light))
 
-                connectButton?.text = "🔴 Desconectar"
+                connectButton?.text = "Desconectar"
 
                 connectButton?.setBackgroundColor(getColor(android.R.color.holo_green_dark))
 
                 updateServiceNotification("📡 Fichatech Server", "Monitor de audio: transmitiendo")
             } else {
 
-                statusText?.text = message
+                statusText?.text = "FICHATECH MONITOR"
 
                 statusText?.setTextColor(getColor(android.R.color.holo_orange_light))
 
-                connectButton?.text = "⚫ Conectar"
+                connectButton?.text = "Conectar"
 
                 connectButton?.setBackgroundColor(getColor(android.R.color.holo_red_light))
 
@@ -859,10 +910,18 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         audioClient.disconnect("Desconexión manual")
 
+        // ✅ CRÍTICO: Detener todos los streams Oboe antes de cerrar servicio
+        try {
+            audioRenderer.stop()
+            Log.d(TAG, "✅ Streams Oboe detenidos en disconnect()")
+        } catch (e: Exception) {
+            Log.e(TAG, "⚠️ Error deteniendo streams: ${e.message}")
+        }
+
         stopForegroundService()
 
         runOnUiThread {
-            statusText?.text = "⚫ OFFLINE"
+            updateStatusText(false)
 
             connectButton?.text = "Conectar"
 
@@ -950,27 +1009,17 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                                 }
                             )
 
-                            // rfStatusText.text = audioClient.getRFStatus() // eliminado
-
-                            // ✅ NUEVO: Detectar si hay streams con fallos
-
+                            // ✅ Detectar si hay streams con fallos (solo informativo, sin UX de recreación)
                             val stats = audioRenderer.getRFStats()
-
                             val totalFailures = stats["total_failures"] as? Int ?: 0
 
                             if (totalFailures > 5) {
-
-                                statusText?.text = "⚠️ Streams con errores (long press latencia)"
-
-                                statusText?.setTextColor(
-                                    getColor(android.R.color.holo_orange_light)
-                                )
+                                statusText?.text = "⚠️ Audio inestable"
+                                statusText?.setTextColor(getColor(android.R.color.holo_orange_light))
                             }
                         } else {
 
                             latencyText?.text = "-- ms"
-
-                            // rfStatusText.text = audioClient.getRFStatus() // eliminado
                         }
                     }
 
@@ -1018,6 +1067,14 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateStatusText(isSearching: Boolean) {
+        if (isSearching) {
+            statusText?.text = "🔄 Buscando señal RF..."
+        } else {
+            statusText?.text = "FICHATECH MONITOR"
+        }
+    }
+
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
 
@@ -1044,6 +1101,10 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             audioManager.registerAudioDeviceCallback(audioDeviceCallback, uiHandler)
+        }
+
+        if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            hideSystemUI()
         }
     }
 
@@ -1122,5 +1183,42 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn
         }
     }
-}
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            hideSystemUI()
+        }
+    }
+
+    /**
+     * ✅ MODERNO: Oculta barra de estado y navegación en modo Landscape
+     * Usa WindowInsetsController (API 30+) - método recomendado por Google
+     * Fallback a systemUiVisibility para dispositivos más antiguos (API 16-29)
+     */
+    private fun hideSystemUI() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // API 30+: Método moderno con WindowInsetsController
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            if (controller != null) {
+                // Ocultar ambas barras (estado y navegación)
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars() or androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                // Modo sticky: reaparecen temporalmente con interacción, luego se ocultan de nuevo
+                controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+            // También usa LAYOUT flags para que el contenido use toda la pantalla
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+        } else {
+            // API 16-29: Método legacy (fallback para compatibilidad)
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
+        }
+    }
+}

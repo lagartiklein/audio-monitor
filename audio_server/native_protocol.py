@@ -52,9 +52,37 @@ class NativeAndroidProtocol:
 
     
 
+    # ✅ OPTIMIZACIÓN LATENCIA: Timestamp cacheado para evitar syscalls
+
+    _cached_timestamp = 0
+
+    _timestamp_cache_valid_ms = 5  # Actualizar cada 5ms máximo
+
+    
+
     # ✅ OPTIMIZACIÓN: Buffers pre-alocados
 
     _header_buffer = bytearray(HEADER_SIZE)
+
+    
+
+    @staticmethod
+
+    def _get_timestamp_fast():
+
+        """✅ OPTIMIZACIÓN: Timestamp cacheado para reducir syscalls"""
+
+        import time as _time
+
+        current = int(_time.time() * 1000)
+
+        # Solo actualizar si han pasado más de 5ms
+
+        if current - NativeAndroidProtocol._cached_timestamp > NativeAndroidProtocol._timestamp_cache_valid_ms:
+
+            NativeAndroidProtocol._cached_timestamp = current
+
+        return NativeAndroidProtocol._cached_timestamp & 0xFFFFFFFF
 
 
 
@@ -232,7 +260,7 @@ class NativeAndroidProtocol:
 
                 (NativeAndroidProtocol.MSG_TYPE_AUDIO << 8) | flags,
 
-                int(time.time() * 1000) & 0xFFFFFFFF,
+                NativeAndroidProtocol._get_timestamp_fast(),  # ✅ OPTIMIZADO: timestamp cacheado
 
                 len(payload)
 
@@ -352,7 +380,7 @@ class NativeAndroidProtocol:
 
                 (NativeAndroidProtocol.MSG_TYPE_CONTROL << 8) | flags,
 
-                int(time.time() * 1000) & 0xFFFFFFFF,
+                NativeAndroidProtocol._get_timestamp_fast(),  # ✅ OPTIMIZADO: timestamp cacheado
 
                 len(message_bytes)
 

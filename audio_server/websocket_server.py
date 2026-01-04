@@ -22,6 +22,9 @@ def patched_async_modes(self):
     return ['threading']
 engineio.base_server.BaseServer.async_modes = patched_async_modes
 
+# Configurar logging PRIMERO (antes de usarlo)
+logger = logging.getLogger(__name__)
+
 # Configurar rutas
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
@@ -111,9 +114,6 @@ def _set_client_order(order: list, known_device_uuids: list) -> list:
 
 # Cargar estado al importar
 _load_ui_state_from_disk()
-
-# Configurar logging
-logger = logging.getLogger(__name__)
 
 # ✅ SUPRIMIR logs innecesarios
 logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
