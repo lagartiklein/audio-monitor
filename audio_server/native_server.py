@@ -456,7 +456,7 @@ class NativeAudioServer:
             logger.error(f"[NativeServer] ❌ Error guardando estados: {e}")
     
     def _notify_web_clients_update(self):
-        """✅ NUEVO: Notificar a clientes web sobre cambios de estado (sincronización Android→Web)"""
+        """✅ Notificar a clientes web sobre cambios de estado (sincronización Android→Web)"""
         try:
             if self.websocket_server_ref and hasattr(self.websocket_server_ref, 'broadcast_clients_update'):
                 self.websocket_server_ref.broadcast_clients_update()
@@ -465,6 +465,24 @@ class NativeAudioServer:
         except Exception as e:
             if config.DEBUG:
                 logger.debug(f"[NativeServer] ⚠️ Error notificando a web: {e}")
+
+    def _emit_param_sync_to_web(self, client_id: str, param_type: str, channel: int, value):
+        """✅ NUEVO: Emitir cambio específico a web para sincronización instantánea"""
+        try:
+            if self.websocket_server_ref and hasattr(self.websocket_server_ref, 'socketio'):
+                self.websocket_server_ref.socketio.emit('param_sync', {
+                    'type': param_type,
+                    'channel': channel,
+                    'value': value,
+                    'client_id': client_id,
+                    'source': 'android',
+                    'timestamp': int(time.time() * 1000)
+                })
+                if config.DEBUG:
+                    logger.debug(f"[NativeServer] ⚡ param_sync emitido: {param_type} ch{channel}={value}")
+        except Exception as e:
+            if config.DEBUG:
+                logger.debug(f"[NativeServer] ⚠️ Error emitiendo param_sync: {e}")
     
     def start(self):
         if self.running: 
@@ -961,6 +979,12 @@ class NativeAudioServer:
             try:
                 persistent_id = getattr(client, 'persistent_id', None) or client.id
 
+                # ✅ Guardar estado previo para detectar cambios
+                prev_subscription = self.channel_manager.get_client_subscription(persistent_id)
+                prev_channels = set(prev_subscription.get('channels', [])) if prev_subscription else set()
+                prev_gains = dict(prev_subscription.get('gains', {})) if prev_subscription else {}
+                prev_pans = dict(prev_subscription.get('pans', {})) if prev_subscription else {}
+
                 channels = message.get('channels')
                 gains = message.get('gains')
                 pans = message.get('pans')
@@ -987,7 +1011,32 @@ class NativeAudioServer:
                 )
 
                 if ok:
-                    # ✅ NUEVO: Guardar estado en persistent_state del servidor (para GET_CLIENT_STATE)
+                    # ✅ SINCRONIZACIÓN INSTANTÁNEA A WEB: Emitir cambios específicos
+                    new_subscription = self.channel_manager.get_client_subscription(persistent_id)
+                    if new_subscription:
+                        new_channels = set(new_subscription.get('channels', []))
+                        new_gains = new_subscription.get('gains', {})
+                        new_pans = new_subscription.get('pans', {})
+                        
+                        # Emitir cambios de canales
+                        for ch in new_channels - prev_channels:
+                            self._emit_param_sync_to_web(persistent_id, 'channel_toggle', ch, True)
+                        for ch in prev_channels - new_channels:
+                            self._emit_param_sync_to_web(persistent_id, 'channel_toggle', ch, False)
+                        
+                        # Emitir cambios de gains
+                        if gains_int:
+                            for ch, val in gains_int.items():
+                                if prev_gains.get(ch) != val:
+                                    self._emit_param_sync_to_web(persistent_id, 'gain', ch, val)
+                        
+                        # Emitir cambios de pans
+                        if pans_int:
+                            for ch, val in pans_int.items():
+                                if prev_pans.get(ch) != val:
+                                    self._emit_param_sync_to_web(persistent_id, 'pan', ch, val)
+                    
+                    # ✅ Guardar estado en persistent_state del servidor (para GET_CLIENT_STATE)
                     try:
                         subscription = self.channel_manager.get_client_subscription(persistent_id)
                         if subscription:
@@ -1033,7 +1082,7 @@ class NativeAudioServer:
                         if config.DEBUG:
                             logger.debug(f"DeviceRegistry update (native update_mix) failed: {e}")
 
-                    # refrescar web y devolver estado al propio Android
+                    # refrescar web (broadcast completo) y devolver estado al propio Android
                     self._notify_web_clients_update()
                     try:
                         subscription = self.channel_manager.get_client_subscription(persistent_id)

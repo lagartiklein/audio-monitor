@@ -208,8 +208,8 @@
       "user_agent": null
     },
     "first_seen": 1767396786.9770272,
-    "last_seen": 1767546427.0980344,
-    "reconnections": 1593,
+    "last_seen": 1767552381.891944,
+    "reconnections": 1617,
     "configuration": {
       "channels": [
         0,
@@ -793,8 +793,8 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0"
     },
     "first_seen": 1767459134.1870346,
-    "last_seen": 1767543359.3323674,
-    "reconnections": 21,
+    "last_seen": 1767551497.1313355,
+    "reconnections": 23,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1132,8 +1132,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
     },
     "first_seen": 1767485299.4718986,
-    "last_seen": 1767545594.0403292,
-    "reconnections": 9,
+    "last_seen": 1767549256.419973,
+    "reconnections": 14,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1283,8 +1283,8 @@
       "user_agent": null
     },
     "first_seen": 1767497385.7275724,
-    "last_seen": 1767546689.8296082,
-    "reconnections": 675,
+    "last_seen": 1767552463.0479093,
+    "reconnections": 2155,
     "configuration": {
       "channels": [],
       "gains": {},
@@ -1624,8 +1624,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767540167.3363566,
-    "last_seen": 1767546366.1711342,
-    "reconnections": 6,
+    "last_seen": 1767551499.005401,
+    "reconnections": 8,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1666,6 +1666,46 @@
     "first_seen": 1767543196.6945553,
     "last_seen": 1767544103.7796147,
     "reconnections": 4,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "8eabb9bc-6c0f-4c70-927f-a17c0dc2b06d": {
+    "uuid": "8eabb9bc-6c0f-4c70-927f-a17c0dc2b06d",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767547386.4851613,
+    "last_seen": 1767547386.4851613,
+    "reconnections": 0,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "eb2facf1-202e-4634-96ab-8864ffcbff35": {
+    "uuid": "eb2facf1-202e-4634-96ab-8864ffcbff35",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767551502.2504327,
+    "last_seen": 1767552369.5859175,
+    "reconnections": 1,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],

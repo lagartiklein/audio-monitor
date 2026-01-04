@@ -1085,13 +1085,54 @@
 
                 // ✅ NUEVO: Listeners para confirmaciones rápidas (latencia ultra-baja)
                 this.socket.on('gain_updated', (data) => {
-                    if (config.DEBUG) console.log('[Gain Updated - Fast]', data);
                     // La UI ya se actualizó, solo loguear confirmación del servidor
+                    // console.log('[Gain Updated - Fast]', data);
                 });
 
                 this.socket.on('pan_updated', (data) => {
-                    if (config.DEBUG) console.log('[Pan Updated - Fast]', data);
                     // La UI ya se actualizó, solo loguear confirmación del servidor
+                    // console.log('[Pan Updated - Fast]', data);
+                });
+
+                // ✅ SINCRONIZACIÓN BIDIRECCIONAL: Recibir cambios de otros clientes (web/Android)
+                this.socket.on('param_sync', (data) => {
+                    console.log('[Param Sync]', data);
+                    const { type, channel, value, client_id, source } = data;
+                    
+                    // Actualizar estado local si el cliente existe
+                    if (this.clients[client_id]) {
+                        if (type === 'gain') {
+                            if (!this.clients[client_id].gains) this.clients[client_id].gains = {};
+                            this.clients[client_id].gains[channel] = value;
+                        } else if (type === 'pan') {
+                            if (!this.clients[client_id].pans) this.clients[client_id].pans = {};
+                            this.clients[client_id].pans[channel] = value;
+                        } else if (type === 'channel_toggle') {
+                            const channels = this.clients[client_id].channels || [];
+                            const idx = channels.indexOf(channel);
+                            if (value && idx < 0) channels.push(channel);
+                            if (!value && idx >= 0) channels.splice(idx, 1);
+                            this.clients[client_id].channels = channels;
+                            this.clients[client_id].active_channels = channels.length;
+                        } else if (type === 'solo') {
+                            const solos = this.clients[client_id].solos || [];
+                            const idx = solos.indexOf(channel);
+                            if (value && idx < 0) solos.push(channel);
+                            if (!value && idx >= 0) solos.splice(idx, 1);
+                            this.clients[client_id].solos = solos;
+                            this.clients[client_id].has_solo = solos.length > 0;
+                        } else if (type === 'pfl') {
+                            this.clients[client_id].pre_listen = value;
+                        }
+                        
+                        // Re-renderizar si el cliente afectado está seleccionado
+                        if (this.selectedClientId === client_id) {
+                            this.renderMixer(client_id);
+                        }
+                        
+                        // Actualizar sidebar también
+                        this.updateClientsList(Object.values(this.clients));
+                    }
                 });
 
                 // Auto refresh clients

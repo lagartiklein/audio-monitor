@@ -240,7 +240,7 @@ public:
                 // ✅ v4.0 SINGLE STREAM: Drop más suave - solo el exceso sobre target
                 int excessFrames = available - TARGET_BUFFER_FRAMES;
                 int framesToClear = std::min(excessFrames, numFrames);  // Solo lo necesario
-                
+
                 if (framesToClear > 0) {
                     // Log solo si es significativo (evitar spam)
                     if (framesToClear > 100) {

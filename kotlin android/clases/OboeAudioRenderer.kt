@@ -437,7 +437,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
     /**
      * ✅ NUEVO: Renderizar múltiples canales mezclados en UN SOLO stream
      * Evita race conditions al mezclar todos los canales ANTES de escribir a Oboe
-     * 
+     *
      * @param channelDataMap Mapa de channelNumber -> FloatArray de audio
      * @param samplePosition Posición de muestra para sincronización
      */
@@ -455,7 +455,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
         // ✅ Adquirir un buffer del pool
         val mixedBuffer = acquireBuffer(stereoBufferSize)
-        
+
         // Inicializar el buffer de mezcla a ceros
         mixedBuffer.fill(0f)
 

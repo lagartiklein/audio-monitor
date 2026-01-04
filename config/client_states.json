@@ -12,15 +12,44 @@
     "client_type": "native"
   },
   "41ac1159-21a9-41cf-8201-e2c32e8520fc": {
-    "channels": [],
-    "gains": {},
-    "pans": {},
-    "mutes": {},
+    "channels": [
+      1
+    ],
+    "gains": {
+      "0": 1.0,
+      "1": 0.1778279410038923,
+      "2": 1.0,
+      "3": 1.0,
+      "4": 1.0,
+      "5": 1.0,
+      "6": 1.0,
+      "7": 1.0
+    },
+    "pans": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0
+    },
+    "mutes": {
+      "0": false,
+      "1": false,
+      "2": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false
+    },
     "solos": [],
     "pre_listen": null,
     "master_gain": 1.0,
-    "last_seen": 1767543172.8137515,
-    "reconnection_count": 3,
+    "last_seen": 1767552463.0478923,
+    "reconnection_count": 0,
     "client_type": "native"
   },
   "3a4b1164-fab5-4947-af14-dd8c8c99f242": {
@@ -67,8 +96,8 @@
     "solos": [],
     "pre_listen": null,
     "master_gain": 1.0,
-    "last_seen": 1767543138.6300917,
-    "reconnection_count": 5,
+    "last_seen": 1767552381.8919291,
+    "reconnection_count": 2,
     "client_type": "native"
   },
   "cd1f98c6-4bd4-4903-afe8-cd6c9acc4972": {

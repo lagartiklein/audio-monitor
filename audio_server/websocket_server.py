@@ -516,6 +516,12 @@ def handle_update_client_mix(data):
             emit('error', {'message': 'target_client_id required'})
             return
         
+        # ✅ Guardar estado previo para detectar cambios
+        prev_subscription = channel_manager.get_client_subscription(target_client_id)
+        prev_channels = set(prev_subscription.get('channels', [])) if prev_subscription else set()
+        prev_solos = set(prev_subscription.get('solos', set())) if prev_subscription else set()
+        prev_pfl = prev_subscription.get('pre_listen') if prev_subscription else None
+        
         # ✅ Actualizar mezcla
         success = channel_manager.update_client_mix(
             target_client_id,
@@ -537,13 +543,51 @@ def handle_update_client_mix(data):
             
             logger.info(f"[WebSocket] 🎛️ Mezcla actualizada para {target_client_id[:15]}")
             
-            # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry
-            # Las configuraciones solo persisten en memoria durante la sesión actual
+            # ✅ SINCRONIZACIÓN BIDIRECCIONAL: Emitir cambios específicos para actualización inmediata
+            new_subscription = channel_manager.get_client_subscription(target_client_id)
+            if new_subscription:
+                new_channels = set(new_subscription.get('channels', []))
+                new_solos = set(new_subscription.get('solos', set()))
+                new_pfl = new_subscription.get('pre_listen')
+                
+                timestamp = int(time.time() * 1000)
+                
+                # Emitir cambios de canales (activados/desactivados)
+                for ch in new_channels - prev_channels:  # Nuevos canales activados
+                    socketio.emit('param_sync', {
+                        'type': 'channel_toggle', 'channel': ch, 'value': True,
+                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
+                    }, skip_sid=request.sid)
+                for ch in prev_channels - new_channels:  # Canales desactivados
+                    socketio.emit('param_sync', {
+                        'type': 'channel_toggle', 'channel': ch, 'value': False,
+                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
+                    }, skip_sid=request.sid)
+                
+                # Emitir cambios de solos
+                for ch in new_solos - prev_solos:  # Nuevos solos
+                    socketio.emit('param_sync', {
+                        'type': 'solo', 'channel': ch, 'value': True,
+                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
+                    }, skip_sid=request.sid)
+                for ch in prev_solos - new_solos:  # Solos quitados
+                    socketio.emit('param_sync', {
+                        'type': 'solo', 'channel': ch, 'value': False,
+                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
+                    }, skip_sid=request.sid)
+                
+                # Emitir cambio de PFL si cambió
+                if new_pfl != prev_pfl:
+                    socketio.emit('param_sync', {
+                        'type': 'pfl', 'channel': new_pfl if new_pfl is not None else -1, 
+                        'value': new_pfl,
+                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
+                    }, skip_sid=request.sid)
             
-            # ✅ Broadcast a todos (incluye el cambio)
+            # ✅ Broadcast a todos (incluye el cambio completo)
             broadcast_clients_update()
 
-            # ✅ NUEVO: Si el target es un cliente nativo conectado, empujar mix_state en tiempo real
+            # ✅ Si el target es un cliente nativo conectado, empujar mix_state en tiempo real
             try:
                 subscription = channel_manager.get_client_subscription(target_client_id)
                 if subscription and subscription.get('client_type') == 'native':
@@ -679,7 +723,7 @@ def handle_set_client_name(data):
 @socketio.on('update_gain')
 def handle_update_gain(data):
     """
-    ✅ OPTIMIZADO: Actualizar ganancia de un canal (respuesta inmediata, sin sincronización)
+    ✅ OPTIMIZADO + SINCRONIZADO: Actualizar ganancia (respuesta inmediata + sync a Android/otros web)
     data: {
         'channel': int,
         'gain': float,
@@ -707,7 +751,7 @@ def handle_update_gain(data):
         if client_id in channel_manager.subscriptions:
             channel_manager.subscriptions[client_id]['gains'][channel] = gain
             
-            # ✅ Respuesta inmediata al cliente que solicitó (sin esperar broadcast)
+            # ✅ Respuesta inmediata al cliente que solicitó
             emit('gain_updated', {
                 'channel': channel,
                 'gain': gain,
@@ -715,9 +759,28 @@ def handle_update_gain(data):
                 'timestamp': int(time.time() * 1000)
             }, to=request.sid)
             
-            # ✅ DEBUG: Latencia ultra-baja
+            # ✅ SINCRONIZACIÓN BIDIRECCIONAL: Propagar a OTROS clientes web (broadcast)
+            socketio.emit('param_sync', {
+                'type': 'gain',
+                'channel': channel,
+                'value': gain,
+                'client_id': client_id,
+                'source': 'web',
+                'timestamp': int(time.time() * 1000)
+            }, skip_sid=request.sid)  # No enviar al que ya lo cambió
+            
+            # ✅ SINCRONIZACIÓN A ANDROID: Si el target es nativo, enviar mix_state
+            try:
+                subscription = channel_manager.get_client_subscription(client_id)
+                if subscription and subscription.get('client_type') == 'native':
+                    if native_server_instance is not None:
+                        native_server_instance.push_mix_state_to_client(client_id)
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"[WebSocket] Android sync failed: {e}")
+            
             if config.DEBUG:
-                logger.debug(f"[WebSocket] ⚡ Gain CH{channel}: {gain:.2f} ({client_id[:8]})")
+                logger.debug(f"[WebSocket] ⚡ Gain CH{channel}: {gain:.2f} ({client_id[:8]}) [synced]")
     
     except Exception as e:
         if config.DEBUG:
@@ -728,7 +791,7 @@ def handle_update_gain(data):
 @socketio.on('update_pan')
 def handle_update_pan(data):
     """
-    ✅ OPTIMIZADO: Actualizar panorama de un canal (respuesta inmediata, sin sincronización)
+    ✅ OPTIMIZADO + SINCRONIZADO: Actualizar panorama (respuesta inmediata + sync a Android/otros web)
     data: {
         'channel': int,
         'pan': float (-1.0 a 1.0),
@@ -756,7 +819,7 @@ def handle_update_pan(data):
         if client_id in channel_manager.subscriptions:
             channel_manager.subscriptions[client_id]['pans'][channel] = pan
             
-            # ✅ Respuesta inmediata al cliente que solicitó (sin esperar broadcast)
+            # ✅ Respuesta inmediata al cliente que solicitó
             emit('pan_updated', {
                 'channel': channel,
                 'pan': pan,
@@ -764,9 +827,28 @@ def handle_update_pan(data):
                 'timestamp': int(time.time() * 1000)
             }, to=request.sid)
             
-            # ✅ DEBUG: Latencia ultra-baja
+            # ✅ SINCRONIZACIÓN BIDIRECCIONAL: Propagar a OTROS clientes web (broadcast)
+            socketio.emit('param_sync', {
+                'type': 'pan',
+                'channel': channel,
+                'value': pan,
+                'client_id': client_id,
+                'source': 'web',
+                'timestamp': int(time.time() * 1000)
+            }, skip_sid=request.sid)  # No enviar al que ya lo cambió
+            
+            # ✅ SINCRONIZACIÓN A ANDROID: Si el target es nativo, enviar mix_state
+            try:
+                subscription = channel_manager.get_client_subscription(client_id)
+                if subscription and subscription.get('client_type') == 'native':
+                    if native_server_instance is not None:
+                        native_server_instance.push_mix_state_to_client(client_id)
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"[WebSocket] Android sync failed: {e}")
+            
             if config.DEBUG:
-                logger.debug(f"[WebSocket] ⚡ Pan CH{channel}: {pan:.2f} ({client_id[:8]})")
+                logger.debug(f"[WebSocket] ⚡ Pan CH{channel}: {pan:.2f} ({client_id[:8]}) [synced]")
     
     except Exception as e:
         if config.DEBUG:
