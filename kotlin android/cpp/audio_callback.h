@@ -35,10 +35,10 @@
 // ✅ OPTIMIZADO: Buffer circular con mínima contención y operaciones vectorizadas
 class AudioCallback : public oboe::AudioStreamDataCallback {
 private:
-    // ✅ OPTIMIZACIÓN LATENCIA: Buffer más pequeño para menor latencia
-    static constexpr int BUFFER_SIZE_FRAMES = 1024;      // Reducido de 2048 (~21ms @ 48kHz)
-    static constexpr int TARGET_BUFFER_FRAMES = 96;      // ~2ms target latency
-    static constexpr int DROP_THRESHOLD = 768;           // 75% del buffer
+    // ✅ OPTIMIZACIÓN LATENCIA: Buffer aumentado para evitar saturación sin lag
+    static constexpr int BUFFER_SIZE_FRAMES = 2048;      // ⬆️ AUMENTADO: 1024 → 2048 (~43ms @ 48kHz)
+    static constexpr int TARGET_BUFFER_FRAMES = 128;      // ~2.67ms target latency
+    static constexpr int DROP_THRESHOLD = 1536;           // 75% del nuevo buffer (más tolerancia)
     static constexpr int SILENCE_TIMEOUT_MS = 5000;      // Timeout de silencio
     static constexpr int CORRUPTION_CHECK_INTERVAL = 200; // Menos frecuente para mejor perf
 
@@ -217,9 +217,10 @@ public:
         int available = availableFrames.load(std::memory_order_acquire);
         int freeFrames = BUFFER_SIZE_FRAMES - available;
 
-        // 2) Si no hay espacio suficiente, hacer drop agresivo (raro)
+        // 2) Si no hay espacio suficiente, hacer drop menos agresivo (ahora con buffer mayor)
         if (UNLIKELY(freeFrames < numFrames)) {
-            int framesToClear = (available * 3) / 4;
+            // ✅ FIX: En lugar de limpiar 75%, solo limpiar 50% (menos lag)
+            int framesToClear = (available * 1) / 2;  // 50% en lugar de 75%
             if (framesToClear > 0) {
                 LOGW("🗑️ Buffer saturado (%d frames), limpiando %d", available, framesToClear);
                 

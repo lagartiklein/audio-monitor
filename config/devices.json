@@ -208,8 +208,8 @@
       "user_agent": null
     },
     "first_seen": 1767396786.9770272,
-    "last_seen": 1767520127.2193282,
-    "reconnections": 567,
+    "last_seen": 1767522142.9328542,
+    "reconnections": 577,
     "configuration": {
       "channels": [
         1
@@ -229,7 +229,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767520127219
+      "timestamp": 1767522142932
     },
     "configuration_session_id": "f57717282ffb470188b8cfb91c6610be",
     "tags": [],
@@ -671,8 +671,8 @@
       "user_agent": null
     },
     "first_seen": 1767442886.0863066,
-    "last_seen": 1767520266.2896082,
-    "reconnections": 1161,
+    "last_seen": 1767522335.1655495,
+    "reconnections": 1473,
     "configuration": {
       "channels": [],
       "gains": {},
@@ -681,7 +681,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767520266289
+      "timestamp": 1767522335165
     },
     "configuration_session_id": null,
     "tags": [],
@@ -964,8 +964,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767482238.9807353,
-    "last_seen": 1767520127.4997156,
-    "reconnections": 29,
+    "last_seen": 1767521579.8768747,
+    "reconnections": 33,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1250,14 +1250,14 @@
       "user_agent": null
     },
     "first_seen": 1767497385.7275724,
-    "last_seen": 1767520127.756811,
-    "reconnections": 161,
+    "last_seen": 1767522110.5800924,
+    "reconnections": 297,
     "configuration": {
       "channels": [
         1
       ],
       "gains": {
-        "1": 0.6309573444801932
+        "1": 1.0
       },
       "pans": {
         "1": 0.0
@@ -1268,7 +1268,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767520127756
+      "timestamp": 1767522110580
     },
     "configuration_session_id": null,
     "tags": [],
@@ -1287,8 +1287,8 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767518345.6826,
-    "last_seen": 1767520124.8199768,
-    "reconnections": 5,
+    "last_seen": 1767520347.461577,
+    "reconnections": 8,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],

@@ -8,9 +8,10 @@
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 
-# ✅ FASE 3: BLOCKSIZE optimizado para batching eficiente
-# 128 samples = ~2.67ms (balance entre latencia y overhead de red)
-BLOCKSIZE = 128  # ⬆️ Incrementado de 64 para mejor throughput
+# ✅ FASE 3: BLOCKSIZE optimizado para balance latencia/buffer
+# ⚠️ NUEVO: 64 samples = ~1.33ms (más frecuente pero menos buffer saturation)
+# (Antes 128 samples causaba saturación de buffer en Android)
+BLOCKSIZE = 64  # ⬇️ REDUCIDO: 128 → 64 para evitar lag de buffer saturado
 
 # ✅ CANALES POR DEFECTO
 DEFAULT_NUM_CHANNELS = 32  # Valor por defecto, pero se sobrescribe por el real del dispositivo
