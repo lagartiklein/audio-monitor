@@ -45,9 +45,9 @@ class NativeClient:
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config.SOCKET_SNDBUF)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config.SOCKET_RCVBUF)
-            self.socket.settimeout(5.0)
-            # ✅ FASE 2: Socket no bloqueante para envío
-            self.socket.setblocking(False)
+            # ✅ FIX: Socket BLOQUEANTE con timeout para lectura, select() para escritura no-bloqueante
+            self.socket.setblocking(True)
+            self.socket.settimeout(3.0)  # ⚠️ Reducido: 5s → 3s para detección rápida de errores
             
             if config.TCP_KEEPALIVE:
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -319,36 +319,42 @@ class NativeClient:
             return False
     
     def close(self):
-        """✅ FASE 2: Cierre con limpieza de thread de envío"""
+        """✅ MEJORADO: Cierre robusto y garantizado de recursos"""
         connection_duration = time.time() - self.connection_time
         logger.info(f"🔌 {self.id[:15]} - Duración: {connection_duration:.1f}s, "
                    f"Enviados: {self.packets_sent}, Perdidos: {self.packets_dropped}, "
                    f"Reconexiones: {self.reconnection_count}")
         self.status = 0
         
-        # ✅ FASE 2: Detener thread de envío
+        # ✅ FIX: Detener thread de envío ANTES de cerrar socket
         self.send_running = False
         try:
             self.send_queue.put_nowait(None)  # Señal de parada
         except:
             pass
         
-        # Esperar que termine el thread (con timeout)
+        # Esperar que termine el thread (con timeout corto)
         if self.send_thread and self.send_thread.is_alive():
-            self.send_thread.join(timeout=0.5)
+            try:
+                self.send_thread.join(timeout=0.5)
+            except:
+                pass
         
-        # Cerrar socket
-        try:
-            self.socket.shutdown(socket.SHUT_RDWR)
-        except:
-            pass
+        # ✅ FIX: Cerrar socket con shutdown explícito (más robusto)
+        if self.socket:
+            try:
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except (OSError, BrokenPipeError):
+                pass  # Socket ya cerrado o error al cerrar
+            
+            try:
+                self.socket.close()
+            except (OSError, BrokenPipeError):
+                pass
+            
+            self.socket = None
         
-        try:
-            self.socket.close()
-        except:
-            pass
-        
-        self.socket = None
+        logger.debug(f"✅ {self.id[:15]} - Recursos liberados correctamente")
 
 
 class NativeAudioServer:
@@ -555,12 +561,22 @@ class NativeAudioServer:
                     if config.DEBUG:
                         logger.warning(f"⚠️ Magic inválido #{consecutive_errors} - {client_id[:15]}")
 
-                    if consecutive_errors >= 5:
-                        logger.warning(f"⚠️ Demasiados errores - {client_id[:15]}")
-                        break
-
-                    time.sleep(0.1)
-                    continue
+                    if consecutive_errors >= 3:  # ⚠️ REDUCIDO: 5 → 3 intentos antes de sincronizar
+                        logger.info(f"🔄 Intentando resincronización... ({client_id[:15]})")
+                        # ✅ FIX: Buscar siguiente MAGIC válido en el stream
+                        synced_header = self._sync_to_magic(client.socket, timeout=2.0)
+                        if synced_header:
+                            header_data = synced_header
+                            magic, version, typeAndFlags, timestamp, payloadLength = struct.unpack('!IHHII', header_data)
+                            msgType = (typeAndFlags >> 8) & 0xFF
+                            consecutive_errors = 0
+                            logger.info(f"✅ Resincronizado: {client_id[:15]}")
+                        else:
+                            logger.warning(f"❌ No se pudo resincronizar - {client_id[:15]}")
+                            break
+                    else:
+                        time.sleep(0.05)  # ⚠️ REDUCIDO: 0.1s → 0.05s (más rápido)
+                        continue
                 
                 consecutive_errors = 0
                 
@@ -598,9 +614,61 @@ class NativeAudioServer:
         
         self._disconnect_client(client_id, preserve_state=client.auto_reconnect)
     
+    def _sync_to_magic(self, sock: socket.socket, timeout: float = 2.0) -> bytes:
+        """
+        ✅ FIX: Buscar MAGIC_NUMBER en el stream para resincronización automática.
+        Si hay datos corruptos o fuera de sincronización, encuentra el próximo frame válido.
+        
+        Retorna: 16 bytes del header con MAGIC al inicio, o None si timeout
+        """
+        MAGIC_NUMBER = NativeAndroidProtocol.MAGIC_NUMBER
+        MAGIC_BYTES = struct.pack('!I', MAGIC_NUMBER)
+        buffer = b''
+        start = time.time()
+        
+        while time.time() - start < timeout:
+            try:
+                byte_chunk = sock.recv(1)
+                if not byte_chunk:
+                    return None
+                
+                buffer += byte_chunk
+                
+                # Buscar MAGIC_NUMBER en los últimos 4 bytes
+                if len(buffer) >= 4:
+                    last_4 = buffer[-4:]
+                    if last_4 == MAGIC_BYTES:
+                        # ✅ MAGIC encontrado! Leer 12 bytes más para completar header
+                        magic = last_4
+                        rest = sock.recv(12)  # Leer resto del header
+                        if len(rest) == 12:
+                            return magic + rest
+                        else:
+                            return None
+                    
+                    # Limpiar buffer si crece demasiado (evitar memory leak)
+                    if len(buffer) > 10000:
+                        buffer = buffer[-4:]
+                        if config.DEBUG:
+                            logger.warning(f"Buffer de sincronización limpiado (datos corruptos?)")
+                            
+            except socket.timeout:
+                continue
+            except (ConnectionError, BrokenPipeError, OSError):
+                return None
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"Sync error: {e}")
+                return None
+        
+        if config.DEBUG:
+            logger.warning(f"⚠️ Timeout sincronizando a MAGIC (buffer: {len(buffer)} bytes)")
+        return None
+    
     def _recv_exact(self, sock: socket.socket, size: int):
+        """✅ FIX: Timeout más agresivo (2s en lugar de 10s) para detección rápida de errores"""
         data = b''
-        timeout = 10.0  # ✅ REDUCIDO: 10s (era 60s)
+        timeout = 2.0  # ⚠️ REDUCIDO: 10s → 2s (detección rápida)
         start = time.time()
         
         while len(data) < size and (time.time() - start) < timeout:
@@ -797,6 +865,7 @@ class NativeAudioServer:
             self._notify_web_clients_update()
         
         elif msg_type == 'heartbeat':
+            # ✅ FIX: Responder heartbeat INMEDIATAMENTE con retry logic
             response = NativeAndroidProtocol.create_control_packet(
                 'heartbeat_response',
                 {
@@ -806,8 +875,18 @@ class NativeAudioServer:
                 client.rf_mode
             )
             if response:
-                # ✅ FASE 2: Heartbeat síncrono
-                client.send_bytes_sync(response)
+                # ✅ FIX: Intentar envío sync CON REINTENTOS
+                max_attempts = 3
+                for attempt in range(max_attempts):
+                    if client.send_bytes_sync(response):
+                        if config.DEBUG:
+                            logger.debug(f"💓 Heartbeat response enviado a {client.id[:15]}")
+                        break
+                    else:
+                        if attempt < max_attempts - 1:
+                            time.sleep(0.05)  # Esperar 50ms antes de reintentar
+                        else:
+                            logger.warning(f"⚠️ No se pudo enviar heartbeat response a {client.id[:15]}")
 
         elif msg_type == 'update_mix':
             # ✅ Permitir que el cliente Android controle su propia mezcla (ON/gain/pan)

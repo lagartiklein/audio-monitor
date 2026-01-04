@@ -53,7 +53,7 @@ VU_PEAK_DECAY = 0.95
 SOCKET_SNDBUF = 65536
 SOCKET_RCVBUF = 32768
 SOCKET_NODELAY = True
-SOCKET_TIMEOUT = 5.0  # ✅ REDUCIDO: 5s (era 30s) para detectar zombies rápido
+SOCKET_TIMEOUT = 3.0  # ✅ REDUCIDO: 5s → 3s para detección rápida de errores de red
 
 # TCP Keepalive (más agresivo para detectar clientes muertos)
 TCP_KEEPALIVE = True
@@ -73,9 +73,15 @@ RF_MAX_RECONNECT_ATTEMPTS = 10
 RF_MAX_PERSISTENT_STATES = 50  # ✅ NUEVO: Límite máximo de estados guardados
 
 # ✅ NUEVO: Detección de clientes zombie
-CLIENT_ALIVE_TIMEOUT = 30.0  # Segundos sin actividad antes de considerar zombie
+CLIENT_ALIVE_TIMEOUT = 15.0  # ⚠️ REDUCIDO: 30s → 15s para detección más rápida
 CLIENT_MAX_CONSECUTIVE_FAILURES = 5  # Fallos de envío antes de desconectar
-MAINTENANCE_INTERVAL = 10.0  # ✅ REDUCIDO: 10s (era 30s) para limpieza frecuente
+MAINTENANCE_INTERVAL = 5.0  # ⚠️ REDUCIDO: 10s → 5s para limpieza más frecuente
+
+# ============================================================================
+# NATIVE HEARTBEAT - OPTIMIZADO
+# ============================================================================
+NATIVE_HEARTBEAT_INTERVAL = 3000  # ⚠️ REDUCIDO: 5s → 3s para detectar desconexiones 40% más rápido
+NATIVE_HEARTBEAT_TIMEOUT = 60  # Timeout después de 60 segundos sin respuesta
 
 # ============================================================================
 # DEBUG Y LOGS

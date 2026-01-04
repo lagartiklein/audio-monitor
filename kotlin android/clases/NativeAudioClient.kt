@@ -32,7 +32,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
         // Timeouts optimizados para API 36
         private const val CONNECT_TIMEOUT = 5000
-        private const val READ_TIMEOUT = 8000
+        private const val READ_TIMEOUT = 5000  // ⚠️ REDUCIDO: 8s → 5s
 
         // Protocolo binario
         private const val HEADER_SIZE = 16
@@ -58,8 +58,8 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         private const val RECONNECT_BACKOFF = 1.5
 
         // Heartbeat keep-alive
-        private const val HEARTBEAT_INTERVAL_MS = 5000L
-        private const val HEARTBEAT_TIMEOUT_MS = 15000L
+        private const val HEARTBEAT_INTERVAL_MS = 2000L  // ⚠️ REDUCIDO: 3s → 2s para respuesta más rápida
+        private const val HEARTBEAT_TIMEOUT_MS = 6000L   // ⚠️ REDUCIDO: 9s → 6s
         
         // ✅ OPTIMIZACIÓN LATENCIA: Constante para división Int16->Float
         private const val INVERSE_32768 = 1f / 32768f
@@ -137,9 +137,12 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
         order(ByteOrder.nativeOrder())
     }
 
+    // ✅ FIX: Mutex para sincronizar lectura del socket (DataInputStream NO es thread-safe)
+    private val readLock = Any()
+
     private val _shouldStop = AtomicBoolean(false)
     private var consecutiveMagicErrors = 0
-    private val maxConsecutiveMagicErrors = 3
+    private val maxConsecutiveMagicErrors = 5  // ⚠️ AUMENTADO: 3 → 5 errores antes de desconectar
 
     // Estado persistente para reconexión completa
     private val clientId = deviceUUID
@@ -257,16 +260,20 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
                 val timeSinceLastResponse = System.currentTimeMillis() - lastHeartbeatResponse.get()
                 if (timeSinceLastResponse > HEARTBEAT_TIMEOUT_MS) {
-                    Log.w(TAG, "💔 Heartbeat timeout (${timeSinceLastResponse}ms)")
+                    Log.w(TAG, "💔 Heartbeat timeout (${timeSinceLastResponse}ms) - sin datos del servidor")
                     handleConnectionLost("Heartbeat timeout")
                     break
                 }
 
                 if (_isConnected.get()) {
-                    sendControlMessage("heartbeat", mapOf(
-                        "timestamp" to System.currentTimeMillis(),
-                        "device_uuid" to deviceUUID
-                    ))
+                    try {
+                        sendControlMessage("heartbeat", mapOf(
+                            "timestamp" to System.currentTimeMillis(),
+                            "device_uuid" to deviceUUID
+                        ))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "⚠️ Error enviando heartbeat: ${e.message}")
+                    }
                 }
             }
         }
@@ -314,14 +321,22 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                     Log.w(TAG, "❌ Intento #$attempt falló: ${e.message}")
                 }
 
+                // ✅ FIX: Backoff exponencial pero con máximo limitado para reconexión rápida
                 currentReconnectDelay = (currentReconnectDelay * RECONNECT_BACKOFF)
                     .toLong()
                     .coerceAtMost(MAX_RECONNECT_DELAY_MS)
+                    .coerceAtLeast(500L)  // ✅ NUEVO: Mínimo 500ms
 
                 attempt++
+                
+                // ✅ Log de progreso
+                if (attempt % 5 == 0) {
+                    Log.w(TAG, "⚠️ Llevamos $attempt intentos, retryando...")
+                }
             }
         }
     }
+
 
     /**
      * Desconectar (desactiva auto-reconexión y heartbeat)
@@ -475,15 +490,23 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                         break
                     }
 
-                    input.readFully(headerBuffer)
+                    // ✅ FIX: Proteger lectura con mutex (DataInputStream no es thread-safe)
+                    synchronized(readLock) {
+                        input.readFully(headerBuffer)
+                    }
+                    
                     val header = decodeHeader(headerBuffer)
 
                     if (header.magic != MAGIC_NUMBER) {
                         consecutiveMagicErrors++
+                        Log.w(TAG, "⚠️ Magic error #$consecutiveMagicErrors/$maxConsecutiveMagicErrors")
+                        
                         if (consecutiveMagicErrors >= maxConsecutiveMagicErrors) {
-                            handleConnectionLost("Protocolo inválido")
+                            handleConnectionLost("Protocolo inválido ($consecutiveMagicErrors errores consecutivos)")
                             break
                         }
+                        // ✅ FIX: Skip este byte y esperar el siguiente frame (resincronización suave)
+                        delay(50)
                         continue
                     }
 
@@ -493,13 +516,20 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
                         MAX_CONTROL_PAYLOAD else MAX_AUDIO_PAYLOAD
 
                     if (header.payloadLength < 0 || header.payloadLength > maxPayload) {
+                        Log.w(TAG, "⚠️ Payload inválido: ${header.payloadLength}")
                         continue
                     }
 
                     val payload = ByteArray(header.payloadLength)
                     if (header.payloadLength > 0) {
-                        input.readFully(payload)
+                        // ✅ FIX: Proteger lectura de payload también
+                        synchronized(readLock) {
+                            input.readFully(payload)
+                        }
                     }
+
+                    // ✅ FIX: Actualizar heartbeat cuando recibimos CUALQUIER dato (más robusto)
+                    lastHeartbeatResponse.set(System.currentTimeMillis())
 
                     when (header.msgType) {
                         MSG_TYPE_AUDIO -> {

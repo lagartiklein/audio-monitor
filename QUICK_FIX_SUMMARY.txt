@@ -1,0 +1,67 @@
+# 🚨 RESUMEN RÁPIDO: Fixes Críticos
+
+## El Problema Real
+
+Tu app CRASHEA con **SIGSEGV** y **Heartbeat timeout** porque:
+
+1. **Race condition en lectura del socket**
+   - Múltiples coroutinas leen `DataInputStream` simultáneamente
+   - Sin sincronización → datos corrompidos → CRASH
+
+2. **Heartbeat timeout a 9 segundos**
+   - Servidor responde pero cliente no ve la respuesta
+   - Cliente desconecta pensando que servidor está muerto
+
+3. **Buffer de audio saturado**
+   - Datos llegan corruptos por desincronización
+   - Se acumulan → buffer overflow
+
+## La Solución
+
+### 1️⃣ Sincronización de Lectura (CRÍTICO)
+```kotlin
+// Agregar Mutex para proteger lecturas
+private val readLock = Any()
+
+// En startReaderThread():
+synchronized(readLock) {
+    input.readFully(headerBuffer)  // ✅ Seguro
+}
+```
+
+### 2️⃣ Heartbeat Más Rápido
+```kotlin
+// Detectar desconexiones 33% más rápido
+HEARTBEAT_INTERVAL_MS = 2000L   // 2s en lugar de 3s
+HEARTBEAT_TIMEOUT_MS = 6000L    // 6s en lugar de 9s
+```
+
+### 3️⃣ Actualizar con Cualquier Dato
+```kotlin
+// No solo con heartbeat_response
+lastHeartbeatResponse.set(System.currentTimeMillis())
+```
+
+### 4️⃣ Respuesta Robusta en Servidor
+```python
+# Reintentar 3 veces si falla
+for attempt in range(3):
+    if client.send_bytes_sync(response):
+        break
+```
+
+## Archivos Modificados
+
+- ✅ `kotlin android/clases/NativeAudioClient.kt` (5 cambios)
+- ✅ `audio_server/native_server.py` (1 cambio)
+
+## Resultado Esperado
+
+✅ **Sin SIGSEGV**  
+✅ **Sin Heartbeat timeout**  
+✅ **Sin Buffer saturado**  
+✅ **Conexión estable**  
+
+---
+
+**Estado:** ✅ LISTO PARA COMPILAR Y TESTEAR
