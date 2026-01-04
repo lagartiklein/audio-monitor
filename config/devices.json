@@ -208,8 +208,8 @@
       "user_agent": null
     },
     "first_seen": 1767396786.9770272,
-    "last_seen": 1767527835.0143082,
-    "reconnections": 1329,
+    "last_seen": 1767529737.121881,
+    "reconnections": 1345,
     "configuration": {
       "channels": [
         1
@@ -226,7 +226,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767527835014
+      "timestamp": 1767529737121
     },
     "configuration_session_id": "f57717282ffb470188b8cfb91c6610be",
     "tags": [],
@@ -657,19 +657,19 @@
     "type": "android",
     "name": "android-cd1f98c6",
     "mac_address": null,
-    "primary_ip": "192.168.1.9",
+    "primary_ip": null,
     "device_info": {
-      "type": "android",
-      "name": "android-cd1f98c6",
-      "primary_ip": "192.168.1.9",
+      "type": "native",
+      "name": "native-cd1f98c6",
+      "primary_ip": null,
       "client_id": "cd1f98c6-4bd4-4903-afe8-cd6c9acc4972",
       "protocol_version": 2,
       "rf_mode": true,
       "user_agent": null
     },
     "first_seen": 1767442886.0863066,
-    "last_seen": 1767528140.0711246,
-    "reconnections": 4500,
+    "last_seen": 1767528530.5185907,
+    "reconnections": 4795,
     "configuration": {
       "channels": [
         1
@@ -686,7 +686,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767528124228
+      "timestamp": 1767528530518
     },
     "configuration_session_id": null,
     "tags": [],
@@ -969,8 +969,8 @@
       "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767482238.9807353,
-    "last_seen": 1767522454.9811513,
-    "reconnections": 34,
+    "last_seen": 1767529737.7677832,
+    "reconnections": 41,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -1255,8 +1255,8 @@
       "user_agent": null
     },
     "first_seen": 1767497385.7275724,
-    "last_seen": 1767528095.0845003,
-    "reconnections": 317,
+    "last_seen": 1767529736.912639,
+    "reconnections": 357,
     "configuration": {
       "channels": [
         1
@@ -1273,7 +1273,7 @@
       "solos": [],
       "pre_listen": null,
       "master_gain": 1.0,
-      "timestamp": 1767528095084
+      "timestamp": 1767529736912
     },
     "configuration_session_id": null,
     "tags": [],
@@ -1294,6 +1294,66 @@
     "first_seen": 1767518345.6826,
     "last_seen": 1767520347.461577,
     "reconnections": 8,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "9b378dea-0476-4488-8b62-7d913e2958c4": {
+    "uuid": "9b378dea-0476-4488-8b62-7d913e2958c4",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767528497.078951,
+    "last_seen": 1767528569.8801918,
+    "reconnections": 1,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "687b891e-d326-4364-b73a-9fa39a72b88c": {
+    "uuid": "687b891e-d326-4364-b73a-9fa39a72b88c",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767528806.8850396,
+    "last_seen": 1767528806.8850396,
+    "reconnections": 0,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "cc2b2306-4a03-4150-b27c-ad59b89588a0": {
+    "uuid": "cc2b2306-4a03-4150-b27c-ad59b89588a0",
+    "type": "web",
+    "name": "control-center",
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767529708.8240194,
+    "last_seen": 1767529740.0570693,
+    "reconnections": 4,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],

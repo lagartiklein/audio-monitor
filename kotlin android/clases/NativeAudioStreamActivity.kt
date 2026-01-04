@@ -458,6 +458,26 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             handleControlSync(update)
         }
 
+        // ✅ NUEVO: Callback de reconexión exitosa - reiniciar renderer y servicio
+        audioClient.onReconnected = {
+            lifecycleScope.launch {
+                if (!isFinishing && !isDestroyed) {
+                    Log.d(TAG, "🔌 Reconexión detectada - Reiniciando renderer y servicio")
+                    try {
+                        // Reiniciar renderer con streams Oboe
+                        audioRenderer.start()
+                        Log.d(TAG, "✅ OboeAudioRenderer reiniciado después de reconexión")
+                        
+                        // Reiniciar servicio foreground
+                        startForegroundService()
+                        Log.d(TAG, "✅ ForegroundService reiniciado después de reconexión")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error reiniciando componentes: ${e.message}", e)
+                    }
+                }
+            }
+        }
+
         // Solo conectar si no está conectado
         if (!audioClient.isConnected()) {
             connectToServer()

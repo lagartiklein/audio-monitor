@@ -166,6 +166,7 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
     var onMixState: ((MixState) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     var onControlSync: ((ControlUpdate) -> Unit)? = null
+    var onReconnected: (() -> Unit)? = null  // ✅ NUEVO: Callback cuando reconecta exitosamente
 
     /**
      * Conectar en modo RF con auto-reconexión y heartbeat
@@ -221,6 +222,11 @@ class NativeAudioClient private constructor(val deviceUUID: String) {
 
             // Re-suscribir con estado completo
             restoreSubscriptionState()
+
+            // ✅ NUEVO: Disparar callback de reconexión exitosa para reiniciar renderer
+            withContext(Dispatchers.Main) {
+                onReconnected?.invoke()
+            }
 
             true
         } catch (e: Exception) {

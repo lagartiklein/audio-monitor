@@ -37,7 +37,7 @@ class AudioCallback : public oboe::AudioStreamDataCallback {
 private:
     // ✅ OPTIMIZACIÓN LATENCIA: Buffer aumentado para evitar saturación sin lag
     static constexpr int BUFFER_SIZE_FRAMES = 2048;      // ⬆️ AUMENTADO: 1024 → 2048 (~43ms @ 48kHz)
-    static constexpr int TARGET_BUFFER_FRAMES = 128;      // ~2.67ms target latency
+    static constexpr int TARGET_BUFFER_FRAMES = 64;       // ⬇️ REDUCIDO: 128 → 64 (~1.33ms target latency)
     static constexpr int DROP_THRESHOLD = 1536;           // 75% del nuevo buffer (más tolerancia)
     static constexpr int SILENCE_TIMEOUT_MS = 5000;      // Timeout de silencio
     static constexpr int CORRUPTION_CHECK_INTERVAL = 200; // Menos frecuente para mejor perf
@@ -236,8 +236,8 @@ public:
             freeFrames = BUFFER_SIZE_FRAMES - available;
             
             if (UNLIKELY(freeFrames < numFrames) && available > 100) {
-                // ✅ FIX: Cleanly drop solo 30% (mucho menos agresivo que 50%)
-                int framesToClear = (available * 3) / 10;  // 30% en lugar de 75% anterior
+                // ✅ FIX: Cleanly drop solo 20% (aún menos agresivo para mejor sync)
+                int framesToClear = (available * 2) / 10;  // 20% en lugar de 30% anterior
                 if (framesToClear > 0) {
                     LOGW("🗑️ Buffer saturado (%d frames), limpiando %d", available, framesToClear);
                     

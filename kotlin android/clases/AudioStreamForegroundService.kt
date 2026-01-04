@@ -358,7 +358,9 @@ class AudioStreamForegroundService : Service() {
         monitorHandler.removeCallbacks(monitorRunnable)
         lockRenewalHandler.removeCallbacks(lockRenewalRunnable)
         if (this::oboeAudioRenderer.isInitialized) {
-            oboeAudioRenderer.release()
+            // ✅ CRÍTICO: Solo detener streams, NO destruir engine (para permitir reconexión)
+            // El engine es singleton y se reutiliza en reconexiones
+            oboeAudioRenderer.stop()
         }
         super.onDestroy()
     }

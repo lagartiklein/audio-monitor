@@ -633,6 +633,25 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
     }
 
+    /**
+     * ✅ NUEVO: Reanudar después de stop (simplemente limpia estado para que streams se recreen)
+     * Los streams se recrearán automáticamente en renderChannelRF cuando lleguen datos
+     */
+    fun start() {
+        try {
+            Log.d(TAG, "▶️ Reanudando OboeAudioRenderer...")
+            // Los streams se recrearán bajo demanda en getOrCreateStream()
+            // Solo asegurarse de que el engine esté listo
+            if (!isInitialized || engineHandle == 0L) {
+                Log.e(TAG, "❌ Engine no inicializado para start()")
+                return
+            }
+            Log.d(TAG, "✅ OboeAudioRenderer listo para reanudar (streams se crearán bajo demanda)")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error reanudando: ${e.message}")
+        }
+    }
+
     fun release() {
         try {
             stop()
