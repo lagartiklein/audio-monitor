@@ -57,11 +57,17 @@ class DeviceRegistry:
         self.max_devices = 500
         self.device_cache_timeout = 604800  # 7 días
         
+        # ✅ NUEVO: Estado global de canales (persistente entre reinicios)
+        self.channels_state_file = os.path.join(os.path.dirname(persistence_file) or '.', 'channels_state.json')
+        self.channels_state = {}  # {channel: {active, gains, pans} para cada cliente}
+        self.channels_state_lock = threading.Lock()
+        
         # Crear directorio si no existe
         os.makedirs(os.path.dirname(persistence_file) or '.', exist_ok=True)
         
         # Cargar desde disco
         self.load_from_disk()
+        self.load_channels_state()
         
         # Iniciar thread de limpieza
         self._start_cleanup_thread()
@@ -364,6 +370,111 @@ class DeviceRegistry:
                 
             except Exception as e:
                 logger.error(f"[Device Registry] ❌ Error cargando desde disco: {e}")
+    
+    # ========================================================================
+    # PERSISTENCIA DE ESTADO DE CANALES
+    # ========================================================================
+    
+    def save_channels_state(self) -> bool:
+        """✅ NUEVO: Guardar estado de canales a disco."""
+        with self.channels_state_lock:
+            try:
+                os.makedirs(os.path.dirname(self.channels_state_file) or '.', exist_ok=True)
+                
+                # Preparar datos para guardar
+                state_data = {
+                    'timestamp': int(time.time()),
+                    'channels_state': self.channels_state
+                }
+                
+                # Guardar con archivo temporal para evitar corrupción
+                tmp_path = self.channels_state_file + '.tmp'
+                with open(tmp_path, 'w') as f:
+                    json.dump(state_data, f, indent=2)
+                os.replace(tmp_path, self.channels_state_file)
+                
+                logger.debug(f"[Device Registry] 💾 Estado de canales guardado")
+                return True
+                
+            except Exception as e:
+                logger.error(f"[Device Registry] ❌ Error guardando estado de canales: {e}")
+                return False
+    
+    def load_channels_state(self) -> bool:
+        """✅ NUEVO: Cargar estado de canales desde disco."""
+        if not os.path.exists(self.channels_state_file):
+            logger.debug(f"[Device Registry] 📄 Archivo de estado no existe: {self.channels_state_file}")
+            return False
+        
+        with self.channels_state_lock:
+            try:
+                with open(self.channels_state_file, 'r') as f:
+                    state_data = json.load(f)
+                
+                self.channels_state = state_data.get('channels_state', {})
+                
+                logger.info(f"[Device Registry] ✅ Estado de canales cargado: {len(self.channels_state)} clientes")
+                return True
+                
+            except Exception as e:
+                logger.error(f"[Device Registry] ❌ Error cargando estado de canales: {e}")
+                return False
+    
+    def update_channels_state(self, client_id: str, state: dict) -> bool:
+        """✅ NUEVO: Actualizar y persistir estado de canales para un cliente.
+        
+        Args:
+            client_id: ID del cliente
+            state: {
+                'channels': [...],
+                'gains': {channel: gain, ...},
+                'pans': {channel: pan, ...},
+                'mutes': {channel: muted, ...},
+                'master_gain': float,
+                'timestamp': int
+            }
+        """
+        with self.channels_state_lock:
+            self.channels_state[client_id] = {
+                **state,
+                'timestamp': int(time.time() * 1000)
+            }
+        
+        # Guardar a disco de forma async para no bloquear
+        threading.Thread(target=self.save_channels_state, daemon=True).start()
+        return True
+    
+    def get_channels_state(self, client_id: Optional[str] = None) -> dict:
+        """✅ NUEVO: Obtener estado de canales.
+        
+        Args:
+            client_id: Si es None, retorna estado de TODOS los clientes
+                      Si es string, retorna estado de ese cliente
+        
+        Returns:
+            dict con estado de canales
+        """
+        with self.channels_state_lock:
+            if client_id is None:
+                return dict(self.channels_state)
+            else:
+                return self.channels_state.get(client_id, {})
+    
+    def clear_channels_state(self, client_id: Optional[str] = None) -> bool:
+        """✅ NUEVO: Limpiar estado de canales.
+        
+        Args:
+            client_id: Si es None, limpia TODOS; si es string, limpia solo ese cliente
+        """
+        with self.channels_state_lock:
+            if client_id is None:
+                self.channels_state.clear()
+            else:
+                self.channels_state.pop(client_id, None)
+        
+        # Guardar cambios
+        return self.save_channels_state()
+
     
     # ========================================================================
     # LIMPIEZA Y MANTENIMIENTO

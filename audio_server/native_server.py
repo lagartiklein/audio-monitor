@@ -1,17 +1,28 @@
-# native_server.py - FASE 2: OPTIMIZADO CON ENVÍO ASÍNCRONO
+# native_server.py - FASE 4: AUDIO COMPRESSION + ULTRA LOW LATENCY + ZERO-LATENCY
 import socket, threading, time, json, struct, numpy as np, logging, os
 import select
-from queue import Queue, Empty, Full
+# ✅ ZERO-LATENCY: Queue eliminado - envío directo sin buffers
 from audio_server.native_protocol import NativeAndroidProtocol
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 import config
+
+from audio_server.audio_compression import get_audio_compressor
+COMPRESSION_AVAILABLE = True
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL), format='[RF-SERVER] %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ✅ FASE 2: Configuración de colas asíncronas
-SEND_QUEUE_SIZE = 8  # Paquetes máximos en cola por cliente
-SEND_THREAD_COUNT = 2  # Threads de envío
+ # ✅ FASE 4: Configuración de compresión solo zlib
+AUDIO_COMPRESSOR = get_audio_compressor(
+    sample_rate=config.SAMPLE_RATE,
+    channels=1,
+    bitrate=32000  # Valor fijo, ignorado en zlib
+)
+logger.info(f"[NativeServer] ✅ Audio Compression enabled (zlib)")
+
+# ✅ ZERO-LATENCY: Sin colas/buffers - envío directo tipo RF
+# El audio se corta si la red es mala (preferible para músicos en vivo)
 
 
 class NativeClient:
@@ -35,19 +46,19 @@ class NativeClient:
         self.consecutive_send_failures = 0
         self.max_consecutive_failures = 5
         
-        # ✅ FASE 2: Cola de envío asíncrono por cliente
-        self.send_queue = Queue(maxsize=SEND_QUEUE_SIZE)
-        self.send_thread = None
-        self.send_running = True
+        # ✅ ZERO-LATENCY: Sin cola - envío directo (tipo RF)
+        # self.send_queue = ELIMINADO
+        # self.send_thread = ELIMINADO
+        # self.send_running = ELIMINADO
         
         # Socket optimizado
         try:
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config.SOCKET_SNDBUF)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config.SOCKET_RCVBUF)
-            # ✅ FIX: Socket BLOQUEANTE con timeout para lectura, select() para escritura no-bloqueante
-            self.socket.setblocking(True)
-            self.socket.settimeout(3.0)  # ⚠️ Reducido: 5s → 3s para detección rápida de errores
+            # ✅ ZERO-LATENCY: Socket NO-BLOQUEANTE para envío directo (tipo RF)
+            self.socket.setblocking(False)  # Non-blocking para envío sin esperas
+            # self.socket.settimeout() = ELIMINADO (incompatible con non-blocking)
             
             if config.TCP_KEEPALIVE:
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -59,8 +70,8 @@ class NativeClient:
         except Exception as e:
             logger.warning(f"⚠️ Socket options: {e}")
         
-        # ✅ FASE 2: Iniciar thread de envío asíncrono
-        self._start_send_thread()
+        # ✅ ZERO-LATENCY: Sin thread asíncrono - todo directo
+        # self._start_send_thread() = ELIMINADO
     
     def update_activity(self): 
         self.last_activity = time.time()
@@ -69,37 +80,13 @@ class NativeClient:
         self.last_heartbeat = time.time()
         self.update_activity()
     
-    # ✅ FASE 2: Thread de envío asíncrono por cliente
-    def _start_send_thread(self):
-        """Iniciar thread dedicado para envío no bloqueante"""
-        self.send_thread = threading.Thread(
-            target=self._send_loop, 
-            daemon=True,
-            name=f"send-{self.id[:8]}"
-        )
-        self.send_thread.start()
+    # ✅ ZERO-LATENCY: Métodos de cola/thread ELIMINADOS
+    # _start_send_thread() = ELIMINADO
+    # _send_loop() = ELIMINADO
+    # _send_with_select() = MOVIDO a send_bytes_direct()
     
-    def _send_loop(self):
-        """Loop de envío asíncrono - NO BLOQUEA el hilo principal"""
-        while self.send_running and self.status == 1:
-            try:
-                # Esperar paquete con timeout
-                data = self.send_queue.get(timeout=0.5)
-                if data is None:  # Señal de parada
-                    break
-                
-                # Envío con select para no bloquear
-                self._send_with_select(data)
-                self.send_queue.task_done()
-                
-            except Empty:
-                continue
-            except Exception as e:
-                if config.DEBUG:
-                    logger.debug(f"Send loop error {self.id[:8]}: {e}")
-    
-    def _send_with_select(self, data: bytes) -> bool:
-        """✅ FASE 2: Envío no bloqueante con select"""
+    def _send_direct_nonblocking(self, data: bytes) -> bool:
+        """✅ ZERO-LATENCY: Envío directo sin select ni esperas (tipo RF)"""
         if self.status == 0 or not data or not self.socket:
             return False
         
@@ -107,27 +94,23 @@ class NativeClient:
             total_sent = 0
             data_len = len(data)
             
+            # ✅ OPTIMIZACIÓN: Envío directo sin select (sin esperas)
             while total_sent < data_len:
-                # Esperar que socket esté listo para escribir (max 100ms)
-                _, writable, errors = select.select([], [self.socket], [self.socket], 0.1)
-                
-                if errors:
-                    self.consecutive_send_failures += 1
-                    return False
-                
-                if writable:
-                    try:
-                        sent = self.socket.send(data[total_sent:])
-                        if sent == 0:
-                            self.consecutive_send_failures += 1
-                            return False
-                        total_sent += sent
-                    except (BlockingIOError, socket.error):
-                        continue
-                else:
-                    # Timeout - socket no disponible
+                try:
+                    sent = self.socket.send(data[total_sent:])
+                    if sent == 0:
+                        # Socket cerrado
+                        self.consecutive_send_failures += 1
+                        self.packets_dropped += 1
+                        return False
+                    total_sent += sent
+                except BlockingIOError:
+                    # Socket buffer lleno - DROP packet (tipo RF)
                     self.consecutive_send_failures += 1
                     self.packets_dropped += 1
+                    return False
+                except (BrokenPipeError, ConnectionError, OSError):
+                    self.status = 0
                     return False
             
             self.packets_sent += 1
@@ -185,7 +168,7 @@ class NativeClient:
             return False
     
     def send_bytes_direct(self, data: bytes) -> bool:
-        """✅ FASE 2: Envío asíncrono via cola - NO BLOQUEA"""
+        """✅ ZERO-LATENCY: Envío directo sin cola (tipo RF)"""
         if self.status == 0 or not data:
             return False
         
@@ -194,23 +177,8 @@ class NativeClient:
             self.consecutive_send_failures += 1
             return False
         
-        try:
-            # ✅ FASE 2: Encolar sin bloquear - descarta si cola llena
-            self.send_queue.put_nowait(data)
-            return True
-        except Full:
-            # Cola llena - descartar paquete más antiguo y encolar nuevo
-            try:
-                self.send_queue.get_nowait()  # Descartar antiguo
-                self.packets_dropped += 1
-            except Empty:
-                pass
-            try:
-                self.send_queue.put_nowait(data)
-                return True
-            except Full:
-                self.packets_dropped += 1
-                return False
+        # ✅ Envío inmediato sin cola ni buffer
+        return self._send_direct_nonblocking(data)
     
     def send_bytes_sync(self, data: bytes) -> bool:
         """Envío síncrono para mensajes de control (handshake, etc)"""
@@ -269,9 +237,30 @@ class NativeClient:
         if not valid_channels:
             return True
         
-        packet_bytes = NativeAndroidProtocol.create_audio_packet(
-            audio_data, valid_channels, sample_position, 0, self.rf_mode
-        )
+        # ✅ FASE 4: Aplicar compresión zlib siempre
+        try:
+            compressed_data = {}
+            for ch in valid_channels:
+                channel_audio = audio_data[:, ch]
+                compressed = AUDIO_COMPRESSOR.compress(channel_audio)
+                if compressed:
+                    compressed_data[ch] = compressed
+            if compressed_data:
+                packet_bytes = NativeAndroidProtocol.create_audio_packet(
+                    compressed_data, valid_channels, sample_position, 1, self.rf_mode
+                )
+            else:
+                packet_bytes = NativeAndroidProtocol.create_audio_packet(
+                    audio_data, valid_channels, sample_position, 0, self.rf_mode
+                )
+        except Exception as e:
+            logger.warning(f"[Compression] Error: {e}, usando sin comprimir")
+            packet_bytes = NativeAndroidProtocol.create_audio_packet(
+                audio_data, valid_channels, sample_position, 0, self.rf_mode
+            )
+            packet_bytes = NativeAndroidProtocol.create_audio_packet(
+                audio_data, valid_channels, sample_position, 0, self.rf_mode
+            )
         
         if packet_bytes:
             if config.DEBUG and config.VALIDATE_PACKETS:
@@ -296,8 +285,6 @@ class NativeClient:
             gains = subscription.get('gains', {}) or {}
             pans = subscription.get('pans', {}) or {}
             mutes = subscription.get('mutes', {}) or {}
-            pre_listen = subscription.get('pre_listen', None)
-            solos = list(subscription.get('solos', set()) or [])
             master_gain = subscription.get('master_gain', 1.0)
 
             payload = {
@@ -305,8 +292,6 @@ class NativeClient:
                 'gains': {str(int(k)): float(v) for k, v in gains.items()},
                 'pans': {str(int(k)): float(v) for k, v in pans.items()},
                 'mutes': {str(int(k)): bool(v) for k, v in mutes.items()},
-                'pre_listen': pre_listen,
-                'solos': [int(ch) for ch in solos],
                 'master_gain': float(master_gain),
             }
 
@@ -334,19 +319,8 @@ class NativeClient:
                    f"Reconexiones: {self.reconnection_count}")
         self.status = 0
         
-        # ✅ FIX: Detener thread de envío ANTES de cerrar socket
-        self.send_running = False
-        try:
-            self.send_queue.put_nowait(None)  # Señal de parada
-        except:
-            pass
-        
-        # Esperar que termine el thread (con timeout corto)
-        if self.send_thread and self.send_thread.is_alive():
-            try:
-                self.send_thread.join(timeout=0.5)
-            except:
-                pass
+        # ✅ ZERO-LATENCY: Sin threads ni colas que cerrar
+        # Cerrar socket directamente
         
         # ✅ FIX: Cerrar socket con shutdown explícito (más robusto)
         if self.socket:
@@ -412,6 +386,15 @@ class NativeAudioServer:
         }
         self.start_time = time.time()
         self.stats_lock = threading.Lock()
+        
+        # ✅ OPTIMIZACIÓN: ThreadPoolExecutor para envío paralelo de audio a múltiples clientes
+        # Con 10 clientes, usar 4-6 hilos evita saturación del hilo de captura
+        max_workers = min(10, max(4, getattr(config, 'AUDIO_SEND_POOL_SIZE', 6)))
+        self.audio_send_pool = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix='audio-send-'
+        )
+        logger.info(f"[NativeServer] ✅ ThreadPoolExecutor para envío: {max_workers} workers")
     
     def set_physical_channels(self, num_channels: int):
         """✅ NUEVO: Establecer número de canales reales del dispositivo"""
@@ -589,6 +572,10 @@ class NativeAudioServer:
     
     def stop(self):
         self.running = False
+        
+        # ✅ NUEVO: Detener ThreadPoolExecutor
+        logger.info("[NativeServer] 🛑 Deteniendo ThreadPoolExecutor...")
+        self.audio_send_pool.shutdown(wait=True)
         
         # ✅ NUEVO: Guardar estado antes de apagar
         logger.info(f"[NativeServer] 💾 Guardando estado de clientes antes de apagar...")
@@ -916,8 +903,6 @@ class NativeAudioServer:
                     gains=restored_state.get('gains', {}),
                     pans=restored_state.get('pans', {}),
                     mutes=restored_state.get('mutes', {}),
-                    solos=restored_state.get('solos', []),
-                    pre_listen=restored_state.get('pre_listen'),
                     master_gain=restored_state.get('master_gain', 1.0)
                 )
 
@@ -1054,8 +1039,6 @@ class NativeAudioServer:
                                     'gains': subscription.get('gains', {}),
                                     'pans': subscription.get('pans', {}),
                                     'mutes': subscription.get('mutes', {}),
-                                    'solos': list(subscription.get('solos', set())),
-                                    'pre_listen': subscription.get('pre_listen'),
                                     'master_gain': subscription.get('master_gain', 1.0),
                                     'timestamp': int(time.time() * 1000)
                                 }
@@ -1080,8 +1063,6 @@ class NativeAudioServer:
                                 'gains': subscription.get('gains', {}) if subscription else {},
                                 'pans': subscription.get('pans', {}) if subscription else {},
                                 'mutes': subscription.get('mutes', {}) if subscription else {},
-                                'solos': list(subscription.get('solos', set())) if subscription else [],
-                                'pre_listen': subscription.get('pre_listen') if subscription else None,
                                 'master_gain': subscription.get('master_gain', 1.0) if subscription else 1.0,
                                 'timestamp': int(time.time() * 1000)
                             }
@@ -1126,8 +1107,6 @@ class NativeAudioServer:
                             'gains': {str(k): v for k, v in saved_state.get('gains', {}).items()},
                             'pans': {str(k): v for k, v in saved_state.get('pans', {}).items()},
                             'mutes': {str(k): v for k, v in saved_state.get('mutes', {}).items()},
-                            'solos': saved_state.get('solos', []),
-                            'pre_listen': saved_state.get('pre_listen'),
                             'master_gain': saved_state.get('master_gain', 1.0),
                         },
                         client.rf_mode,
@@ -1147,8 +1126,6 @@ class NativeAudioServer:
                             'gains': {},
                             'pans': {},
                             'mutes': {},
-                            'solos': [],
-                            'pre_listen': None,
                             'master_gain': 1.0,
                         },
                         client.rf_mode,
@@ -1188,17 +1165,19 @@ class NativeAudioServer:
             if mute is not None:
                 control_data['mute'] = mute
             
-            packet = NativeAndroidProtocol.create_control_packet('control_update', control_data, True)
-            if not packet:
-                return
-            
             # ✅ FASE 2: Snapshot de clientes y envío síncrono
             with self.client_lock:
                 active_clients = [(cid, c) for cid, c in self.clients.items() if c.status == 1 and c.is_alive()]
             
             for client_id, client in active_clients:
                 try:
-                    client.send_bytes_sync(packet)
+                    packet = NativeAndroidProtocol.create_control_packet(
+                        'control_update',
+                        control_data,
+                        bool(getattr(client, 'rf_mode', False)),
+                    )
+                    if packet:
+                        client.send_bytes_sync(packet)
                 except Exception as e:
                     if config.DEBUG:
                         logger.debug(f"Error enviando control_update a {client_id[:12]}: {e}")
@@ -1225,6 +1204,56 @@ class NativeAudioServer:
             if config.DEBUG:
                 logger.error(f"❌ push_mix_state_to_client({client_id[:12]}) failed: {e}")
             return False
+
+    def broadcast_to_native_clients(self, message: dict) -> int:
+        """
+        ✅ NUEVO: Enviar mensaje de control a TODOS los clientes nativos conectados.
+        Usado para push de cambios desde web UI.
+        
+        Args:
+            message: Dict con el mensaje a enviar (debe tener 'type')
+        
+        Returns:
+            Número de clientes que recibieron el mensaje
+        """
+        try:
+            if not message or 'type' not in message:
+                logger.warning("[NativeServer] ⚠️ broadcast_to_native_clients: mensaje inválido")
+                return 0
+            
+            msg_type = message.get('type', 'unknown')
+            
+            # Tomar snapshot de clientes activos
+            with self.client_lock:
+                active_clients = [
+                    (cid, client) for cid, client in self.clients.items()
+                    if client.status == 1 and client.is_alive()
+                ]
+            
+            if not active_clients:
+                logger.debug(f"[NativeServer] 📤 No hay clientes nativos para broadcast de {msg_type}")
+                return 0
+            
+            sent_count = 0
+            for client_id, client in active_clients:
+                try:
+                    packet = NativeAndroidProtocol.create_control_packet(
+                        msg_type,
+                        message,
+                        rf_mode=bool(getattr(client, 'rf_mode', False)),
+                    )
+                    if packet and client.send_bytes_sync(packet):
+                        sent_count += 1
+                except Exception as e:
+                    if config.DEBUG:
+                        logger.debug(f"[NativeServer] Error enviando {msg_type} a {client_id[:12]}: {e}")
+            
+            logger.info(f"[NativeServer] 📤 Broadcast {msg_type} a {sent_count}/{len(active_clients)} clientes")
+            return sent_count
+            
+        except Exception as e:
+            logger.error(f"[NativeServer] ❌ Error en broadcast_to_native_clients: {e}")
+            return 0
     
     def on_audio_data(self, audio_data):
         """✅ FASE 2: Envío optimizado con cache de paquetes y menos contención"""
@@ -1300,8 +1329,8 @@ class NativeAudioServer:
             client.subscribed_channels = set(valid_subscribed)
             
             try:
-                # ✅ ULTRA-BAJA LATENCIA: Envío síncrono directo (sin cola async)
-                if client.send_bytes_sync(packet_bytes):
+                # ✅ OPTIMIZACIÓN: Envío asíncrono (no bloquea hilo de captura)
+                if client.send_bytes_direct(packet_bytes):
                     sent += 1
                 else:
                     if client.consecutive_send_failures >= client.max_consecutive_failures:
@@ -1339,8 +1368,6 @@ class NativeAudioServer:
                                 'gains': subscription.get('gains', {}),
                                 'pans': subscription.get('pans', {}),
                                 'mutes': subscription.get('mutes', {}),
-                                'solos': list(subscription.get('solos', set())),
-                                'pre_listen': subscription.get('pre_listen'),
                                 'master_gain': subscription.get('master_gain', 1.0),
                                 'last_seen': time.time(),
                                 'reconnection_count': client.reconnection_count,

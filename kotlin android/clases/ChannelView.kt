@@ -347,54 +347,25 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     }
 
     private fun isPointOnThumb(slider: Slider, event: MotionEvent): Boolean {
-        val thumbRadius = thumbTouchRadius
-
-        // Obtener la posición del thumb
         val trackPosition = slider.trackSidePadding
-        val trackWidth = slider.width - (trackPosition * 2)
-        val valueRange = slider.valueTo - slider.valueFrom
-        val normalizedValue = (slider.value - slider.valueFrom) / valueRange
-        val thumbX = trackPosition + (normalizedValue * trackWidth)
-
-        // Obtener coordenadas del toque
-        val touchX = event.x
-        val touchY = event.y
-
-        // Calcular distancia al thumb
-        val deltaX = touchX - thumbX
-        val deltaY = touchY - slider.height / 2f
-        val distance = kotlin.math.sqrt((deltaX * deltaX) + (deltaY * deltaY))
-
-        return distance <= thumbRadius
+        val thumbX = trackPosition + ((slider.value - slider.valueFrom) / (slider.valueTo - slider.valueFrom) * (slider.width - 2 * trackPosition))
+        val distance = kotlin.math.sqrt(((event.x - thumbX).pow(2)) + ((event.y - slider.height / 2f).pow(2)))
+        return distance <= thumbTouchRadius
     }
 
     private fun isPointOnThumbPan(slider: Slider, event: MotionEvent): Boolean {
-        val thumbRadius = thumbTouchRadiusPan
-
-        // Obtener la posición del thumb
         val trackPosition = slider.trackSidePadding
-        val trackWidth = slider.width - (trackPosition * 2)
-        val valueRange = slider.valueTo - slider.valueFrom
-        val normalizedValue = (slider.value - slider.valueFrom) / valueRange
-        val thumbX = trackPosition + (normalizedValue * trackWidth)
-
-        // Obtener coordenadas del toque
-        val touchX = event.x
-        val touchY = event.y
-
-        // Calcular distancia al thumb
-        val deltaX = touchX - thumbX
-        val deltaY = touchY - slider.height / 2f
-        val distance = kotlin.math.sqrt((deltaX * deltaX) + (deltaY * deltaY))
-
-        return distance <= thumbRadius
+        val thumbX = trackPosition + ((slider.value - slider.valueFrom) / (slider.valueTo - slider.valueFrom) * (slider.width - 2 * trackPosition))
+        val distance = kotlin.math.sqrt(((event.x - thumbX).pow(2)) + ((event.y - slider.height / 2f).pow(2)))
+        return distance <= thumbTouchRadiusPan
     }
 
-    /**
-     * Limpia recursos cuando el view se destruye
-     */
     fun cleanup() {
-        mainHandler.removeCallbacks(gainDebounceRunnable ?: return)
-        mainHandler.removeCallbacks(panDebounceRunnable ?: return)
+        gainDebounceRunnable?.let { mainHandler.removeCallbacks(it) }
+        panDebounceRunnable?.let { mainHandler.removeCallbacks(it) }
     }
+    
+    // ✅ Alias para compatibilidad con código de sincronización web
+    fun setPan(pan: Float, fromServer: Boolean = false) = setPanValue(pan, fromServer)
+    fun setActive(active: Boolean, fromServer: Boolean = false) = activateChannel(active, fromServer)
 }

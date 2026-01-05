@@ -17,6 +17,9 @@ import threading  # ✅ Asegurar que threading esté disponible
 import json
 import numpy as np
 import engineio.server
+import math
+import uuid  # ✅ NUEVO: Para generar device_uuid únicos
+from audio_server.audio_mixer import get_audio_mixer
 
 # ✅ PATCH: Forzar async_modes a solo 'threading' para PyInstaller
 original_async_modes = engineio.base_server.BaseServer.async_modes
@@ -212,6 +215,39 @@ def broadcast_master_audio(audio_data: bytes, sample_rate: int, channels: int):
         logger.debug(f"[WebSocket] Error en broadcast_master_audio: {e}")
 
 
+def broadcast_master_audio_internal(audio_data: bytes, sample_rate: int, channels: int, master_client_id: str):
+    """
+    ✅ NUEVO: Versión interna de broadcast (llamada desde AudioMixer)
+    Encapsula audio en base64 si es necesario para transmisión WebSocket
+    """
+    try:
+        import base64
+        
+        with master_audio_lock:
+            if not master_audio_listeners:
+                return
+            
+            listeners = list(master_audio_listeners.keys())
+        
+        # Codificar audio en base64 para transmisión segura vía WebSocket
+        audio_b64 = base64.b64encode(audio_data).decode('ascii')
+        
+        for sid in listeners:
+            try:
+                socketio.emit('master_audio_data', {
+                    'audio': audio_b64,
+                    'sample_rate': sample_rate,
+                    'channels': channels,
+                    'client_id': master_client_id,
+                    'timestamp': int(time.time() * 1000)
+                }, to=sid, namespace='/')
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"[WebSocket] Error enviando audio a {sid[:8]}: {e}")
+    except Exception as e:
+        logger.debug(f"[WebSocket] Error en broadcast_master_audio_internal: {e}")
+
+
 def register_master_audio_listener(sid: str):
     """✅ NUEVO: Registrar un cliente web para recibir audio del maestro"""
     with master_audio_lock:
@@ -225,6 +261,66 @@ def unregister_master_audio_listener(sid: str):
         if sid in master_audio_listeners:
             del master_audio_listeners[sid]
             logger.info(f"[WebSocket] 🎧 Listener de audio maestro removido: {sid[:8]}")
+
+
+# ✅ NUEVO: Funciones de push para cliente nativo (receptor pasivo)
+
+def push_channel_update_to_native(channel_id: int, active: bool = None, gainDb: float = None, pan: float = None):
+    """
+    ✅ NUEVO: Enviar cambio de canal al cliente nativo Android
+    
+    Args:
+        channel_id: ID del canal (0-indexed)
+        active: Estado del canal (True/False)
+        gainDb: Ganancia en dB (-60 a +12)
+        pan: Pan normalizado (-1.0 a +1.0)
+    """
+    if not native_server_instance:
+        logger.debug("[WebSocket] Native server not available for push")
+        return
+    
+    try:
+        # Construir mensaje de actualización
+        message = {
+            'type': 'channel_update',
+            'channel': channel_id
+        }
+        
+        if active is not None:
+            message['active'] = active
+        if gainDb is not None:
+            message['gainDb'] = float(gainDb)
+        if pan is not None:
+            message['pan'] = float(pan)
+        
+        # Enviar a todos los clientes nativos conectados
+        logger.info(f"[WebSocket] 📤 Push a APK: Canal {channel_id} - {message}")
+        native_server_instance.broadcast_to_native_clients(message)
+        
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en push_channel_update_to_native: {e}")
+
+
+def push_master_gain_to_native(gainDb: float):
+    """
+    ✅ NUEVO: Enviar cambio de ganancia maestra al cliente nativo
+    
+    Args:
+        gainDb: Ganancia maestra en dB
+    """
+    if not native_server_instance:
+        return
+    
+    try:
+        message = {
+            'type': 'master_gain_update',
+            'gainDb': float(gainDb)
+        }
+        logger.info(f"[WebSocket] 📤 Push a APK: Master Gain = {gainDb}dB")
+        native_server_instance.broadcast_to_native_clients(message)
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en push_master_gain_to_native: {e}")
+
 
 def cleanup_expired_web_states():
     """Limpiar estados persistentes expirados para web clients"""
@@ -261,6 +357,12 @@ def init_server(manager, native_server=None):
     # ✅ Inyectar socketio en channel_manager para broadcasts
     if hasattr(channel_manager, 'set_socketio'):
         channel_manager.set_socketio(socketio)
+    
+    # ✅ NUEVO: Conectar audio mixer
+    audio_mixer = get_audio_mixer()
+    if audio_mixer:
+        audio_mixer.set_audio_callback(broadcast_master_audio_internal)
+        logger.info(f"[WebSocket] ✅ Audio Mixer conectado")
     
     logger.info(f"[WebSocket] ✅ Inicializado (Control Central)")
     logger.info(f"[WebSocket]    Puerto: {config.WEB_PORT}")
@@ -322,6 +424,31 @@ def not_found(e):
 # EVENTOS SOCKETIO - CONEXIÓN
 # ============================================================================
 
+def _restore_client_channels_state(client_id: str, channel_manager) -> dict:
+    """
+    ✅ NUEVO: Restaurar estado de canales guardado para un cliente
+    
+    Retorna el estado restaurado (puede estar vacío si no hay guardado)
+    """
+    if not hasattr(channel_manager, 'device_registry') or not channel_manager.device_registry:
+        return {}
+    
+    try:
+        registry = channel_manager.device_registry
+        saved_state = registry.get_channels_state(client_id)
+        
+        if saved_state:
+            logger.info(f"[WebSocket] 🔄 Estado de canales restaurado para {client_id[:12]}: "
+                       f"{len(saved_state.get('channels', []))} canales")
+            return saved_state
+        
+        return {}
+        
+    except Exception as e:
+        logger.debug(f"[WebSocket] Error restaurando estado de canales: {e}")
+        return {}
+
+
 @socketio.on('connect')
 def handle_connect(auth=None):
     """Cliente web conectado"""
@@ -330,6 +457,10 @@ def handle_connect(auth=None):
     auth = auth or {}
     web_device_uuid = auth.get('device_uuid')
     
+    # ✅ NUEVO: Si no hay device_uuid, generar uno único para este web
+    if not web_device_uuid:
+        web_device_uuid = f"web-{uuid.uuid4().hex[:12]}"
+    
     # ✅ Registrar cliente web
     with web_clients_lock:
         web_clients[client_id] = {
@@ -337,7 +468,7 @@ def handle_connect(auth=None):
             'last_activity': time.time(),
             'address': request.remote_addr,
             'user_agent': request.headers.get('User-Agent', 'Unknown'),
-            'device_uuid': web_device_uuid
+            'device_uuid': web_device_uuid  # ✅ SIEMPRE tendrá valor
         }
     
     logger.info(f"[WebSocket] ✅ Cliente web conectado: {client_id[:8]} ({request.remote_addr})")
@@ -559,8 +690,6 @@ def handle_update_client_mix(data):
         'gains': {...},
         'pans': {...},
         'mutes': {...},
-        'solos': [...],
-        'pre_listen': int | None,
         'master_gain': float
     }
     """
@@ -580,8 +709,38 @@ def handle_update_client_mix(data):
         # ✅ Guardar estado previo para detectar cambios
         prev_subscription = channel_manager.get_client_subscription(target_client_id)
         prev_channels = set(prev_subscription.get('channels', [])) if prev_subscription else set()
-        prev_solos = set(prev_subscription.get('solos', set())) if prev_subscription else set()
-        prev_pfl = prev_subscription.get('pre_listen') if prev_subscription else None
+        
+        # ✅ Si el cliente no existe aún, crearlo (suscribción inicial)
+        if not prev_subscription:
+            # Get device_uuid from web_clients if available
+            device_uuid = None
+            with web_clients_lock:
+                if target_client_id in web_clients:
+                    device_uuid = web_clients[target_client_id].get('device_uuid')
+            
+            # Create initial subscription with provided channels
+            channels = data.get('channels', [])
+            try:
+                sub_success = channel_manager.subscribe_client(
+                    target_client_id,
+                    channels=channels,
+                    gains=data.get('gains'),
+                    pans=data.get('pans'),
+                    client_type='web',
+                    device_uuid=device_uuid
+                )
+                if not sub_success:
+                    emit('error', {'message': f'Failed to create subscription for {target_client_id}'})
+                    logger.error(f"[WebSocket] subscribe_client returned False for {target_client_id[:15]}")
+                    return
+                logger.info(f"[WebSocket] New web client subscribed: {target_client_id[:15]} ({len(channels)} channels)")
+            except Exception as e:
+                emit('error', {'message': f'Error creating subscription: {str(e)}'})
+                logger.error(f"[WebSocket] Error in subscribe_client: {e}", exc_info=True)
+                return
+            
+            # Refresh subscription after creation
+            prev_subscription = channel_manager.get_client_subscription(target_client_id)
         
         # ✅ Actualizar mezcla
         success = channel_manager.update_client_mix(
@@ -590,8 +749,6 @@ def handle_update_client_mix(data):
             gains=data.get('gains'),
             pans=data.get('pans'),
             mutes=data.get('mutes'),
-            solos=data.get('solos'),
-            pre_listen=data.get('pre_listen'),
             master_gain=data.get('master_gain')
         )
         
@@ -608,8 +765,6 @@ def handle_update_client_mix(data):
             new_subscription = channel_manager.get_client_subscription(target_client_id)
             if new_subscription:
                 new_channels = set(new_subscription.get('channels', []))
-                new_solos = set(new_subscription.get('solos', set()))
-                new_pfl = new_subscription.get('pre_listen')
                 
                 timestamp = int(time.time() * 1000)
                 
@@ -624,26 +779,9 @@ def handle_update_client_mix(data):
                         'type': 'channel_toggle', 'channel': ch, 'value': False,
                         'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
                     }, skip_sid=request.sid)
-                
-                # Emitir cambios de solos
-                for ch in new_solos - prev_solos:  # Nuevos solos
-                    socketio.emit('param_sync', {
-                        'type': 'solo', 'channel': ch, 'value': True,
-                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
-                    }, skip_sid=request.sid)
-                for ch in prev_solos - new_solos:  # Solos quitados
-                    socketio.emit('param_sync', {
-                        'type': 'solo', 'channel': ch, 'value': False,
-                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
-                    }, skip_sid=request.sid)
-                
-                # Emitir cambio de PFL si cambió
-                if new_pfl != prev_pfl:
-                    socketio.emit('param_sync', {
-                        'type': 'pfl', 'channel': new_pfl if new_pfl is not None else -1, 
-                        'value': new_pfl,
-                        'client_id': target_client_id, 'source': 'web', 'timestamp': timestamp
-                    }, skip_sid=request.sid)
+            
+            # ✅ NUEVO: Guardar estado de canales para persistencia
+            _save_client_config_to_registry(target_client_id)
             
             # ✅ Broadcast a todos (incluye el cambio completo)
             broadcast_clients_update()
@@ -658,6 +796,9 @@ def handle_update_client_mix(data):
                 logger.debug(f"[WebSocket] mix_state push failed: {e}")
             
         else:
+            # Debug: log what went wrong
+            subscription_check = channel_manager.get_client_subscription(target_client_id)
+            logger.error(f"[WebSocket] update_client_mix failed: subscription_check={subscription_check is not None} for {target_client_id[:15]}")
             emit('error', {'message': f'Failed to update mix for {target_client_id}'})
     
     except Exception as e:
@@ -810,7 +951,10 @@ def handle_update_gain(data):
         
         # ✅ Actualizar en channel manager (respuesta INMEDIATA)
         if client_id in channel_manager.subscriptions:
-            channel_manager.subscriptions[client_id]['gains'][channel] = gain
+            channel_manager.update_client_mix(
+                client_id,
+                gains={channel: gain},
+            )
             
             # ✅ Respuesta inmediata al cliente que solicitó
             emit('gain_updated', {
@@ -830,7 +974,7 @@ def handle_update_gain(data):
                 'timestamp': int(time.time() * 1000)
             }, skip_sid=request.sid)  # No enviar al que ya lo cambió
             
-            # ✅ SINCRONIZACIÓN A ANDROID: Si el target es nativo, enviar mix_state
+            # ✅ SINCRONIZACIÓN A ANDROID: Empujar estado al cliente nativo objetivo
             try:
                 subscription = channel_manager.get_client_subscription(client_id)
                 if subscription and subscription.get('client_type') == 'native':
@@ -839,6 +983,12 @@ def handle_update_gain(data):
             except Exception as e:
                 if config.DEBUG:
                     logger.debug(f"[WebSocket] Android sync failed: {e}")
+            
+            # ✅ NUEVO: Guardar estado de canales para persistencia
+            _save_client_config_to_registry(client_id)
+            
+            # Broadcast para actualizar estado en todos los clientes web
+            broadcast_clients_update()
             
             if config.DEBUG:
                 logger.debug(f"[WebSocket] ⚡ Gain CH{channel}: {gain:.2f} ({client_id[:8]}) [synced]")
@@ -878,7 +1028,10 @@ def handle_update_pan(data):
         
         # ✅ Actualizar en channel manager (respuesta INMEDIATA)
         if client_id in channel_manager.subscriptions:
-            channel_manager.subscriptions[client_id]['pans'][channel] = pan
+            channel_manager.update_client_mix(
+                client_id,
+                pans={channel: pan},
+            )
             
             # ✅ Respuesta inmediata al cliente que solicitó
             emit('pan_updated', {
@@ -898,7 +1051,7 @@ def handle_update_pan(data):
                 'timestamp': int(time.time() * 1000)
             }, skip_sid=request.sid)  # No enviar al que ya lo cambió
             
-            # ✅ SINCRONIZACIÓN A ANDROID: Si el target es nativo, enviar mix_state
+            # ✅ SINCRONIZACIÓN A ANDROID: Empujar estado al cliente nativo objetivo
             try:
                 subscription = channel_manager.get_client_subscription(client_id)
                 if subscription and subscription.get('client_type') == 'native':
@@ -908,6 +1061,12 @@ def handle_update_pan(data):
                 if config.DEBUG:
                     logger.debug(f"[WebSocket] Android sync failed: {e}")
             
+            # ✅ NUEVO: Guardar estado de canales para persistencia
+            _save_client_config_to_registry(client_id)
+            
+            # Broadcast para actualizar estado en todos los clientes web
+            broadcast_clients_update()
+            
             if config.DEBUG:
                 logger.debug(f"[WebSocket] ⚡ Pan CH{channel}: {pan:.2f} ({client_id[:8]}) [synced]")
     
@@ -915,6 +1074,179 @@ def handle_update_pan(data):
         if config.DEBUG:
             logger.error(f"[WebSocket] Error update_pan: {e}")
         emit('pan_updated', {'status': 'error', 'channel': data.get('channel')})
+
+
+@socketio.on('toggle_mute')
+def handle_toggle_mute(data):
+    """
+    ✅ NUEVO: Toggle mute de un canal (respuesta ultra-rápida)
+    data: {
+        'channel': int,
+        'muted': bool,
+        'target_client_id': str (opcional)
+    }
+    """
+    client_id = data.get('target_client_id') or request.sid
+    update_client_activity(request.sid)
+    
+    if not channel_manager:
+        emit('mute_toggled', {'status': 'error', 'channel': data.get('channel')})
+        return
+    
+    try:
+        channel = data.get('channel')
+        muted = bool(data.get('muted', False))
+        
+        if channel is None:
+            return
+        
+        channel = int(channel)
+        
+        # ✅ Actualizar en channel manager (respuesta INMEDIATA)
+        if client_id in channel_manager.subscriptions:
+            channel_manager.update_client_mix(
+                client_id,
+                mutes={channel: muted},
+            )
+            
+            # ✅ Respuesta inmediata al cliente que solicitó
+            emit('mute_toggled', {
+                'channel': channel,
+                'muted': muted,
+                'client_id': client_id,
+                'timestamp': int(time.time() * 1000)
+            }, to=request.sid)
+            
+            # ✅ SINCRONIZACIÓN BIDIRECCIONAL: Propagar a OTROS clientes web
+            socketio.emit('param_sync', {
+                'type': 'mute',
+                'channel': channel,
+                'value': muted,
+                'client_id': client_id,
+                'source': 'web',
+                'timestamp': int(time.time() * 1000)
+            }, skip_sid=request.sid)
+            
+            # ✅ SINCRONIZACIÓN A ANDROID: Enviar mix_state al cliente nativo objetivo
+            try:
+                subscription = channel_manager.get_client_subscription(client_id)
+                if subscription and subscription.get('client_type') == 'native':
+                    if native_server_instance is not None:
+                        native_server_instance.push_mix_state_to_client(client_id)
+            except Exception as e:
+                if config.DEBUG:
+                    logger.debug(f"[WebSocket] Android sync failed: {e}")
+            
+            # ✅ NUEVO: Guardar estado de canales para persistencia
+            _save_client_config_to_registry(client_id)
+            
+            # Broadcast para actualizar estado en todos los clientes web
+            broadcast_clients_update()
+            
+            if config.DEBUG:
+                logger.debug(f"[WebSocket] 🔇 Mute CH{channel}: {muted} ({client_id[:8]}) [synced]")
+    
+    except Exception as e:
+        if config.DEBUG:
+            logger.error(f"[WebSocket] Error toggle_mute: {e}")
+        emit('mute_toggled', {'status': 'error', 'channel': data.get('channel')})
+
+
+def validate_channels(channels, operational_channels):
+    """✅ NUEVO: Validar canales contra los operacionales"""
+    if not channels:
+        return []
+    try:
+        channels = [int(ch) for ch in channels]
+    except (ValueError, TypeError):
+        return []
+    
+    valid = [ch for ch in channels if ch in operational_channels]
+    invalid = set(channels) - set(valid)
+    if invalid:
+        logger.warning(f"[WebSocket] ⚠️ Canales inválidos ignorados: {invalid}")
+    return valid
+
+
+@socketio.on('sync_to_android')
+def handle_sync_to_android(data):
+    """
+    ✅ NUEVO: Sincronizar cambios web → Android
+    data: {
+        'target_client_id': str,
+        'type': 'gain'|'pan'|'channel_toggle'|'mute',
+        'channel': int,
+        'value': float|bool
+    }
+    """
+    if not channel_manager or not native_server_instance:
+        return
+    
+    update_client_activity(request.sid)
+    
+    try:
+        target_client_id = data.get('target_client_id')
+        sync_type = data.get('type')
+        channel = int(data.get('channel', -1))
+        value = data.get('value')
+        
+        if not target_client_id or sync_type is None:
+            return
+        
+        # Obtener suscripción del cliente
+        subscription = channel_manager.get_client_subscription(target_client_id)
+        if not subscription:
+            return
+        
+        # Validar canal contra operacionales
+        operational = channel_manager.get_operational_channels()
+        if channel not in operational:
+            logger.warning(f"[WebSocket] ⚠️ Canal {channel} no operacional")
+            return
+        
+        # Registrar cambio específico
+        if sync_type == 'gain':
+            if not subscription.get('gains'):
+                subscription['gains'] = {}
+            subscription['gains'][channel] = float(value)
+            logger.debug(f"[WebSocket] 📊 Sync Web→Android: gain ch{channel}={value:.2f}")
+        
+        elif sync_type == 'pan':
+            if not subscription.get('pans'):
+                subscription['pans'] = {}
+            subscription['pans'][channel] = float(value)
+            logger.debug(f"[WebSocket] 📊 Sync Web→Android: pan ch{channel}={value:.2f}")
+        
+        elif sync_type == 'channel_toggle':
+            channels = subscription.get('channels', [])
+            if bool(value):
+                if channel not in channels:
+                    channels.append(channel)
+            else:
+                if channel in channels:
+                    channels.remove(channel)
+            subscription['channels'] = channels
+            logger.debug(f"[WebSocket] 📊 Sync Web→Android: ch{channel} toggle={value}")
+        
+        elif sync_type == 'mute':
+            if not subscription.get('mutes'):
+                subscription['mutes'] = {}
+            subscription['mutes'][channel] = bool(value)
+            logger.debug(f"[WebSocket] 📊 Sync Web→Android: mute ch{channel}={value}")
+        
+        # Empujar estado al cliente nativo si está conectado
+        if subscription.get('client_type') == 'native':
+            try:
+                if native_server_instance:
+                    native_server_instance.push_mix_state_to_client(target_client_id)
+            except Exception as e:
+                logger.debug(f"[WebSocket] Error empujando estado a Android: {e}")
+        
+        emit('sync_complete', {'status': 'ok', 'type': sync_type})
+    
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error en sync_to_android: {e}")
+        emit('sync_error', {'message': str(e)})
 
 
 @socketio.on('disconnect_client')
@@ -1093,7 +1425,7 @@ def handle_get_master_client_info():
         emit('master_client_info', {
             'enabled': True,
             'master_client_id': master_id,
-            'name': getattr(config, 'MASTER_CLIENT_NAME', '🎧 Monitor Sonidista'),
+            'name': getattr(config, 'MASTER_CLIENT_NAME', 'Control'),
             'channels': subscription.get('channels', []) if subscription else [],
             'sample_rate': config.SAMPLE_RATE,
             'buffer_size': getattr(config, 'WEB_AUDIO_BUFFER_SIZE', 2048),
@@ -1118,7 +1450,8 @@ def update_client_activity(client_id):
 
 def _save_client_config_to_registry(client_id):
     """
-    ✅ NUEVO: Guardar configuración de cliente en device_registry de forma permanente
+    ✅ NUEVO: Guardar estado de canales de cliente de forma permanente
+    Persiste ganancia, pan, canales activos y mutes para restauración en reinicio
     """
     try:
         if not channel_manager:
@@ -1128,150 +1461,70 @@ def _save_client_config_to_registry(client_id):
         if not subscription:
             return
         
-        device_uuid = subscription.get('device_uuid')
+        # ✅ NUEVO: Guardar en channels_state para persistencia global
+        state_to_save = {
+            'channels': subscription.get('channels', []),
+            'gains': subscription.get('gains', {}),
+            'pans': subscription.get('pans', {}),
+            'mutes': subscription.get('mutes', {}),
+            'solos': list(subscription.get('solos', set())),
+            'master_gain': subscription.get('master_gain', 1.0),
+            'timestamp': int(time.time() * 1000)
+        }
         
-        # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry
-        # Las configuraciones solo persisten en memoria durante la sesión actual
+        # Guardar en device_registry
+        if hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            channel_manager.device_registry.update_channels_state(client_id, state_to_save)
+            logger.debug(f"[WebSocket] 💾 Estado de canales guardado para {client_id[:12]}")
+        
+        # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry (deshabilitado)
         if False:  # DISABLED FOR SESSION-ONLY CONFIG
-            # Preparar configuración para guardar
-            config_to_save = {
-                'channels': subscription.get('channels', []),
-                'gains': subscription.get('gains', {}),
-                'pans': subscription.get('pans', {}),
-                'mutes': subscription.get('mutes', {}),
-                'solos': list(subscription.get('solos', set())),
-                'pre_listen': subscription.get('pre_listen'),
-                'master_gain': subscription.get('master_gain', 1.0),
-                'timestamp': int(time.time() * 1000)
-            }
+            pass
             
-            channel_manager.device_registry.update_configuration(
-                device_uuid,
-                config_to_save
-            )
     except Exception as e:
-        logger.debug(f"[WebSocket] Error guardando config en device_registry: {e}")
+        logger.debug(f"[WebSocket] Error guardando estado de canales: {e}")
 
 
 def get_all_clients_info():
     """
-    ✅ Obtener información de TODOS los clientes (nativos + web + maestro)
-    ✅ FILTRO: Solo mostrar clientes reales (type='web' o 'native'/'android' o 'master')
+    ✅ Obtener información de clientes para mostrar en web
+    ✅ FILTRO ESTRICTO: Solo mostrar:
+       1. Cliente maestro (servidor - monitor sonidista)
+       2. Clientes Android nativos ACTIVOS
+    ✅ NO mostrar: Web, dispositivos inactivos, fantasmas, etc.
     """
-    # --- NUEVO: Mostrar todos los dispositivos conocidos (persistentes y activos) ---
-    all_devices = []
-    device_registry = getattr(channel_manager, 'device_registry', None)
-    if device_registry:
-        try:
-            all_devices = device_registry.get_all_devices(active_only=False)
-            # ✅ FILTRO: Solo clientes reales (web o native/android)
-            all_devices = [d for d in all_devices if d.get('type') in ('web', 'native', 'android')]
-        except Exception as e:
-            logger.error(f"[WebSocket] Error obteniendo dispositivos de device_registry: {e}")
-
     # Obtener clientes activos en memoria (incluye el maestro)
-    active_clients = {}
+    result_clients = []
+    
     if channel_manager:
         try:
-            for c in channel_manager.get_all_clients_info():
-                # ✅ MEJORADO: Incluir clientes reales Y el cliente maestro
+            all_info = channel_manager.get_all_clients_info()
+            
+            for c in all_info:
                 client_type = c.get('type', 'unknown')
                 is_master = c.get('is_master', False)
-                
-                if client_type not in ('web', 'native', 'android', 'master') and not is_master:
+                # Mostrar cliente maestro
+                if is_master:
+                    result_clients.append(c)
                     continue
-                    
-                # Indexar por device_uuid si existe, sino por id
-                key = c.get('device_uuid') or c.get('id')
-                active_clients[key] = c
+                # Mostrar todos los clientes android y native (sin importar estado conectado)
+                if client_type in ('native', 'android'):
+                    result_clients.append(c)
+                    continue
+                # No mostrar otros tipos
+                
         except Exception as e:
             logger.error(f"[WebSocket] Error obteniendo clientes activos: {e}")
 
-    # Unir info persistente y activa
-    merged_clients = []
-    seen_uuids = set()
-    for device in all_devices:
-        device_uuid = device.get('uuid')
-        config_data = device.get('configuration', {})
-        client_info = {
-            'id': device_uuid,
-            'type': device.get('type', 'unknown'),
-            'device_uuid': device_uuid,
-            'device_model': device.get('device_info', {}).get('model') or device.get('device_info', {}).get('device_model'),
-            'custom_name': device.get('custom_name'),
-            'device_name': device.get('name'),
-            'channels': config_data.get('channels', []),
-            'gains': config_data.get('gains', {}),
-            'pans': config_data.get('pans', {}),
-            'solos': config_data.get('solos', []),
-            'active_channels': len(config_data.get('channels', [])),
-            'has_solo': bool(config_data.get('solos')),
-            'pre_listen': config_data.get('pre_listen'),
-            'master_gain': config_data.get('master_gain', 1.0),
-            'last_update': device.get('last_seen', 0),
-            'connected': False,
-            'address': device.get('primary_ip'),
-            'connected_at': device.get('first_seen'),
-            'last_activity': device.get('last_seen'),
-        }
-        # Si está activo, sobreescribir info
-        active = active_clients.get(device_uuid)
-        if active:
-            client_info.update(active)
-            client_info['connected'] = True
-        merged_clients.append(client_info)
-        seen_uuids.add(device_uuid)
-
-    # Agregar clientes activos que no tengan device_uuid (ej: legacy o sin registro)
-    for key, active in active_clients.items():
-        if key and key not in seen_uuids:
-            # ✅ MEJORADO: Incluir clientes reales Y el cliente maestro
-            client_type = active.get('type', 'unknown')
-            is_master = active.get('is_master', False)
-            
-            if client_type in ('web', 'native', 'android', 'master') or is_master:
-                merged_clients.append(active)
-
-    # Enriquecer con info de web_clients (address, last_activity)
-    with web_clients_lock:
-        for client_info in merged_clients:
-            client_id = client_info.get('id')
-            if client_id in web_clients:
-                web_info = web_clients[client_id]
-                client_info['address'] = web_info.get('address')
-                client_info['connected_at'] = web_info.get('connected_at')
-                client_info['last_activity'] = web_info.get('last_activity')
-
-    # ✅ NUEVO: Orden global (si existe) compartido entre navegadores
-    # ✅ IMPORTANTE: El cliente maestro SIEMPRE va primero, seguido de clientes activos
-    order = _get_client_order()
+    # ✅ Orden final: Maestro primero, luego Android nativos activos
+    # Separar maestro del resto
+    master_clients = [c for c in result_clients if c.get('is_master', False)]
+    other_clients = [c for c in result_clients if not c.get('is_master', False)]
     
-    # Separar cliente maestro del resto
-    master_clients = [c for c in merged_clients if c.get('is_master', False)]
-    other_clients = [c for c in merged_clients if not c.get('is_master', False)]
+    # Ordenar Android nativos por actividad reciente
+    other_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
     
-    # Separar clientes activos de inactivos
-    active_clients = [c for c in other_clients if c.get('connected', False)]
-    inactive_clients = [c for c in other_clients if not c.get('connected', False)]
-    
-    if order:
-        order_index = {str(v): i for i, v in enumerate(order)}
-
-        def _sort_key(c):
-            cid = c.get('device_uuid') or c.get('id')
-            idx = order_index.get(str(cid), 10**9)
-            # Ordenar por: orden global, luego por actividad reciente
-            return (idx, -(c.get('last_activity') or 0))
-
-        active_clients.sort(key=_sort_key)
-        inactive_clients.sort(key=_sort_key)
-    else:
-        # Orden por defecto: más reciente primero
-        active_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
-        inactive_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
-    
-    # ✅ Orden final: Maestro → Activos → Inactivos
-    return master_clients + active_clients + inactive_clients
+    return master_clients + other_clients
 
 
 def get_server_stats():

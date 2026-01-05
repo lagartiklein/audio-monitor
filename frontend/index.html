@@ -44,25 +44,32 @@
         }
 
         :root {
-            --bg-primary: #0d1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #21262d;
-            --border-color: #30363d;
-            --accent: #58a6ff;
-            --accent-dark: #1f6feb;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --green: #3fb950;
-            --yellow: #d29922;
-            --red: #f85149;
-            --purple: #bc8cff;
+              --bg-primary: #000000;
+              --bg-secondary: #111111;
+              --bg-tertiary: #181818;
+              --border-color: #232323;
+              --accent: #4f93ff;
+              --accent-light: #7bb3ff;
+              --accent-dark: #1f5cdb;
+              --text-primary: #f0f4f8;
+              --text-secondary: #a0aec0;
+              --green: #39ff14;
+              --green-dark: #2f855a;
+              --yellow: #ecc94b;
+              --red: #f56565;
+              --red-dark: #c53030;
+              --purple: #b794f6;
+              --gradient-accent: linear-gradient(135deg, #232323, #181818);
+              --gradient-dark: linear-gradient(135deg, #181818, #111111);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
@@ -74,14 +81,15 @@
 
         /* Header */
         header {
-            background: var(--bg-secondary);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(0,0,0,0.95) 100%);
             border-bottom: 1px solid var(--border-color);
-            padding: 16px 24px;
+            padding: clamp(12px, 3vw, 20px) clamp(16px, 4vw, 32px);
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
             position: relative;
+            backdrop-filter: blur(10px);
         }
 
         header::after {
@@ -91,36 +99,42 @@
             right: 0;
             bottom: -1px;
             height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(88, 166, 255, 0.35), transparent);
+            background: linear-gradient(90deg, transparent, rgba(79, 147, 255, 0.4), transparent);
             pointer-events: none;
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: clamp(8px, 2vw, 16px);
         }
 
         .logo h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            font-weight: 700;
             color: var(--text-primary);
+            letter-spacing: -0.5px;
+            background: none;
+            color: #ffe066;
+            text-shadow: 0 2px 8px #bfa60099, 0 1px 0 #fffbe6;
         }
 
         .status-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            background: rgba(63, 185, 80, 0.15);
+            padding: clamp(4px, 1vw, 8px) clamp(10px, 2vw, 14px);
+            border-radius: 20px;
+            font-size: clamp(0.65rem, 1vw, 0.8rem);
+            font-weight: 600;
+            background: rgba(72, 187, 120, 0.12);
             color: var(--green);
-            border: 1px solid rgba(63, 185, 80, 0.3);
+            border: 1px solid rgba(72, 187, 120, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .status-badge.disconnected {
-            background: rgba(248, 81, 73, 0.15);
+            background: rgba(245, 101, 101, 0.12);
             color: var(--red);
-            border-color: rgba(248, 81, 73, 0.3);
+            border-color: rgba(245, 101, 101, 0.4);
         }
 
         /* Main Layout */
@@ -128,11 +142,12 @@
             display: flex;
             flex: 1;
             overflow: hidden;
+            gap: 1px;
         }
 
         /* Sidebar */
         .sidebar {
-            width: 280px;
+            width: clamp(200px, 20vw, 320px);
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
             display: flex;
@@ -141,47 +156,51 @@
         }
 
         .sidebar-header {
-            padding: 16px;
+            padding: clamp(10px, 2vw, 16px);
             border-bottom: 1px solid var(--border-color);
         }
 
         .sidebar-header h2 {
-            font-size: 0.875rem;
-            font-weight: 600;
+            font-size: clamp(0.75rem, 1.2vw, 0.95rem);
+            font-weight: 700;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
         }
 
         .client-list {
             flex: 1;
             overflow-y: auto;
-            padding: 8px;
+            padding: clamp(8px, 1.5vw, 12px);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(4px, 0.8vw, 8px);
         }
 
         .client-item {
-            background: var(--bg-tertiary);
+            background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(24,24,24,0.7));
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 8px;
+            border-radius: 12px;
+            padding: clamp(10px, 2vw, 14px);
             cursor: pointer;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             position: relative;
             user-select: none;
             cursor: grab;
+            backdrop-filter: blur(5px);
         }
 
         .client-item:hover {
-            border-color: var(--accent);
-            box-shadow: 0 0 8px rgba(88, 166, 255, 0.2);
-            transform: translateY(-1px);
+            border-color: var(--accent-light);
+            box-shadow: 0 8px 24px rgba(79, 147, 255, 0.25), 0 0 1px rgba(79, 147, 255, 0.1);
+            transform: translateY(-2px);
         }
 
         .client-item.dragging {
-            opacity: 0.5;
+            opacity: 0.7;
             cursor: grabbing;
-            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.4);
+            box-shadow: 0 12px 32px rgba(79, 147, 255, 0.4);
+            transform: scale(1.01);
         }
 
         .client-item.drag-over-top {
@@ -199,13 +218,10 @@
             pointer-events: none;
         }
 
-        .client-item:hover {
-            border-color: var(--accent);
-        }
-
         .client-item.selected {
-            border-color: var(--accent);
-            background: rgba(88, 166, 255, 0.1);
+            border-color: var(--accent-light);
+            background: linear-gradient(135deg, rgba(79, 147, 255, 0.2), rgba(79, 147, 255, 0.1));
+            box-shadow: 0 0 12px rgba(79, 147, 255, 0.2);
         }
 
         .client-item.disconnected {
@@ -236,7 +252,7 @@
 
         /* ✅ NUEVO: Estilo para cliente maestro */
         .client-item.master {
-            background: linear-gradient(135deg, rgba(188, 140, 255, 0.15), rgba(88, 166, 255, 0.1));
+            background: linear-gradient(135deg, rgba(183, 148, 246, 0.10), rgba(24,24,24,0.15));
             border: 2px solid var(--purple);
         }
 
@@ -247,81 +263,95 @@
             top: 8px;
             bottom: 8px;
             width: 4px;
-            background: linear-gradient(180deg, var(--purple), var(--accent));
+            background: linear-gradient(180deg, #b794f6, #4f93ff);
             border-radius: 0 2px 2px 0;
         }
 
         .client-item.master:hover {
             border-color: var(--purple);
-            box-shadow: 0 0 12px rgba(188, 140, 255, 0.4);
+            box-shadow: 0 8px 24px rgba(183, 148, 246, 0.3);
         }
 
         .client-item.master.selected {
             border-color: var(--purple);
-            background: rgba(188, 140, 255, 0.2);
+            background: linear-gradient(135deg, rgba(183, 148, 246, 0.25), rgba(79, 147, 255, 0.15));
         }
 
         /* Audio player para cliente maestro */
         .master-audio-controls {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-top: 8px;
-            padding-top: 8px;
+            gap: clamp(6px, 1vw, 10px);
+            margin-top: clamp(6px, 1.2vw, 10px);
+            padding-top: clamp(6px, 1.2vw, 10px);
             border-top: 1px solid var(--border-color);
+            flex-wrap: wrap;
         }
 
         .master-audio-btn {
-            padding: 6px 12px;
-            background: var(--purple);
+            padding: clamp(6px, 1.2vw, 10px) clamp(10px, 1.8vw, 14px);
+            background: linear-gradient(135deg, var(--purple), #9e6fdf);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 600;
+            font-size: clamp(0.7rem, 1vw, 0.8rem);
+            font-weight: 700;
             display: flex;
             align-items: center;
-            gap: 4px;
-            transition: all 0.15s ease;
+            gap: clamp(3px, 0.6vw, 6px);
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            flex: 1;
+            min-width: 100px;
+            justify-content: center;
         }
 
         .master-audio-btn:hover {
-            background: #9e6fdf;
-            transform: scale(1.02);
+            background: linear-gradient(135deg, #9e6fdf, #8b7acc);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(183, 148, 246, 0.3);
         }
 
         .master-audio-btn.playing {
-            background: var(--green);
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            border-color: var(--green);
         }
 
         .master-audio-btn.playing:hover {
-            background: #2ea043;
+            background: linear-gradient(135deg, var(--green-dark), #1e7e34);
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
         }
 
         .master-audio-status {
-            font-size: 0.7rem;
+            font-size: clamp(0.65rem, 0.9vw, 0.75rem);
             color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .master-audio-status.active {
             color: var(--green);
+            font-weight: 700;
         }
 
         .client-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 6px;
+            margin-bottom: clamp(4px, 0.8vw, 8px);
+            gap: clamp(4px, 0.8vw, 8px);
         }
 
         .client-name {
-            font-weight: 600;
-            font-size: 0.9rem;
+            font-weight: 700;
+            font-size: clamp(0.8rem, 1.2vw, 0.95rem);
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: clamp(4px, 0.8vw, 8px);
+            flex: 1;
+            min-width: 0;
         }
 
         .client-name-text {
@@ -337,9 +367,9 @@
             color: var(--text-secondary);
             cursor: pointer;
             padding: 2px;
-            font-size: 0.8rem;
+            font-size: clamp(0.7rem, 0.9vw, 0.8rem);
             opacity: 0;
-            transition: opacity 0.15s;
+            transition: opacity 0.15s, color 0.15s;
         }
 
         .client-item:hover .edit-name-btn {
@@ -351,38 +381,16 @@
         }
 
         .client-info {
-            font-size: 0.75rem;
+            font-size: clamp(0.7rem, 0.95vw, 0.8rem);
             color: var(--text-secondary);
-        }
-
-        .client-badges {
-            display: flex;
-            gap: 4px;
-            margin-top: 6px;
-        }
-
-        .badge {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge.solo {
-            background: rgba(210, 153, 34, 0.2);
-            color: var(--yellow);
-        }
-
-        .badge.pfl {
-            background: rgba(188, 140, 255, 0.2);
-            color: var(--purple);
+            font-weight: 500;
         }
 
         .no-clients {
             text-align: center;
-            padding: 40px 20px;
+            padding: clamp(30px, 6vw, 50px) clamp(20px, 3vw, 30px);
             color: var(--text-secondary);
+            font-size: clamp(0.8rem, 1.2vw, 1rem);
         }
 
         /* Mixer Area */
@@ -394,109 +402,123 @@
         }
 
         .mixer-header {
-            padding: 16px 24px;
+            padding: clamp(12px, 2vw, 20px) clamp(16px, 3vw, 32px);
             border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
-            background: var(--bg-secondary);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(0,0,0,0.95) 100%);
+            backdrop-filter: blur(5px);
         }
 
         .mixer-title {
-            font-size: 1rem;
-            font-weight: 600;
+            font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+            font-weight: 700;
+            letter-spacing: -0.3px;
         }
 
         .mixer-controls {
             display: flex;
-            gap: 8px;
+            gap: clamp(6px, 1vw, 12px);
+            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 6px 12px;
-            background: var(--bg-tertiary);
+            padding: clamp(6px, 1.5vw, 10px) clamp(10px, 2vw, 16px);
+            background: linear-gradient(135deg, var(--bg-tertiary), rgba(26, 31, 58, 0.7));
             color: var(--text-primary);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: all 0.15s ease;
+            font-size: clamp(0.7rem, 1vw, 0.85rem);
+            font-weight: 600;
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            white-space: nowrap;
         }
 
         .btn:focus-visible {
-            outline: 2px solid rgba(88, 166, 255, 0.6);
+            outline: 2px solid rgba(79, 147, 255, 0.6);
             outline-offset: 2px;
         }
 
         .btn:hover {
-            background: var(--accent-dark);
-            border-color: var(--accent);
+            background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+            border-color: var(--accent-light);
             color: white;
+            box-shadow: 0 4px 12px rgba(79, 147, 255, 0.25);
+            transform: translateY(-1px);
         }
 
         .btn.active {
-            background: var(--accent);
-            border-color: var(--accent);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            border-color: var(--accent-light);
             color: white;
+            box-shadow: 0 4px 12px rgba(79, 147, 255, 0.3);
         }
 
         /* Channel Grid */
         .channel-grid-wrapper {
             flex: 1;
             overflow: auto;
-            padding: 16px;
+            padding: clamp(12px, 2vw, 20px);
         }
 
         .channel-grid {
-            display: flex;
-            gap: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100px, 100%), 1fr));
+            gap: clamp(10px, 1.5vw, 16px);
             min-height: 100%;
+            align-content: start;
+        }
+
+        @media (max-width: 480px) {
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            }
         }
 
         /* Channel Strip */
         .channel-strip {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 12px;
-            min-width: 90px;
-            width: 90px;
+            background: #181818;
+            border: 2px solid #444;
+            border-radius: 12px;
+            padding: clamp(10px, 1.5vw, 14px);
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
-            transition: all 0.15s ease;
+            gap: clamp(8px, 1.2vw, 12px);
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            backdrop-filter: blur(5px);
         }
 
         .channel-strip:hover {
-            transform: translateY(-1px);
-        }
-
-        .channel-strip:hover {
-            border-color: var(--accent);
+            transform: translateY(-2px);
+            border-color: #39ff14 !important;
+            box-shadow: 0 8px 20px rgba(79, 147, 255, 0.2);
         }
 
         .channel-strip.active {
-            border-color: var(--green);
-            box-shadow: 0 0 0 1px var(--green);
-        }
-
-        .channel-strip.pfl-active {
-            border-color: var(--purple);
-            box-shadow: 0 0 0 1px var(--purple);
-        }
-
-        .channel-strip.solo-active {
-            border-color: var(--yellow);
-            box-shadow: 0 0 0 1px var(--yellow);
+            border-color: #39ff14 !important;
+            box-shadow: 0 0 12px rgba(72, 187, 120, 0.4);
         }
 
         /* Channel recognition states */
         .channel-strip.recognized {
-            border: 2px solid var(--green) !important;
-            box-shadow: 0 0 12px rgba(63, 185, 80, 0.6) !important;
+            border: 2px solid #39ff14 !important;
+            box-shadow: 0 0 12px rgba(72, 187, 120, 0.6) !important;
             opacity: 1 !important;
         }
 
@@ -507,23 +529,24 @@
 
         .channel-strip.active.recognized {
             border: 2px solid var(--green) !important;
-            box-shadow: 0 0 12px rgba(63, 185, 80, 0.6) !important;
+            box-shadow: 0 0 12px rgba(72, 187, 120, 0.6) !important;
         }
 
         .channel-number {
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: clamp(0.75rem, 1.1vw, 0.9rem);
             color: var(--text-secondary);
-            background: var(--bg-tertiary);
-            padding: 4px 10px;
-            border-radius: 4px;
+            background: linear-gradient(135deg, rgba(79, 147, 255, 0.1), rgba(79, 147, 255, 0.05));
+            padding: clamp(4px, 0.8vw, 6px) clamp(8px, 1.2vw, 10px);
+            border-radius: 6px;
             width: 100%;
             text-align: center;
+            border: 1px solid var(--border-color);
         }
 
         .channel-strip.active .channel-number {
             color: var(--green);
-            background: rgba(63, 185, 80, 0.1);
+            background: rgba(72, 187, 120, 0.1);
         }
 
         .channel-strip.recognized .channel-number {
@@ -535,18 +558,18 @@
         .channel-buttons {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: clamp(3px, 0.6vw, 6px);
             width: 100%;
         }
 
         .channel-btn {
-            padding: 6px 4px;
-            background: var(--bg-tertiary);
+            padding: clamp(5px, 1vw, 7px) clamp(3px, 0.8vw, 5px);
+            background: linear-gradient(135deg, var(--bg-tertiary), rgba(26, 31, 58, 0.7));
             color: var(--text-secondary);
             border: 1px solid var(--border-color);
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.7rem;
+            font-size: clamp(0.65rem, 0.9vw, 0.8rem);
             font-weight: 700;
             transition: all 0.15s ease;
             text-transform: uppercase;
@@ -558,81 +581,102 @@
         }
 
         .channel-btn.on-btn.active {
-            background: var(--green);
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
             border-color: var(--green);
             color: white;
+            box-shadow: 0 0 8px rgba(72, 187, 120, 0.3);
         }
 
-        .channel-btn.solo.active {
-            background: var(--yellow);
-            border-color: var(--yellow);
-            color: black;
-        }
 
-        .channel-btn.pfl.active {
-            background: var(--purple);
-            border-color: var(--purple);
-            color: white;
-        }
 
         /* Fader Section */
         .fader-section {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: clamp(4px, 0.8vw, 8px);
             width: 100%;
+            flex: 1;
+            justify-content: center;
+            min-height: 160px;
         }
 
         .fader-wrapper {
-            height: 200px;
+            flex: 1;
+            width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
+            min-height: 120px;
+            max-height: 280px;
         }
 
         .fader {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 120px;
-            height: 6px;
-            background: var(--bg-tertiary);
-            border-radius: 3px;
-            transform: rotate(-90deg);
+            -webkit-appearance: slider-vertical;
+            appearance: slider-vertical;
+            writing-mode: bt-lr;
+            width: clamp(20px, 5vw, 28px);
+            height: 100%;
+            min-height: 120px;
+            max-height: 280px;
+            background: linear-gradient(to top, rgba(79, 147, 255, 0.15), rgba(79, 147, 255, 0.05));
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
             cursor: pointer;
+            outline: none;
         }
 
         .fader::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 16px;
-            height: 24px;
-            background: var(--accent);
-            border-radius: 3px;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            height: clamp(18px, 2.5vw, 24px);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            border-radius: 4px;
+            cursor: grab;
+            box-shadow: 0 2px 8px rgba(79, 147, 255, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+            transition: all 0.1s ease;
+        }
+
+        .fader::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            box-shadow: 0 4px 12px rgba(79, 147, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.2);
         }
 
         .fader::-moz-range-thumb {
-            width: 16px;
-            height: 24px;
-            background: var(--accent);
-            border-radius: 3px;
-            cursor: pointer;
+            width: 100%;
+            height: clamp(18px, 2.5vw, 24px);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            border-radius: 4px;
+            cursor: grab;
             border: none;
+            box-shadow: 0 2px 8px rgba(79, 147, 255, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+        }
+
+        .fader::-moz-range-thumb:active {
+            cursor: grabbing;
         }
 
         .db-display {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--accent);
-            background: var(--bg-tertiary);
-            padding: 3px 8px;
-            border-radius: 4px;
+            font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+            font-weight: 700;
+            color: var(--accent-light);
+            background: linear-gradient(135deg, rgba(79, 147, 255, 0.1), rgba(123, 179, 255, 0.05));
+            padding: clamp(4px, 0.8vw, 6px) clamp(6px, 1vw, 10px);
+            border: 1px solid rgba(79, 147, 255, 0.3);
+            border-radius: 6px;
             width: 100%;
             text-align: center;
-            font-family: 'SF Mono', 'Consolas', monospace;
-            transition: color 0.15s ease, text-shadow 0.15s ease;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            transition: all 0.15s ease;
+            letter-spacing: 0.3px;
+        }
+
+        .fader-section:focus-within .db-display {
+            color: var(--accent);
+            background: linear-gradient(135deg, rgba(79, 147, 255, 0.15), rgba(123, 179, 255, 0.08));
+            border-color: rgba(79, 147, 255, 0.5);
+            box-shadow: 0 0 12px rgba(79, 147, 255, 0.2);
         }
 
         /* Pan Control */
@@ -640,7 +684,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: clamp(3px, 0.6vw, 6px);
             width: 100%;
         }
 
@@ -648,37 +692,47 @@
             -webkit-appearance: none;
             appearance: none;
             width: 100%;
-            height: 4px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
+            height: clamp(4px, 0.8vw, 6px);
+            background: linear-gradient(to right, rgba(79, 147, 255, 0.2), rgba(79, 147, 255, 0.05));
+            border: 1px solid rgba(79, 147, 255, 0.2);
+            border-radius: 3px;
             cursor: pointer;
+            outline: none;
         }
 
         .pan-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 12px;
-            height: 12px;
-            background: var(--text-secondary);
+            width: clamp(12px, 2vw, 16px);
+            height: clamp(12px, 2vw, 16px);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
             border-radius: 50%;
-            cursor: pointer;
+            cursor: grab;
+            box-shadow: 0 2px 6px rgba(79, 147, 255, 0.3);
+            transition: all 0.1s ease;
+        }
+
+        .pan-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            box-shadow: 0 4px 10px rgba(79, 147, 255, 0.4);
         }
 
         .pan-slider::-moz-range-thumb {
-            width: 12px;
-            height: 12px;
-            background: var(--text-secondary);
+            width: clamp(12px, 2vw, 16px);
+            height: clamp(12px, 2vw, 16px);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
             border-radius: 50%;
-            cursor: pointer;
+            cursor: grab;
             border: none;
+            box-shadow: 0 2px 6px rgba(79, 147, 255, 0.3);
         }
 
         .pan-value {
-            font-size: 0.65rem;
+            font-size: clamp(0.6rem, 0.85vw, 0.75rem);
             color: var(--text-secondary);
-            font-weight: 600;
+            font-weight: 700;
             transition: color 0.15s ease;
-        }
+            letter-spacing: 0.2px;
         }
 
         /* No client selected */
@@ -688,38 +742,196 @@
             align-items: center;
             justify-content: center;
             color: var(--text-secondary);
+            text-align: center;
+            padding: clamp(20px, 5vw, 40px);
+            font-size: clamp(0.85rem, 1.5vw, 1rem);
         }
 
         /* Input edit */
         .name-input {
-            background: var(--bg-primary);
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
             border: 1px solid var(--accent);
             color: var(--text-primary);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
+            padding: clamp(4px, 0.8vw, 8px) clamp(6px, 1vw, 10px);
+            border-radius: 6px;
+            font-size: clamp(0.75rem, 1vw, 0.95rem);
             width: 100%;
             outline: none;
+            transition: all 0.15s ease;
         }
 
         .name-input:focus {
-            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+            box-shadow: 0 0 0 3px rgba(79, 147, 255, 0.2);
+            border-color: var(--accent-light);
         }
 
-        /* Responsive */
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .mixer-controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
         @media (max-width: 768px) {
+            .container {
+                height: 100vh;
+            }
+            
             .sidebar {
                 width: 100%;
-                max-height: 200px;
+                max-height: 180px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                flex-direction: row;
             }
-
+            
+            .sidebar-header {
+                min-width: 100px;
+                border-right: 1px solid var(--border-color);
+                border-bottom: none;
+                display: flex;
+                align-items: center;
+            }
+            
+            .client-list {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: clamp(6px, 2vw, 10px);
+            }
+            
             .main-layout {
                 flex-direction: column;
             }
+            
+            .mixer-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: clamp(10px, 2vw, 14px);
+            }
+            
+            .mixer-controls {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+            
+            .btn {
+                flex: 1;
+                min-width: 100px;
+            }
+            
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+                gap: clamp(8px, 1vw, 12px);
+            }
+            
+            .fader-section {
+                min-height: 140px;
+            }
+            
+            .fader-wrapper {
+                min-height: 100px;
+                max-height: 220px;
+            }
 
+            .master-audio-controls {
+                margin-top: 6px;
+                padding-top: 6px;
+            }
+
+            .master-audio-btn {
+                padding: clamp(4px, 0.8vw, 8px) clamp(8px, 1.5vw, 12px);
+                font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .logo h1 {
+                font-size: 1rem;
+            }
+
+            .status-badge {
+                padding: 3px 8px;
+                font-size: 0.6rem;
+            }
+            
+            .sidebar-header h2 {
+                font-size: 0.7rem;
+            }
+            
+            .client-item {
+                padding: 8px;
+                flex: 0 1 calc(50% - 5px);
+            }
+
+            .client-name {
+                font-size: 0.8rem;
+            }
+
+            .client-info {
+                font-size: 0.65rem;
+            }
+            
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+                gap: 8px;
+            }
+            
+            .mixer-title {
+                font-size: 0.85rem;
+            }
+
+            .mixer-header {
+                padding: 8px 12px;
+            }
+            
             .channel-strip {
-                min-width: 80px;
-                width: 80px;
+                padding: 8px;
+                gap: 6px;
+            }
+
+            .channel-number {
+                font-size: 0.65rem;
+                padding: 3px 6px;
+            }
+
+            .channel-btn {
+                padding: 4px 3px;
+                font-size: 0.6rem;
+            }
+            
+            .db-display {
+                font-size: 0.6rem;
+                padding: 3px 5px;
+            }
+
+            .pan-value {
+                font-size: 0.6rem;
+            }
+
+            .no-clients {
+                padding: 30px 15px;
+                font-size: 0.8rem;
+            }
+
+            .master-audio-btn {
+                padding: 4px 6px;
+                font-size: 0.6rem;
+                gap: 2px;
+            }
+
+            .master-audio-status {
+                font-size: 0.6rem;
             }
         }
 
@@ -747,7 +959,7 @@
     <div class="container">
         <header>
             <div class="logo">
-                <h1>FICHATECH SERVER</h1>
+                <h1>FICHATECH RETRO</h1>
             </div>
             <span class="status-badge" id="connection-status">Conectando...</span>
         </header>
@@ -770,8 +982,6 @@
                     <div class="mixer-controls">
                         <button class="btn" id="btn-select-all">Todos ON</button>
                         <button class="btn" id="btn-select-none">Todos OFF</button>
-                        <button class="btn" id="btn-clear-solo">Clear Solo</button>
-                        <button class="btn" id="btn-clear-pfl">Clear PFL</button>
                     </div>
                 </div>
                 
@@ -792,8 +1002,6 @@
                 this.selectedClientId = null;
                 this.deviceInfo = null;
                 this.webDeviceUuid = this.getOrCreateWebDeviceUuid();
-                this.pflChannel = {}; // Track PFL per client
-                this.soloChannels = {}; // Track SOLO per client
                 this.clientOrder = []; // Track order for drag/drop
                 this.draggedElement = null;
                 this.draggedClientId = null;
@@ -903,21 +1111,61 @@
                     }
                 }
                 
-                // Ordenar clientes regulares según clientOrder
-                const ordered = [];
+                // ✅ NUEVO: Separar clientes con cambios de los sin cambios
+                const clientsWithChanges = [];
+                const clientsWithoutChanges = [];
+                
+                for (const c of regularClients) {
+                    if (this.clientHasRealChanges(c)) {
+                        clientsWithChanges.push(c);
+                    } else {
+                        clientsWithoutChanges.push(c);
+                    }
+                }
+                
+                // Ordenar clientes con cambios por último acceso (más recientes primero)
+                clientsWithChanges.sort((a, b) => (b.last_update || 0) - (a.last_update || 0));
+                
+                // Ordenar clientes sin cambios por orden guardado
+                const orderedWithoutChanges = [];
                 for (const id of this.clientOrder) {
                     const c = byId.get(id);
-                    if (c && !c.is_master && c.type !== 'master') ordered.push(c);
+                    if (c && !c.is_master && c.type !== 'master' && clientsWithoutChanges.includes(c)) {
+                        orderedWithoutChanges.push(c);
+                    }
                 }
                 
-                // Any leftover (should be none after sync) appended
-                for (const c of regularClients) {
-                    const id = this.getClientId(c);
-                    if (id && !this.clientOrder.includes(id)) ordered.push(c);
+                // Agregar clientes nuevos sin cambios al final
+                for (const c of clientsWithoutChanges) {
+                    if (!orderedWithoutChanges.includes(c)) {
+                        orderedWithoutChanges.push(c);
+                    }
                 }
                 
-                // ✅ Maestro siempre primero
-                return [...masterClients, ...ordered];
+                // ✅ Orden final: Maestro > Con cambios (por actividad) > Sin cambios (por orden guardado)
+                return [...masterClients, ...clientsWithChanges, ...orderedWithoutChanges];
+            }
+
+            // ✅ NUEVO: Verificar si un cliente tiene cambios reales
+            clientHasRealChanges(client) {
+                if (!client) return false;
+                
+                // ¿Tiene canales configurados?
+                if (!client.channels || client.channels.length === 0) return false;
+                
+                // ¿Tiene ganancias customizadas (no todas en 1.0)?
+                const gains = client.gains || {};
+                if (Object.values(gains).some(g => Math.abs(g - 1.0) > 0.01)) return true;
+                
+                // ¿Tiene pans customizados (no todos en 0.0)?
+                const pans = client.pans || {};
+                if (Object.values(pans).some(p => Math.abs(p - 0.0) > 0.01)) return true;
+                
+                // ¿Tiene mutes activados?
+                const mutes = client.mutes || {};
+                if (Object.values(mutes).some(m => m)) return true;
+                
+                return false;
             }
 
             createClientItem(client) {
@@ -967,7 +1215,6 @@
                         </div>
                         <div class="client-badges">
                             ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
-                            ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
                         </div>
                         ${masterAudioHTML}
                     `;
@@ -1247,6 +1494,19 @@
                     // console.log('[Pan Updated - Fast]', data);
                 });
 
+                // ✅ NUEVO: Listeners para toggle_mute (respuesta ultra-rápida)
+                this.socket.on('mute_toggled', (data) => {
+                    if (data.status === 'error') {
+                        console.error('[Mute Error]', data);
+                        // Reload mixer para sincronizar estado real
+                        if (this.selectedClientId) {
+                            this.renderMixer(this.selectedClientId);
+                        }
+                    } else {
+                        // console.log('[Mute Toggled]', data);
+                    }
+                });
+
                 // ✅ SINCRONIZACIÓN BIDIRECCIONAL: Recibir cambios de otros clientes (web/Android)
                 this.socket.on('param_sync', (data) => {
                     console.log('[Param Sync]', data);
@@ -1270,17 +1530,6 @@
                             this.clients[client_id].channels = channels;
                             this.clients[client_id].active_channels = channels.length;
                             needsListUpdate = true;  // ✅ Los canales activos cambiaron
-                        } else if (type === 'solo') {
-                            const solos = this.clients[client_id].solos || [];
-                            const idx = solos.indexOf(channel);
-                            if (value && idx < 0) solos.push(channel);
-                            if (!value && idx >= 0) solos.splice(idx, 1);
-                            this.clients[client_id].solos = solos;
-                            this.clients[client_id].has_solo = solos.length > 0;
-                            needsListUpdate = true;  // ✅ Estado SOLO cambió
-                        } else if (type === 'pfl') {
-                            this.clients[client_id].pre_listen = value;
-                            needsListUpdate = true;  // ✅ Estado PFL cambió
                         }
                         
                         // ✅ Re-renderizar inmediatamente si el cliente afectado está seleccionado
@@ -1321,8 +1570,6 @@
                 const gains = client.gains || {};
                 const pans = client.pans || {};
                 const mutes = client.mutes || {};
-                const solos = Array.isArray(client.solos) ? [...client.solos].sort((a, b) => a - b) : [];
-                const pre = client.pre_listen ?? null;
 
                 const keys = (obj) => Object.keys(obj).sort();
                 const pickSorted = (obj) => {
@@ -1336,8 +1583,6 @@
                     gains: pickSorted(gains),
                     pans: pickSorted(pans),
                     mutes: pickSorted(mutes),
-                    solos,
-                    pre,
                 });
             }
 
@@ -1348,14 +1593,6 @@
 
                 document.getElementById('btn-select-none').addEventListener('click', () => {
                     this.selectNoChannels();
-                });
-
-                document.getElementById('btn-clear-solo').addEventListener('click', () => {
-                    this.clearSolos();
-                });
-
-                document.getElementById('btn-clear-pfl').addEventListener('click', () => {
-                    this.clearPFL();
                 });
             }
 
@@ -1368,11 +1605,12 @@
                     return;
                 }
 
-                // ✅ MEJORADO: Mostrar clientes reales (web, native, android) Y el maestro
+                // ✅ Mostrar maestro y todos los clientes android/native (sin importar estado conectado)
                 const realClients = clientsData.filter(c => {
-                    const type = c.type || 'web';
+                    const type = c.type || 'unknown';
                     const isMaster = c.is_master || type === 'master';
-                    return isMaster || type === 'web' || type === 'native' || type === 'android';
+                    // Mostrar: maestro O (android/native)
+                    return isMaster || type === 'native' || type === 'android';
                 });
 
                 if (realClients.length === 0) {
@@ -1450,10 +1688,7 @@
                 }
 
                 if (badgesEl) {
-                    badgesEl.innerHTML = `
-                        ${client.has_solo ? '<span class="badge solo">SOLO</span>' : ''}
-                        ${client.pre_listen !== null && client.pre_listen !== undefined ? '<span class="badge pfl">PFL</span>' : ''}
-                    `;
+                    badgesEl.innerHTML = '';
                 }
 
                 // Update connection state
@@ -1465,11 +1700,14 @@
             }
 
             renderClientsList(clientsData, container) {
-                // ✅ MEJORADO: Mostrar clientes reales (web, native, android) Y el maestro
+                // ✅ FILTRO ESTRICTO: Solo mostrar maestro + Android nativos activos
                 const realClients = clientsData.filter(c => {
-                    const type = c.type || 'web';
+                    const type = c.type || 'unknown';
                     const isMaster = c.is_master || type === 'master';
-                    return isMaster || type === 'web' || type === 'native' || type === 'android';
+                    const isConnected = c.connected !== false;
+                    
+                    // Mostrar: maestro O (android/native Y conectado)
+                    return isMaster || ((type === 'native' || type === 'android') && isConnected);
                 });
                 
                 const ordered = this.orderClients(realClients);
@@ -1595,16 +1833,16 @@
                 const gains = client.gains || {};
                 const pans = client.pans || {};
                 const activeChannels = client.channels || [];
-                const pflChannel = client.pre_listen;
-                const soloChannels = client.solos || [];
+
+                const FADER_MIN_DB = -24;
+                const FADER_MAX_DB = 12;
 
                 for (let i = 0; i < numChannels; i++) {
                     const isActive = activeChannels.includes(i);
-                    const isPfl = pflChannel === i;
-                    const isSolo = soloChannels.includes(i);
                     
                     const gainLinear = gains[i] !== undefined ? gains[i] : 1.0;
-                    const gainDB = this.linearToDb(gainLinear);
+                    const gainDBRaw = this.linearToDb(gainLinear);
+                    const gainDB = Math.max(FADER_MIN_DB, Math.min(FADER_MAX_DB, gainDBRaw));
                     const panValue = pans[i] !== undefined ? pans[i] : 0;
 
                     const strip = document.createElement('div');
@@ -1615,22 +1853,18 @@
                     } else {
                         strip.classList.add('unrecognized');
                     }
-                    if (isPfl) strip.classList.add('pfl-active');
-                    if (isSolo) strip.classList.add('solo-active');
 
                     strip.innerHTML = `
                         <div class="channel-number">CH ${i + 1}</div>
                         
                         <div class="channel-buttons">
                             <button class="channel-btn on-btn ${isActive ? 'active' : ''}" data-channel="${i}">ON</button>
-                            <button class="channel-btn solo ${isSolo ? 'active' : ''}" data-channel="${i}">SOLO</button>
-                            <button class="channel-btn pfl ${isPfl ? 'active' : ''}" data-channel="${i}">PFL</button>
                         </div>
 
                         <div class="fader-section">
                             <div class="fader-wrapper">
                                 <input type="range" class="fader" data-channel="${i}" 
-                                       min="-60" max="12" value="${gainDB}" step="0.5">
+                                       min="${FADER_MIN_DB}" max="${FADER_MAX_DB}" value="${gainDB}" step="0.5">
                             </div>
                             <div class="db-display" data-channel="${i}">${this.formatDb(gainDB)}</div>
                         </div>
@@ -1646,16 +1880,9 @@
                     const onBtn = strip.querySelector('.on-btn');
                     onBtn.addEventListener('click', () => this.toggleChannel(clientId, i));
 
-                    // SOLO button
-                    const soloBtn = strip.querySelector('.solo');
-                    soloBtn.addEventListener('click', () => this.toggleSolo(clientId, i));
-
-                    // PFL button
-                    const pflBtn = strip.querySelector('.pfl');
-                    pflBtn.addEventListener('click', () => this.togglePFL(clientId, i));
-
                     // Fader
                     const fader = strip.querySelector('.fader');
+                    let faderDebounce;
                     fader.addEventListener('input', (e) => {
                         const db = parseFloat(e.target.value);
                         // Update display immediately for smooth feedback
@@ -1663,14 +1890,15 @@
                         if (dbDisplay) {
                             dbDisplay.textContent = this.formatDb(db);
                         }
-                    });
-                    fader.addEventListener('change', (e) => {
-                        const db = parseFloat(e.target.value);
-                        this.updateGain(clientId, i, db);
+                        clearTimeout(faderDebounce);
+                        faderDebounce = setTimeout(() => {
+                            this.updateGain(clientId, i, db);
+                        }, 40); // 25 actualizaciones por segundo máx
                     });
 
                     // Pan slider
                     const panSlider = strip.querySelector('.pan-slider');
+                    let panDebounce;
                     panSlider.addEventListener('input', (e) => {
                         const pan = parseInt(e.target.value) / 100;
                         // Update display immediately for smooth feedback
@@ -1678,10 +1906,10 @@
                         if (panValue) {
                             panValue.textContent = this.formatPan(pan);
                         }
-                    });
-                    panSlider.addEventListener('change', (e) => {
-                        const pan = parseInt(e.target.value) / 100;
-                        this.updatePan(clientId, i, pan);
+                        clearTimeout(panDebounce);
+                        panDebounce = setTimeout(() => {
+                            this.updatePan(clientId, i, pan);
+                        }, 40); // 25 actualizaciones por segundo máx
                     });
 
                     // Double click pan to reset
@@ -1713,54 +1941,10 @@
                 client.active_channels = channels.length;
                 this.renderMixer(clientId);
 
-                // Enviar al servidor (no-blocking)
+                // ✅ Enviar al servidor con event optimizado (no-blocking)
                 this.socket.emit('update_client_mix', {
                     target_client_id: clientId,
                     channels: channels
-                });
-            }
-
-            toggleSolo(clientId, channel) {
-                const client = this.clients[clientId];
-                if (!client) return;
-
-                const solos = [...(client.solos || [])];
-                const index = solos.indexOf(channel);
-
-                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
-                if (index >= 0) {
-                    solos.splice(index, 1);
-                } else {
-                    solos.push(channel);
-                }
-
-                // Actualizar estado local primero (respuesta inmediata)
-                client.solos = solos;
-                client.has_solo = solos.length > 0;
-                this.renderMixer(clientId);
-
-                // Enviar al servidor (no-blocking)
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    solos: solos
-                });
-            }
-
-            togglePFL(clientId, channel) {
-                const client = this.clients[clientId];
-                if (!client) return;
-
-                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
-                const newPfl = client.pre_listen === channel ? null : channel;
-
-                // Actualizar estado local primero (respuesta inmediata)
-                client.pre_listen = newPfl;
-                this.renderMixer(clientId);
-
-                // Enviar al servidor (no-blocking)
-                this.socket.emit('update_client_mix', {
-                    target_client_id: clientId,
-                    pre_listen: newPfl
                 });
             }
 
@@ -1834,39 +2018,6 @@
                 this.socket.emit('update_client_mix', {
                     target_client_id: this.selectedClientId,
                     channels: []
-                });
-            }
-
-            clearSolos() {
-                if (!this.selectedClientId) return;
-                
-                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
-                if (this.clients[this.selectedClientId]) {
-                    this.clients[this.selectedClientId].solos = [];
-                    this.clients[this.selectedClientId].has_solo = false;
-                }
-                this.renderMixer(this.selectedClientId);
-
-                // Enviar al servidor (no-blocking)
-                this.socket.emit('update_client_mix', {
-                    target_client_id: this.selectedClientId,
-                    solos: []
-                });
-            }
-
-            clearPFL() {
-                if (!this.selectedClientId) return;
-                
-                // ✅ OPTIMIZADO: Actualizar UI inmediatamente
-                if (this.clients[this.selectedClientId]) {
-                    this.clients[this.selectedClientId].pre_listen = null;
-                }
-                this.renderMixer(this.selectedClientId);
-
-                // Enviar al servidor (no-blocking)
-                this.socket.emit('update_client_mix', {
-                    target_client_id: this.selectedClientId,
-                    pre_listen: null
                 });
             }
 

@@ -1,4 +1,16 @@
+
 import sys, signal, threading, time, socket, os, webbrowser, uuid
+import logging
+# ✅ NUEVO: Configurar rutas antes de imports
+
+# Configurar logger global
+logger = logging.getLogger("audio_monitor")
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+if not logger.hasHandlers():
+    logger.addHandler(handler)
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -43,6 +55,8 @@ from audio_server.native_server import NativeAudioServer
 from audio_server.websocket_server import app, socketio, init_server
 
 from audio_server.device_registry import init_device_registry
+
+from audio_server.audio_mixer import init_audio_mixer
 
 import config
 
@@ -169,6 +183,18 @@ class AudioServerApp:
 
         
 
+        # ✅ Latencia medida dinámicamente
+
+        if self.audio_capture:
+
+            stats['latency_ms'] = self.audio_capture.get_average_latency()
+
+        else:
+
+            stats['latency_ms'] = 0.0
+
+        
+
         return stats
 
     
@@ -239,6 +265,17 @@ class AudioServerApp:
                     self.gui.queue_log_message(f"⚠️ Error mapeo de canales: {e}", 'WARNING')
 
             
+            # ✅ NUEVO: Inicializar AudioMixer para cliente maestro
+            audio_mixer = init_audio_mixer(
+                sample_rate=config.SAMPLE_RATE,
+                buffer_size=config.BLOCKSIZE
+            )
+            
+            # Conectar mixer con audio capture
+            self.audio_capture.set_audio_mixer(audio_mixer)
+            self.audio_capture.set_channel_manager(self.channel_manager)
+            
+            logger.info("[MAIN] ✅ AudioMixer conectado y configurado")
 
             # Inicializar servidor nativo
 
@@ -570,7 +607,7 @@ class AudioServerApp:
 
                     pass
             
-            def _send_master_audio(self, audio_data, channels, gains, pans, subscription):
+            def _send_master_audio(self, audio_data, channels, gains, pans):
                 """✅ NUEVO: Enviar audio mezclado para el cliente maestro vía WebSocket"""
                 try:
                     from audio_server import websocket_server
@@ -579,19 +616,11 @@ class AudioServerApp:
                     if not websocket_server.master_audio_listeners:
                         return
                     
-                    # Pre-escucha tiene prioridad
-                    pre_listen = subscription.get('pre_listen')
-                    solos = subscription.get('solos', set())
-                    mutes = subscription.get('mutes', {})
-                    master_gain = subscription.get('master_gain', 1.0)
+                    mutes = {}
+                    master_gain = 1.0
                     
-                    # Determinar canales activos
-                    if pre_listen is not None:
-                        active_channels = [pre_listen]
-                    elif solos:
-                        active_channels = [ch for ch in channels if ch in solos]
-                    else:
-                        active_channels = [ch for ch in channels if not mutes.get(ch, False)]
+                    # Determinar canales activos (no muteados)
+                    active_channels = [ch for ch in channels if not mutes.get(ch, False)]
                     
                     if not active_channels:
                         return

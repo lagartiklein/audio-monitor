@@ -8,9 +8,13 @@
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 
-# ✅ FASE 3: BLOCKSIZE optimizado para balance latencia/buffer
-# 128 samples @ 48kHz ≈ 2.67ms; bajar más reduce latencia pero aumenta jitter/CPU
+# ✅ FASE 4: BLOCKSIZE ultra-reducido para baja latencia
+# 512 samples @ 48kHz ≈ 10.67ms latencia; mejor balance entre latencia y CPU
 BLOCKSIZE = 128
+
+# ✅ COMPRESIÓN DE AUDIO: Solo zlib habilitado
+ENABLE_OPUS_COMPRESSION = False  # Opus deshabilitado, solo zlib
+OPUS_BITRATE = 32  # (Ignorado, solo para compatibilidad)
 
 # ✅ CANALES POR DEFECTO
 DEFAULT_NUM_CHANNELS = 2  # Solo fallback; se usa el conteo real del dispositivo
@@ -35,6 +39,14 @@ WEBSOCKET_QUICK_RESPONSE = True  # Respuesta inmediata sin broadcast completo
 # ============================================================================
 SEND_QUEUE_SIZE = 8          # Máximo 8 paquetes encolados por cliente
 SEND_THREAD_COUNT = 1        # 1 hilo de envío por cliente
+
+# ============================================================================
+# ✅ OPTIMIZACIÓN: ThreadPoolExecutor para envío paralelo de audio
+# ============================================================================
+# Número de hilos para enviar audio paralelo a múltiples clientes Android/nativos
+# Con 10 clientes y 16 canales c/u, usar 4-6 hilos evita saturar el hilo de captura
+# Por defecto: min(10, max(4, num_cpus))
+AUDIO_SEND_POOL_SIZE = 6  # Hilos de envío paralelo (ajusta según tu CPU)
 
 # ============================================================================
 # COLAS (MaaDO DIRECTO PARA RF)
@@ -152,7 +164,7 @@ USE_AUDIO_WORKLET = False
 # - Permite al sonidista monitorear sin interferir con Android
 MASTER_CLIENT_ENABLED = True
 MASTER_CLIENT_UUID = "__master_server_client__"
-MASTER_CLIENT_NAME = "🎧 Monitor Sonidista"
+MASTER_CLIENT_NAME = "Control"
 MASTER_CLIENT_DEFAULT_CHANNELS = []  # Empezar sin canales, el usuario selecciona
 WEB_AUDIO_BUFFER_SIZE = 2048  # Buffer para Web Audio (samples)
 WEB_AUDIO_STREAM_ENABLED = True  # Habilitar streaming de audio vía WebSocket

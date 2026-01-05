@@ -10,6 +10,8 @@ import os
 
 import sys
 
+import time  # ✅ Agregar para medición de latencia
+
 
 
 class AudioCapture:
@@ -35,10 +37,13 @@ class AudioCapture:
         self.rt_priority_set = False
 
         
-
         # ✅ Callbacks directos (sin colas)
-
         self.callbacks = []  # Lista de funciones callback
+        
+        # ✅ NUEVO: Mixer de audio para cliente maestro
+        self.audio_mixer = None
+        self.channel_manager = None
+        self.master_client_id = None
 
         
 
@@ -53,6 +58,16 @@ class AudioCapture:
         self.vu_peak_hold = {}  # {channel: peak_value}
 
         self.vu_peak_decay = 0.95  # Factor de decaimiento de picos
+
+        # ✅ Latencia: Medición dinámica
+
+        self.latency_measurements = []
+
+        self.last_callback_time = None
+
+        self.max_latency_samples = 100  # Mantener promedio de 100 mediciones
+
+        self.stream_latency = 0.0  # ✅ Latencia del motor de audio
 
         
 
@@ -130,29 +145,46 @@ class AudioCapture:
 
             elif sys.platform == 'win32':
 
-                import ctypes
-
-                
-
-                # HIGH_PRIORITY_CLASS
-
-                ctypes.windll.kernel32.SetPriorityClass(
-
-                    ctypes.windll.kernel32.GetCurrentProcess(),
-
-                    0x00000080
-
-                )
-
-                print("[RF] ✅ Prioridad ALTA establecida (Windows)")
-
+                self._set_windows_priority()
                 self.rt_priority_set = True
-
                 
 
         except Exception as e:
 
             print(f"[RF] ⚠️ RT priority no disponible: {e}")
+
+    
+    def _set_windows_priority(self):
+        """✅ NUEVO: Establecer prioridad alta en Windows para audio en tiempo real"""
+        try:
+            import ctypes
+            
+            # Constantes de Windows
+            PROCESS_SET_INFORMATION = 0x0200
+            HIGH_PRIORITY_CLASS = 0x00000080
+            REALTIME_PRIORITY_CLASS = 0x00000100
+            
+            pid = os.getpid()
+            
+            # Abrir el proceso
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_SET_INFORMATION, False, pid)
+            if not handle:
+                print("[RF] ⚠️ No se pudo obtener handle del proceso en Windows")
+                return
+            
+            try:
+                # Establecer prioridad HIGH (más seguro que REALTIME)
+                success = ctypes.windll.kernel32.SetPriorityClass(handle, HIGH_PRIORITY_CLASS)
+                
+                if success:
+                    print("[RF] ✅ Prioridad ALTA establecida (Windows - HIGH_PRIORITY_CLASS)")
+                else:
+                    print("[RF] ⚠️ No se pudo establecer prioridad en Windows")
+            finally:
+                ctypes.windll.kernel32.CloseHandle(handle)
+                
+        except Exception as e:
+            print(f"[RF] ⚠️ Error estableciendo prioridad Windows: {e}")
 
     
 
@@ -199,6 +231,17 @@ class AudioCapture:
             print(f"[RF] 📞 Callback registrado: '{name}'")
 
         
+    def set_audio_mixer(self, mixer):
+        """✅ NUEVO: Conectar AudioMixer"""
+        self.audio_mixer = mixer
+        print(f"[AudioCapture] 🎛️ AudioMixer conectado")
+    
+    def set_channel_manager(self, channel_manager):
+        """✅ NUEVO: Conectar ChannelManager"""
+        self.channel_manager = channel_manager
+        if hasattr(channel_manager, 'get_master_client_id'):
+            self.master_client_id = channel_manager.get_master_client_id()
+        print(f"[AudioCapture] 🎧 Cliente maestro: {self.master_client_id}")
 
     def unregister_callback(self, callback):
 
@@ -207,6 +250,16 @@ class AudioCapture:
         with self.callback_lock:
 
             self.callbacks = [(n, cb) for n, cb in self.callbacks if cb != callback]
+
+    def get_average_latency(self):
+
+        """Obtener latencia de procesamiento promedio en ms"""
+
+        if not self.latency_measurements:
+
+            return self.stream_latency  # Fallback a latencia del motor
+
+        return sum(self.latency_measurements) / len(self.latency_measurements)
 
     
 
@@ -446,9 +499,15 @@ class AudioCapture:
 
         self.stream.start()
 
+        # ✅ Capturar latencia del motor de audio
+
+        self.stream_latency = self.stream.latency * 1000  # Convertir a ms
+
         
 
         print(f"[RF] ✅ Captura RF DIRECTA iniciada: {channels} canal(es) (sin relleno artificial)")
+
+        print(f"   🎯 Latencia del motor: {self.stream_latency:.2f} ms")
 
         print(f"{'='*70}\n")
 
@@ -464,11 +523,33 @@ class AudioCapture:
 
         """✅ Callback optimizado - usa memoryview sin copias + VU meters"""
 
+        # ✅ Medir latencia de procesamiento completa
+
+        process_start = time.time()
+
+        
+
         if status:
 
             print(f"[RF] ⚠️ Status: {status}")
 
         
+        # ✅ Procesar audio para cliente maestro
+        if self.audio_mixer and self.channel_manager and self.master_client_id:
+            try:
+                if isinstance(indata, memoryview):
+                    audio_array = np.frombuffer(indata, dtype=np.float32).reshape(-1, self.actual_channels)
+                else:
+                    audio_array = indata
+                
+                self.audio_mixer.process_and_broadcast(
+                    audio_array,
+                    self.channel_manager,
+                    self.master_client_id
+                )
+            except Exception as e:
+                if config.DEBUG:
+                    print(f"[RF] ⚠️ Error maestro: {e}")
 
         # 🎚️ CALCULAR VU LEVELS (si está habilitado)
 
@@ -538,6 +619,22 @@ class AudioCapture:
 
                             print(f"[RF] ❌ Error en callback '{name}': {e}")
 
+        
+
+        # ✅ Calcular latencia total de procesamiento y envío
+
+        process_end = time.time()
+
+        total_latency = (process_end - process_start) * 1000  # ms
+
+        
+
+        self.latency_measurements.append(total_latency)
+
+        if len(self.latency_measurements) > self.max_latency_samples:
+
+            self.latency_measurements.pop(0)
+
     
 
     def stop_capture(self):
@@ -551,6 +648,8 @@ class AudioCapture:
             self.stream.stop()
 
             self.stream.close()
+
+            self.stream_latency = 0.0  # ✅ Reset latencia
 
             print(f"[RF] 🛑 Captura detenida")
 

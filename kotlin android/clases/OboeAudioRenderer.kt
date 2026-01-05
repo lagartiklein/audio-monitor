@@ -6,20 +6,18 @@ import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
 
+/**
+ * ✅ VERSIÓN CORREGIDA - Ultra Low Latency
+ *
+ * CORRECCIONES:
+ * 1. Context puede ser null (evita crash si se llama sin context)
+ * 2. Métodos nativos corregidos (firma consistente)
+ * 3. Validación de AudioManager antes de usar
+ */
 class OboeAudioRenderer(private val context: Context? = null) {
 
     companion object {
         private const val TAG = "OboeAudioRenderer"
-
-        // ✅ SINGLETON: Una sola instancia compartida por toda la app
-        @Volatile
-        private var instance: OboeAudioRenderer? = null
-
-        fun getInstance(context: Context? = null): OboeAudioRenderer {
-            return instance ?: synchronized(this) {
-                instance ?: OboeAudioRenderer(context).also { instance = it }
-            }
-        }
 
         // ✅ Variables mutables con valores por defecto seguros
         private var OPTIMAL_SAMPLE_RATE = 48000
@@ -31,7 +29,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
         // ✅ OPTIMIZACIÓN LATENCIA FASE 1: Buffer size reducido para baja latencia
         // 64 frames @ 48kHz = 1.33ms (vs 2.67ms con 128 frames)
         // Nota: Requiere WiFi estable, puede aumentar underruns en redes inestables
-        private var OPTIMAL_BUFFER_SIZE = 64  // ⬇️ REDUCIDO de 128 frames
+        private var OPTIMAL_BUFFER_SIZE = 64 // ⬇️ REDUCIDO de 128 frames
         private const val MIN_BUFFER_SIZE = 64
         private const val MAX_BUFFER_SIZE = 256
 
@@ -61,7 +59,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
     private external fun nativeSetBufferSize(streamHandle: Long, bufferSize: Int)
 
     private var engineHandle: Long = 0
-    private val streamHandles = ConcurrentHashMap<Int, StreamState>()  // Solo canales del usuario
+    private val streamHandles = ConcurrentHashMap<Int, StreamState>()
     private val channelStates = ConcurrentHashMap<Int, ChannelState>()
 
     private var masterGainDb = 0f
@@ -69,40 +67,30 @@ class OboeAudioRenderer(private val context: Context? = null) {
     private var totalPacketsReceived = 0
     private var totalPacketsDropped = 0
 
-    // ✅ FIX: Evitar race conditions entre render (nativeWriteAudio) y destroyStream/nativeStopStream
-    // Se usa un lock corto SOLO alrededor de llamadas nativas (no alrededor de la mezcla).
-    private val streamOpLock = Any()
-
-    // ✅ INTERNO: Stream maestro estéreo (mezcla de todos los canales mono)
-    // Completamente privado, el usuario NO tiene acceso a él
-    // Se gestiona internamente en renderMixedChannels()
-    private var masterStreamState: StreamState? = null
-    private val MASTER_STREAM_NATIVE_CHANNEL_ID = 0
-
     // ✅ Device capabilities con valores seguros
     // ✅ OPTIMIZACIÓN LATENCIA FASE 1: Buffer pool para reducir GC pauses
     // Reutiliza buffers en lugar de crear nuevos en cada frame
     // Ganancia: 0.2-0.5ms menos variabilidad
     private val bufferPool = ArrayDeque<FloatArray>()
-    private val MAX_POOLED_BUFFERS = 2  // Mínimo para no desperdiciar memoria
+    private val MAX_POOLED_BUFFERS = 2 // Mínimo para no desperdiciar memoria
 
     private var deviceSupportsMMAP = false
     private var deviceFramesPerBurst = 0
 
     data class StreamState(
-        val handle: Long,
-        var consecutiveFailures: Int = 0,
-        var lastWriteTime: Long = System.currentTimeMillis(),
-        var lastClearTime: Long = 0
+            val handle: Long,
+            var consecutiveFailures: Int = 0,
+            var lastWriteTime: Long = System.currentTimeMillis(),
+            var lastClearTime: Long = 0
     )
 
     data class ChannelState(
-        var gainDb: Float = 0f,
-        var pan: Float = 0f,
-        var isActive: Boolean = true,
-        var peakLevel: Float = 0f,
-        var rmsLevel: Float = 0f,
-        var packetsReceived: Int = 0
+            var gainDb: Float = 0f,
+            var pan: Float = 0f,
+            var isActive: Boolean = true,
+            var peakLevel: Float = 0f,
+            var rmsLevel: Float = 0f,
+            var packetsReceived: Int = 0
     )
 
     init {
@@ -119,7 +107,9 @@ class OboeAudioRenderer(private val context: Context? = null) {
             isInitialized = engineHandle != 0L
 
             if (isInitialized) {
-                Log.d(TAG, """
+                Log.d(
+                        TAG,
+                        """
                     ✅ Oboe Engine ULTRA-LOW LATENCY
                        📊 Sample Rate: $OPTIMAL_SAMPLE_RATE Hz ${if (context != null) "(nativo)" else "(default)"}
                        🎵 Canales: $CHANNELS
@@ -127,165 +117,86 @@ class OboeAudioRenderer(private val context: Context? = null) {
                        🚀 MMAP Support: $deviceSupportsMMAP
                        ⚡ Frames/Burst: $deviceFramesPerBurst
                        🔧 Engine Handle: $engineHandle
-                """.trimIndent())
+                """.trimIndent()
+                )
             } else {
                 Log.e(TAG, "❌ Falló inicialización de Oboe Engine")
             }
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error inicializando Oboe: ${e.message}", e)
             isInitialized = false
         }
     }
 
-    /**
-     * ✅ CORREGIDO: Validación de AudioManager
-     */
     private fun detectDeviceCapabilities() {
         try {
-            // ✅ Validar que context no sea null
-            if (context == null) {
-                Log.w(TAG, "⚠️ Context es null, usando defaults")
-                return
-            }
+            if (context == null) return
 
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-
             if (audioManager != null) {
-                // Obtener sample rate nativo
-                val sampleRateStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
-                val detectedSampleRate = sampleRateStr?.toIntOrNull()
+                audioManager
+                        .getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+                        ?.toIntOrNull()
+                        ?.let { if (it in 44100..96000) OPTIMAL_SAMPLE_RATE = it }
+                audioManager
+                        .getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+                        ?.toIntOrNull()
+                        ?.let {
+                            if (it in 64..512) {
+                                deviceFramesPerBurst = it
+                                OPTIMAL_BUFFER_SIZE =
+                                        when {
+                                            deviceFramesPerBurst <= 96 -> 64
+                                            deviceFramesPerBurst <= 192 -> 128
+                                            else -> 256
+                                        }.coerceIn(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE)
+                            }
+                        }
+                deviceSupportsMMAP =
+                        context.packageManager.hasSystemFeature(
+                                "android.hardware.audio.low_latency"
+                        ) || context.packageManager.hasSystemFeature("android.hardware.audio.pro")
 
-                // ✅ Validar que sea un valor razonable
-                if (detectedSampleRate != null && detectedSampleRate in 44100..96000) {
-                    OPTIMAL_SAMPLE_RATE = detectedSampleRate
-                } else {
-                    Log.w(TAG, "⚠️ Sample rate inválido: $detectedSampleRate, usando default")
-                }
-
-                // Obtener frames per burst
-                val framesPerBurstStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
-                val detectedFrames = framesPerBurstStr?.toIntOrNull()
-
-                // ✅ Validar que sea un valor razonable
-                if (detectedFrames != null && detectedFrames in 64..512) {
-                    deviceFramesPerBurst = detectedFrames
-
-                    // Ajustar buffer size basado en frames per burst
-                    OPTIMAL_BUFFER_SIZE = when {
-                        deviceFramesPerBurst <= 96 -> 64
-                        deviceFramesPerBurst <= 192 -> 128
-                        else -> 256
-                    }.coerceIn(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE)
-                } else {
-                    Log.w(TAG, "⚠️ Frames per burst inválido: $detectedFrames, usando default")
-                    deviceFramesPerBurst = 128
-                }
-
-                // ✅ Detectar soporte MMAP con verificación de PackageManager
-                try {
-                    deviceSupportsMMAP = context.packageManager.hasSystemFeature(
-                        "android.hardware.audio.low_latency"
-                    ) || context.packageManager.hasSystemFeature(
-                        "android.hardware.audio.pro"
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "⚠️ Error detectando MMAP: ${e.message}")
-                    deviceSupportsMMAP = false
-                }
-
-                Log.d(TAG, """
-                    🔍 Device Audio Capabilities:
-                       Native Sample Rate: $OPTIMAL_SAMPLE_RATE Hz
-                       Frames Per Burst: $deviceFramesPerBurst
-                       Optimal Buffer: $OPTIMAL_BUFFER_SIZE frames
-                       MMAP Capable: $deviceSupportsMMAP
-                """.trimIndent())
-
-            } else {
-                Log.w(TAG, "⚠️ AudioManager no disponible, usando defaults")
+                Log.d(
+                        TAG,
+                        "🔍 Audio: $OPTIMAL_SAMPLE_RATE Hz, ${OPTIMAL_BUFFER_SIZE}f buffer, MMAP=$deviceSupportsMMAP"
+                )
             }
-
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error detectando capabilities: ${e.message}")
-            // Continuar con valores por defecto
+            Log.e(TAG, "Error detectando capabilities: ${e.message}")
         }
     }
 
-    /**
-     * ✅ CORREGIDO: Usar método nativo correcto
-     */
+    /** ✅ CORREGIDO: Usar método nativo correcto */
     private fun getOrCreateStream(channel: Int): Long {
-        return getOrCreateStreamInternal(key = channel, nativeChannelId = channel)
-    }
+        val streamState = streamHandles[channel]
 
-    /**
-     * ✅ INTERNO: Obtener o crear el stream maestro (mezcla estéreo)
-     * Completamente privado, no expuesto al usuario
-     */
-    private fun getOrCreateMasterStream(): Long {
-        return synchronized(streamOpLock) {
-            // Si existe y está sano, reutilizar
-            if (masterStreamState != null && masterStreamState!!.consecutiveFailures < MAX_WRITE_FAILURES) {
-                return@synchronized masterStreamState!!.handle
-            }
+        if (streamState != null && streamState.consecutiveFailures < MAX_WRITE_FAILURES) {
+            return streamState.handle
+        }
 
-            // Destruir el anterior si estaba fallando
-            if (masterStreamState != null) {
-                Log.w(TAG, "🔄 Recreando master stream (${masterStreamState!!.consecutiveFailures} fallos)")
-                destroyMasterStream()
-            }
+        if (streamState != null) {
+            Log.w(
+                    TAG,
+                    "🔄 Recreando stream canal $channel (${streamState.consecutiveFailures} fallos)"
+            )
+            destroyStream(channel)
+        }
 
-            // Crear nuevo
-            val handle = synchronized(streamOpLock) {
-                nativeCreateStream(engineHandle, MASTER_STREAM_NATIVE_CHANNEL_ID)
-            }
-            if (handle != 0L) {
-                synchronized(streamOpLock) {
-                    nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
-                    nativeStartStream(handle)
-                }
-                masterStreamState = StreamState(handle = handle)
-                val latencyEstimate = (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE).format(1)
-                Log.d(TAG, "✅ Master stream creado (estéreo, ~${latencyEstimate}ms)")
+        if (streamHandles.size >= MAX_SIMULTANEOUS_STREAMS && !streamHandles.containsKey(channel)) {
+            Log.w(TAG, "⚠️ Límite de streams alcanzado ($MAX_SIMULTANEOUS_STREAMS)")
+
+            val leastUsed = streamHandles.entries.minByOrNull { it.value.lastWriteTime }?.key
+
+            if (leastUsed != null) {
+                Log.w(TAG, "🗑️ Liberando canal $leastUsed por límite")
+                destroyStream(leastUsed)
             } else {
-                Log.e(TAG, "❌ Falló creación del master stream")
+                return 0L
             }
-
-            handle
         }
-    }
 
-    private fun getOrCreateStreamInternal(key: Int, nativeChannelId: Int): Long {
-        return synchronized(streamOpLock) {
-            val streamState = streamHandles[key]
-
-            if (streamState != null && streamState.consecutiveFailures < MAX_WRITE_FAILURES) {
-                return@synchronized streamState.handle
-            }
-
-            if (streamState != null) {
-                Log.w(TAG, "🔄 Recreando stream canal $key (${streamState.consecutiveFailures} fallos)")
-                destroyStream(key)
-            }
-
-            if (streamHandles.size >= MAX_SIMULTANEOUS_STREAMS && !streamHandles.containsKey(key)) {
-                Log.w(TAG, "⚠️ Límite de streams alcanzado ($MAX_SIMULTANEOUS_STREAMS)")
-
-                val leastUsed = streamHandles.entries
-                    .minByOrNull { it.value.lastWriteTime }
-                    ?.key
-
-                if (leastUsed != null) {
-                    Log.w(TAG, "🗑️ Liberando canal $leastUsed por límite")
-                    destroyStream(leastUsed)
-                } else {
-                    return@synchronized 0L
-                }
-            }
-
-            createNewStream(key = key, nativeChannelId = nativeChannelId)
-        }
+        return createNewStream(channel)
     }
 
     /**
@@ -298,48 +209,45 @@ class OboeAudioRenderer(private val context: Context? = null) {
      *
      * NO necesitamos método nativo custom para MMAP.
      */
-    private fun createNewStream(key: Int, nativeChannelId: Int): Long {
+    private fun createNewStream(channel: Int): Long {
         try {
             if (!isInitialized) {
                 Log.e(TAG, "❌ Engine no inicializado")
                 return 0L
             }
 
-            val handle = synchronized(streamOpLock) {
-                // ✅ Usar método nativo estándar
-                nativeCreateStream(engineHandle, nativeChannelId)
-            }
+            // ✅ Usar método nativo estándar
+            val handle = nativeCreateStream(engineHandle, channel)
 
             if (handle != 0L) {
                 // ✅ Configurar buffer size óptimo
-                synchronized(streamOpLock) {
-                    nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
-                    nativeStartStream(handle)
-                }
-                streamHandles[key] = StreamState(handle = handle)
+                nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
+
+                nativeStartStream(handle)
+                streamHandles[channel] = StreamState(handle = handle)
 
                 val latencyEstimate = (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE).format(1)
 
-                Log.d(TAG, """
-                    ✅ Stream canal $key creado
+                Log.d(
+                        TAG,
+                        """
+                    ✅ Stream canal $channel creado
                        Buffer: $OPTIMAL_BUFFER_SIZE frames (~${latencyEstimate}ms)
                        Sample Rate: $OPTIMAL_SAMPLE_RATE Hz
-                """.trimIndent())
+                """.trimIndent()
+                )
             } else {
-                Log.e(TAG, "❌ Falló creación de stream para canal $key")
+                Log.e(TAG, "❌ Falló creación de stream para canal $channel")
             }
 
             return handle
-
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Excepción creando stream canal $key: ${e.message}", e)
+            Log.e(TAG, "❌ Excepción creando stream canal $channel: ${e.message}", e)
             return 0L
         }
     }
 
-    /**
-     * ✅ OPTIMIZADO: Renderizado de audio con procesamiento vectorizado
-     */
+    /** Renderiza audio (sin cambios) */
     fun renderChannelRF(channel: Int, audioData: FloatArray, samplePosition: Long) {
         if (!isInitialized || audioData.isEmpty()) {
             return
@@ -359,87 +267,42 @@ class OboeAudioRenderer(private val context: Context? = null) {
             return
         }
 
-        // Calcular ganancias (pre-calculado una vez)
+        // Calcular ganancias
         val totalGainDb = state.gainDb + masterGainDb
         val linearGain = dbToLinear(totalGainDb)
 
-        // Panorama optimizado
+        // Panorama
         val panRad = ((state.pan + 1f) * Math.PI / 4).toFloat()
         val leftGain = cos(panRad) * linearGain
         val rightGain = sin(panRad) * linearGain
 
+        // ✅ OPTIMIZACIÓN FASE 1: Reutilizar buffer del pool en lugar de crear uno nuevo
         val bufferSize = audioData.size * 2
         val stereoBuffer = acquireBuffer(bufferSize)
 
-        // ✅ OPTIMIZADO: Procesamiento en bloques de 4 (SIMD-friendly)
         var sumSquares = 0f
         var peak = 0f
-        val audioSize = audioData.size
-        val limit = audioSize - (audioSize % 4)
 
-        var i = 0
-        while (i < limit) {
-            // Bloque de 4 samples para mejor vectorización
-            val s0 = audioData[i]
-            val s1 = audioData[i + 1]
-            val s2 = audioData[i + 2]
-            val s3 = audioData[i + 3]
-
-            // Left channel
-            val l0 = s0 * leftGain
-            val l1 = s1 * leftGain
-            val l2 = s2 * leftGain
-            val l3 = s3 * leftGain
-
-            // Right channel
-            val r0 = s0 * rightGain
-            val r1 = s1 * rightGain
-            val r2 = s2 * rightGain
-            val r3 = s3 * rightGain
-
-            // ✅ OPTIMIZADO: Soft clip sin branches (tanh-approximation)
-            val baseIdx = i * 2
-            stereoBuffer[baseIdx] = fastSoftClip(l0)
-            stereoBuffer[baseIdx + 1] = fastSoftClip(r0)
-            stereoBuffer[baseIdx + 2] = fastSoftClip(l1)
-            stereoBuffer[baseIdx + 3] = fastSoftClip(r1)
-            stereoBuffer[baseIdx + 4] = fastSoftClip(l2)
-            stereoBuffer[baseIdx + 5] = fastSoftClip(r2)
-            stereoBuffer[baseIdx + 6] = fastSoftClip(l3)
-            stereoBuffer[baseIdx + 7] = fastSoftClip(r3)
-
-            // Stats (menos frecuente para mejor perf)
-            val abs0 = abs(s0 * linearGain)
-            if (abs0 > peak) peak = abs0
-            sumSquares += s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3
-
-            i += 4
-        }
-
-        // Resto de samples
-        while (i < audioSize) {
+        for (i in audioData.indices) {
             val sample = audioData[i]
             val left = sample * leftGain
             val right = sample * rightGain
 
-            stereoBuffer[i * 2] = fastSoftClip(left)
-            stereoBuffer[i * 2 + 1] = fastSoftClip(right)
+            stereoBuffer[i * 2] = softClip(left)
+            stereoBuffer[i * 2 + 1] = softClip(right)
 
             val absSample = abs(sample * linearGain)
             if (absSample > peak) peak = absSample
             sumSquares += sample * sample
-            i++
         }
 
         state.peakLevel = peak
-        state.rmsLevel = sqrt(sumSquares / audioSize)
+        state.rmsLevel = sqrt(sumSquares / audioData.size)
         state.packetsReceived++
 
         // Escribir a Oboe
         try {
-            val written = synchronized(streamOpLock) {
-                nativeWriteAudio(streamHandle, stereoBuffer)
-            }
+            val written = nativeWriteAudio(streamHandle, stereoBuffer)
             val streamState = streamHandles[channel]
 
             if (written < stereoBuffer.size) {
@@ -449,16 +312,14 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 if (streamState != null) {
                     streamState.consecutiveFailures++
 
-                    // Estrategia de recuperación
-                    when (streamState.consecutiveFailures) {
-                        1 -> synchronized(streamOpLock) { nativeClearBuffer(streamHandle) }
-                        3 -> {
-                            synchronized(streamOpLock) {
-                                nativeStopStream(streamHandle)
-                                nativeStartStream(streamHandle)
-                            }
-                        }
-                        5 -> destroyStream(channel)
+                    // ✅ Estrategia de recuperación (sin Log en hotpath para Fase 1)
+                    if (streamState.consecutiveFailures == 1) {
+                        nativeClearBuffer(streamHandle)
+                    } else if (streamState.consecutiveFailures == 3) {
+                        nativeStopStream(streamHandle)
+                        nativeStartStream(streamHandle)
+                    } else if (streamState.consecutiveFailures >= 5) {
+                        destroyStream(channel)
                     }
                 }
 
@@ -466,23 +327,23 @@ class OboeAudioRenderer(private val context: Context? = null) {
                     Log.d(TAG, "🗑️ RF Drop: $dropped frames en canal $channel")
                 }
             } else {
-                streamState?.let {
-                    it.consecutiveFailures = 0
-                    it.lastWriteTime = System.currentTimeMillis()
+                if (streamState != null) {
+                    streamState.consecutiveFailures = 0
+                    streamState.lastWriteTime = System.currentTimeMillis()
                 }
             }
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error escribiendo canal $channel: ${e.message}")
             totalPacketsDropped += audioData.size / 2
 
-            streamHandles[channel]?.let { streamState ->
+            val streamState = streamHandles[channel]
+            if (streamState != null) {
                 streamState.consecutiveFailures++
                 val timeSinceLastClear = System.currentTimeMillis() - streamState.lastClearTime
 
                 if (timeSinceLastClear > 500) {
                     try {
-                        synchronized(streamOpLock) { nativeClearBuffer(streamHandle) }
+                        nativeClearBuffer(streamHandle)
                         streamState.lastClearTime = System.currentTimeMillis()
                     } catch (ignored: Exception) {
                         streamState.consecutiveFailures = MAX_WRITE_FAILURES
@@ -490,201 +351,19 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 }
             }
         } finally {
+            // ✅ OPTIMIZACIÓN FASE 1: Devolver buffer al pool
             releaseBuffer(stereoBuffer)
         }
     }
 
-    /**
-     * ✅ NUEVO: Renderizar múltiples canales mezclados en UN SOLO stream
-     * Evita race conditions al mezclar todos los canales ANTES de escribir a Oboe
-     *
-     * @param channelDataMap Mapa de channelNumber -> FloatArray de audio
-     * @param samplePosition Posición de muestra para sincronización
-     */
-    fun renderMixedChannels(
-        channelDataMap: Map<Int, FloatArray>,
-        samplePosition: Long
-    ) {
-        if (!isInitialized || channelDataMap.isEmpty()) {
-            return
-        }
-
-        // Encontrar el tamaño máximo de buffer
-        val maxSamples = channelDataMap.values.maxOfOrNull { it.size } ?: return
-        val stereoBufferSize = maxSamples * 2  // Estéreo
-
-        // ✅ Adquirir un buffer del pool
-        val mixedBuffer = acquireBuffer(stereoBufferSize)
-
-        // Inicializar el buffer de mezcla a ceros
-        mixedBuffer.fill(0f)
-
-        try {
-            // Mezclar todos los canales
-            channelDataMap.forEach { (channel, audioData) ->
-                val state = channelStates.getOrPut(channel) { ChannelState() }
-
-                // Ignorar canales inactivos o silenciados
-                if (!state.isActive || state.gainDb <= -60f) {
-                    return@forEach
-                }
-
-                // Calcular ganancia total (canal + master)
-                val totalGainDb = state.gainDb + masterGainDb
-                val linearGain = dbToLinear(totalGainDb)
-
-                // Panorama optimizado
-                val panRad = ((state.pan + 1f) * Math.PI / 4).toFloat()
-                val leftGain = cos(panRad) * linearGain
-                val rightGain = sin(panRad) * linearGain
-
-                // ✅ Mezclar (acumular) este canal
-                var sumSquares = 0f
-                var peak = 0f
-                val audioSize = audioData.size.coerceAtMost(maxSamples)
-
-                // Procesamiento en bloques de 4 (SIMD-friendly)
-                val limit = audioSize - (audioSize % 4)
-                var i = 0
-
-                while (i < limit) {
-                    val s0 = audioData[i]
-                    val s1 = audioData.getOrNull(i + 1) ?: 0f
-                    val s2 = audioData.getOrNull(i + 2) ?: 0f
-                    val s3 = audioData.getOrNull(i + 3) ?: 0f
-
-                    // Left channel
-                    val l0 = s0 * leftGain
-                    val l1 = s1 * leftGain
-                    val l2 = s2 * leftGain
-                    val l3 = s3 * leftGain
-
-                    // Right channel
-                    val r0 = s0 * rightGain
-                    val r1 = s1 * rightGain
-                    val r2 = s2 * rightGain
-                    val r3 = s3 * rightGain
-
-                    // Acumular al buffer mezclado con soft clip
-                    val baseIdx = i * 2
-                    mixedBuffer[baseIdx] += fastSoftClip(l0)
-                    mixedBuffer[baseIdx + 1] += fastSoftClip(r0)
-                    mixedBuffer[baseIdx + 2] += fastSoftClip(l1)
-                    mixedBuffer[baseIdx + 3] += fastSoftClip(r1)
-                    mixedBuffer[baseIdx + 4] += fastSoftClip(l2)
-                    mixedBuffer[baseIdx + 5] += fastSoftClip(r2)
-                    mixedBuffer[baseIdx + 6] += fastSoftClip(l3)
-                    mixedBuffer[baseIdx + 7] += fastSoftClip(r3)
-
-                    // Stats
-                    val abs0 = abs(s0 * linearGain)
-                    if (abs0 > peak) peak = abs0
-                    sumSquares += s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3
-
-                    i += 4
-                }
-
-                // Resto de samples
-                while (i < audioSize) {
-                    val sample = audioData[i]
-                    val left = sample * leftGain
-                    val right = sample * rightGain
-
-                    mixedBuffer[i * 2] += fastSoftClip(left)
-                    mixedBuffer[i * 2 + 1] += fastSoftClip(right)
-
-                    val absSample = abs(sample * linearGain)
-                    if (absSample > peak) peak = absSample
-                    sumSquares += sample * sample
-                    i++
-                }
-
-                state.peakLevel = peak
-                state.rmsLevel = sqrt(sumSquares / audioSize)
-                state.packetsReceived++
-                totalPacketsReceived++
-            }
-
-            // ✅ ESCRIBIR UNA SOLA VEZ al stream único de Oboe
-            val masterStreamHandle = getOrCreateMasterStream()  // Stream maestro separado de CH1
-            if (masterStreamHandle != 0L) {
-                try {
-                    val written = synchronized(streamOpLock) {
-                        nativeWriteAudio(masterStreamHandle, mixedBuffer)
-                    }
-
-                    if (written < stereoBufferSize) {
-                        val dropped = (stereoBufferSize - written) / 2
-                        totalPacketsDropped += dropped
-
-                        if (dropped > 100) {
-                            Log.d(TAG, "🗑️ Mixed Drop: $dropped frames")
-                        }
-
-                        if (masterStreamState != null) {
-                            masterStreamState!!.consecutiveFailures++
-
-                            // Estrategia de recuperación
-                            when (masterStreamState!!.consecutiveFailures) {
-                                1 -> synchronized(streamOpLock) { nativeClearBuffer(masterStreamHandle) }
-                                3 -> {
-                                    synchronized(streamOpLock) {
-                                        nativeStopStream(masterStreamHandle)
-                                        nativeStartStream(masterStreamHandle)
-                                    }
-                                }
-                                5 -> destroyMasterStream()
-                            }
-                        }
-                    } else {
-                        masterStreamState?.let {
-                            it.consecutiveFailures = 0
-                            it.lastWriteTime = System.currentTimeMillis()
-                        }
-                    }
-
-                } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error escribiendo stream mezclado: ${e.message}")
-                    totalPacketsDropped += stereoBufferSize / 2
-
-                    masterStreamState?.let { streamState ->
-                        streamState.consecutiveFailures++
-                        val timeSinceLastClear = System.currentTimeMillis() - streamState.lastClearTime
-
-                        if (timeSinceLastClear > 500) {
-                            try {
-                                synchronized(streamOpLock) { nativeClearBuffer(masterStreamHandle) }
-                                streamState.lastClearTime = System.currentTimeMillis()
-                            } catch (ignored: Exception) {
-                                streamState.consecutiveFailures = MAX_WRITE_FAILURES
-                            }
-                        }
-                    }
-                }
-            }
-
-        } finally {
-            releaseBuffer(mixedBuffer)
-        }
-    }
-
-    /**
-     * ✅ OPTIMIZADO: Soft clip sin branches usando aproximación matemática
-     * x / (1 + |x|) da un clip suave similar pero sin branches
-     */
-    private fun fastSoftClip(x: Float): Float {
-        return x / (1f + abs(x) * 0.25f)  // Aproximación rápida con límite ~1.0
-    }
-
-    // Pool de buffers
+    // ✅ OPTIMIZACIÓN FASE 1: Métodos de pool de buffers
     private fun acquireBuffer(size: Int): FloatArray {
-        return bufferPool.removeFirstOrNull()?.takeIf { it.size == size }
-            ?: FloatArray(size)
+        return bufferPool.removeFirstOrNull()?.takeIf { it.size == size } ?: FloatArray(size)
     }
 
     private fun releaseBuffer(buffer: FloatArray) {
         if (bufferPool.size < MAX_POOLED_BUFFERS) {
-            buffer.fill(0f)  // Limpiar antes de devolver
+            buffer.fill(0f) // Limpiar antes de devolver
             bufferPool.addLast(buffer)
         }
     }
@@ -707,31 +386,11 @@ class OboeAudioRenderer(private val context: Context? = null) {
         val streamState = streamHandles.remove(channel) ?: return
 
         try {
-            synchronized(streamOpLock) {
-                nativeStopStream(streamState.handle)
-                nativeDestroyStream(streamState.handle)
-            }
+            nativeStopStream(streamState.handle)
+            nativeDestroyStream(streamState.handle)
             Log.d(TAG, "🗑️ Stream canal $channel destruido")
         } catch (e: Exception) {
             Log.e(TAG, "Error destruyendo stream canal $channel: ${e.message}")
-        }
-    }
-
-    /**
-     * ✅ INTERNO: Destruir el stream maestro (privado)
-     */
-    private fun destroyMasterStream() {
-        val streamState = masterStreamState ?: return
-
-        try {
-            synchronized(streamOpLock) {
-                nativeStopStream(streamState.handle)
-                nativeDestroyStream(streamState.handle)
-            }
-            masterStreamState = null
-            Log.d(TAG, "🗑️ Master stream destruido")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error destruyendo master stream: ${e.message}")
         }
     }
 
@@ -739,27 +398,20 @@ class OboeAudioRenderer(private val context: Context? = null) {
         Log.w(TAG, "🔄 Recreando TODOS los streams...")
 
         val channelsToRecreate = streamHandles.keys.toList()
-        channelsToRecreate.forEach { channel ->
-            destroyStream(channel)
-        }
-
-        // También destruir el master stream para que se recree
-        destroyMasterStream()
+        channelsToRecreate.forEach { channel -> destroyStream(channel) }
 
         Log.i(TAG, "✅ Streams marcados para recreación: ${channelsToRecreate.size}")
     }
 
-    /**
-     * ✅ CORREGIDO: Obtener info sin campos MMAP custom
-     */
+    /** ✅ CORREGIDO: Obtener info sin campos MMAP custom */
     fun getDeviceInfo(): Map<String, Any> {
         return mapOf(
-            "sample_rate" to OPTIMAL_SAMPLE_RATE,
-            "buffer_size" to OPTIMAL_BUFFER_SIZE,
-            "estimated_latency_ms" to (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE),
-            "mmap_support" to deviceSupportsMMAP,
-            "frames_per_burst" to deviceFramesPerBurst,
-            "active_streams" to streamHandles.size
+                "sample_rate" to OPTIMAL_SAMPLE_RATE,
+                "buffer_size" to OPTIMAL_BUFFER_SIZE,
+                "estimated_latency_ms" to (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE),
+                "mmap_support" to deviceSupportsMMAP,
+                "frames_per_burst" to deviceFramesPerBurst,
+                "active_streams" to streamHandles.size
         )
     }
 
@@ -769,14 +421,14 @@ class OboeAudioRenderer(private val context: Context? = null) {
         return try {
             val stats = nativeGetRFStats(streamState.handle)
             mapOf(
-                "available_frames" to stats[0],
-                "latency_ms" to stats[1],
-                "is_receiving" to (stats[2] == 1),
-                "underruns" to stats[3],
-                "drops" to stats[4],
-                "buffer_usage" to stats[5],
-                "resets" to (stats.getOrNull(6) ?: 0),
-                "consecutive_failures" to streamState.consecutiveFailures
+                    "available_frames" to stats[0],
+                    "latency_ms" to stats[1],
+                    "is_receiving" to (stats[2] == 1),
+                    "underruns" to stats[3],
+                    "drops" to stats[4],
+                    "buffer_usage" to stats[5],
+                    "resets" to (stats.getOrNull(6) ?: 0),
+                    "consecutive_failures" to streamState.consecutiveFailures
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error obteniendo stats RF: ${e.message}")
@@ -843,20 +495,22 @@ class OboeAudioRenderer(private val context: Context? = null) {
         val totalFramesDropped = totalDrops + totalPacketsDropped
 
         return mapOf(
-            "total_packets" to totalPacketsReceived,
-            "dropped_frames" to totalFramesDropped,
-            "drop_rate" to if (totalPacketsReceived > 0)
-                (totalFramesDropped.toFloat() / totalPacketsReceived * 100f) else 0f,
-            "avg_latency_ms" to avgLatency,
-            "available_frames" to totalAvailable,
-            "underruns" to totalUnderruns,
-            "resets" to totalResets,
-            "active_streams" to streamHandles.size,
-            "is_initialized" to isInitialized,
-            "total_failures" to totalFailures,
-            "device_sample_rate" to OPTIMAL_SAMPLE_RATE,
-            "device_buffer_size" to OPTIMAL_BUFFER_SIZE,
-            "mmap_capable" to deviceSupportsMMAP
+                "total_packets" to totalPacketsReceived,
+                "dropped_frames" to totalFramesDropped,
+                "drop_rate" to
+                        if (totalPacketsReceived > 0)
+                                (totalFramesDropped.toFloat() / totalPacketsReceived * 100f)
+                        else 0f,
+                "avg_latency_ms" to avgLatency,
+                "available_frames" to totalAvailable,
+                "underruns" to totalUnderruns,
+                "resets" to totalResets,
+                "active_streams" to streamHandles.size,
+                "is_initialized" to isInitialized,
+                "total_failures" to totalFailures,
+                "device_sample_rate" to OPTIMAL_SAMPLE_RATE,
+                "device_buffer_size" to OPTIMAL_BUFFER_SIZE,
+                "mmap_capable" to deviceSupportsMMAP
         )
     }
 
@@ -873,40 +527,12 @@ class OboeAudioRenderer(private val context: Context? = null) {
     fun stop() {
         try {
             Log.d(TAG, "🛑 Deteniendo OboeAudioRenderer...")
-            val channelsToStop = streamHandles.keys.toList()
-            channelsToStop.forEach { channel ->
-                try {
-                    destroyStream(channel)
-                    Log.d(TAG, "✅ Stream canal $channel detenido")
-                } catch (e: Exception) {
-                    Log.e(TAG, "⚠️ Error deteniendo stream $channel: ${e.message}")
-                }
-            }
-            destroyMasterStream()
+            streamHandles.keys.forEach { channel -> destroyStream(channel) }
             channelStates.clear()
             resetRFStats()
-            Log.d(TAG, "✅ OboeAudioRenderer detenido completamente")
+            Log.d(TAG, "✅ OboeAudioRenderer detenido")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error deteniendo: ${e.message}")
-        }
-    }
-
-    /**
-     * ✅ NUEVO: Reanudar después de stop (simplemente limpia estado para que streams se recreen)
-     * Los streams se recrearán automáticamente en renderChannelRF cuando lleguen datos
-     */
-    fun start() {
-        try {
-            Log.d(TAG, "▶️ Reanudando OboeAudioRenderer...")
-            // Los streams se recrearán bajo demanda en getOrCreateStream()
-            // Solo asegurarse de que el engine esté listo
-            if (!isInitialized || engineHandle == 0L) {
-                Log.e(TAG, "❌ Engine no inicializado para start()")
-                return
-            }
-            Log.d(TAG, "✅ OboeAudioRenderer listo para reanudar (streams se crearán bajo demanda)")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error reanudando: ${e.message}")
         }
     }
 
@@ -957,23 +583,15 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
 
         return mapOf(
-            "buffered_frames" to totalBufferedFrames,
-            "active_streams" to streamHandles.size,
-            "packets_received" to totalPacketsReceived,
-            "packets_dropped" to totalPacketsDropped,
-            "is_initialized" to isInitialized
+                "buffered_frames" to totalBufferedFrames,
+                "active_streams" to streamHandles.size,
+                "packets_received" to totalPacketsReceived,
+                "packets_dropped" to totalPacketsDropped,
+                "is_initialized" to isInitialized
         )
     }
 
-    private fun dbToLinear(db: Float): Float {
-        return if (db <= -60f) 0f else 10.0f.pow(db / 20.0f)
-    }
-
-    private fun linearToDb(linear: Float): Float {
-        return if (linear > 0.00001f) {
-            20.0f * log10(linear)
-        } else -60f
-    }
-
+    private fun dbToLinear(db: Float): Float = 10.0f.pow(db / 20.0f)
+    private fun linearToDb(linear: Float): Float = if (linear > 0) 20.0f * log10(linear) else -60f
     private fun Float.format(digits: Int) = "%.${digits}f".format(this)
 }

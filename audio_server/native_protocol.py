@@ -190,9 +190,11 @@ class NativeAndroidProtocol:
 
                 
 
-                # Convertir float [-0.9999, 0.9999] a int16 [-32767, 32767]
+                # ✅ ZERO-COPY: Convertir float [-0.9999, 0.9999] a int16 en un solo paso
 
-                interleaved_int16 = (interleaved * 32767.0).astype(np.int16)
+                np.multiply(interleaved, 32767.0, out=interleaved)
+
+                interleaved_int16 = interleaved.astype(np.int16)
 
                 
 
