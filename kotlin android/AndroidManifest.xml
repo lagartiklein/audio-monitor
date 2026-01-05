@@ -1,48 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    
-    <!-- ✅ Permisos de red (requeridos para streaming) -->
+    <!-- Permisos generales -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    
-    <!-- ✅ Permisos de almacenamiento (legacy para Android 12 y anteriores) -->
+    <!-- Permisos de almacenamiento para Android 12 y anteriores -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    
-    <!-- ✅ Features de sensores opcionales -->
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
 
-    <!-- ✅ Permisos de audio -->
+    <!-- Permisos de audio -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
-    <!-- ✅ Permisos de publicidad -->
+    <!-- Permisos de publicidad -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
-    
-    <!-- ✅ Permisos de media para Android 13+ -->
+    <!-- Permisos específicos para Android 13 (API 33) y superiores -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"
         android:minSdkVersion="33" />
-    
-    <!-- ✅ Features de audio profesional para baja latencia -->
-    <uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
-    <uses-feature android:name="android.hardware.audio.pro" android:required="false" />
-    
-    <!-- ✅ Permisos para streaming en segundo plano (API 36 compliant) -->
+    <uses-feature android:name="android.hardware.audio.low_latency" />
+    <uses-feature android:name="android.hardware.audio.pro" />
+    <!-- ✅ Permisos para streaming en segundo plano -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- ✅ API 36: Permiso para servicios especiales de datos en tiempo real -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
-        tools:ignore="PermissionImpliesUnsupportedHardware" />
-    
-    <!-- ✅ Soporte para pantallas grandes y factores de forma (API 36) -->
+    <!-- Soporte para pantallas grandes y factores de forma (Android 16) -->
     <supports-screens
         android:smallScreens="true"
         android:normalScreens="true"
@@ -64,8 +50,6 @@
         android:resizeableActivity="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
-        android:hardwareAccelerated="true"
-        android:usesCleartextTraffic="true"
         tools:targetApi="36">
         <!-- Configuración de AdMob -->
         <meta-data
@@ -142,8 +126,8 @@
             android:exported="false"
             android:theme="@style/AppTheme"
             android:resizeableActivity="true"
-            android:windowSoftInputMode="adjustResize|stateAlwaysHidden"
-            android:configChanges="orientation|screenSize|screenLayout|layoutDirection" />
+            android:configChanges="screenSize|screenLayout|density|keyboardHidden|smallestScreenSize|uiMode|orientation|layoutDirection"
+            android:windowSoftInputMode="adjustResize|stateAlwaysHidden" />
 
 
         <!-- FileProvider para compartir PDFs -->

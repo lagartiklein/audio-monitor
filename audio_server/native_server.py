@@ -545,8 +545,8 @@ class NativeAudioServer:
                     clients_to_remove = []
                     
                     for client_id, client in list(self.clients.items()):
-                        # ✅ Verificar si está realmente vivo
-                        if not client.is_alive(timeout=30.0):
+                        # ✅ Verificar si está realmente vivo (timeout CORTO para detección rápida)
+                        if not client.is_alive(timeout=1.0):  # ⬇️ REDUCIDO de 30s a 1s
                             logger.warning(f"💀 Cliente zombie detectado: {client_id[:15]}")
                             clients_to_remove.append(client_id)
                             self.stats['clients_zombie_killed'] += 1
@@ -1354,34 +1354,59 @@ class NativeAudioServer:
             self.update_stats(packets_sent=sent)
     
     def _disconnect_client(self, client_id: str, preserve_state: bool = False):
+        # ✅ OPTIMIZACIÓN: Sacar client_lock LO ANTES POSIBLE para no bloquear audio
+        # Paso 1: Obtener cliente y actualizar stats (DENTRO del lock, rápido)
         with self.client_lock:
             client = self.clients.pop(client_id, None)
-            if client:
-                self.update_stats(clients_disconnected=1)
-
-                if preserve_state and client.auto_reconnect:
-                    with self.persistent_lock:
-                        subscription = self.channel_manager.get_client_subscription(client_id)
-                        if subscription:
-                            self.persistent_state[client.persistent_id] = {
-                                'channels': subscription.get('channels', []),
-                                'gains': subscription.get('gains', {}),
-                                'pans': subscription.get('pans', {}),
-                                'mutes': subscription.get('mutes', {}),
-                                'master_gain': subscription.get('master_gain', 1.0),
-                                'last_seen': time.time(),
-                                'reconnection_count': client.reconnection_count,
-                                'client_type': 'native'
-                            }
-                            logger.info(f"💾 Estado guardado para reconexión: {client.persistent_id[:15]}")
-                        elif client.persistent_id in self.persistent_state:
-                            self.persistent_state[client.persistent_id]['last_seen'] = time.time()
-
-                logger.info(f"🔌 Desconectado: {client_id[:15]} (reconnect={preserve_state})")
-                client.close()
-
-                self.channel_manager.unsubscribe_client(client_id)
-                self._notify_client_disconnected(client_id)
+            if not client:
+                return  # Cliente ya estaba desconectado
+            self.update_stats(clients_disconnected=1)
+        
+        # ✅ Lock liberado AQUÍ - Audio puede fluir normalmente
+        
+        # Paso 2: Operaciones LENTAS fuera del lock crítico
+        # Guardar persistencia si es necesario
+        if preserve_state and client.auto_reconnect:
+            try:
+                with self.persistent_lock:  # Lock de persistencia, no bloquea audio
+                    subscription = self.channel_manager.get_client_subscription(client_id)
+                    if subscription:
+                        self.persistent_state[client.persistent_id] = {
+                            'channels': subscription.get('channels', []),
+                            'gains': subscription.get('gains', {}),
+                            'pans': subscription.get('pans', {}),
+                            'mutes': subscription.get('mutes', {}),
+                            'master_gain': subscription.get('master_gain', 1.0),
+                            'last_seen': time.time(),
+                            'reconnection_count': client.reconnection_count,
+                            'client_type': 'native'
+                        }
+                        logger.info(f"💾 Estado guardado para reconexión: {client.persistent_id[:15]}")
+                    elif client.persistent_id in self.persistent_state:
+                        self.persistent_state[client.persistent_id]['last_seen'] = time.time()
+            except Exception as e:
+                logger.debug(f"Error guardando estado: {e}")
+        
+        # Paso 3: Cerrar socket
+        try:
+            client.close()
+        except Exception as e:
+            logger.debug(f"Error cerrando socket: {e}")
+        
+        # Paso 4: Desuscribir del channel_manager
+        try:
+            self.channel_manager.unsubscribe_client(client_id)
+        except Exception as e:
+            logger.debug(f"Error desinscribiendo: {e}")
+        
+        logger.info(f"🔌 Desconectado: {client_id[:15]} (reconnect={preserve_state})")
+        
+        # Paso 5: Notificar a clientes web ASÍNCRONO (no bloquea)
+        # Enviar en background para no retardar desconexión
+        try:
+            self.audio_send_pool.submit(self._notify_client_disconnected, client_id)
+        except Exception as e:
+            logger.debug(f"Error notificando: {e}")
 
     def _notify_client_disconnected(self, client_id):
         try:

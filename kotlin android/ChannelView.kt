@@ -12,6 +12,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import com.cepalabsfree.fichatech.R
 import com.google.android.material.slider.Slider
 import kotlin.math.max
+import kotlin.math.pow
 
 /**
  * ✅ ChannelView v2.0 - API 36 Compatible
@@ -364,7 +365,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         gainDebounceRunnable?.let { mainHandler.removeCallbacks(it) }
         panDebounceRunnable?.let { mainHandler.removeCallbacks(it) }
     }
-    
+
     // ✅ Alias para compatibilidad con código de sincronización web
     fun setPan(pan: Float, fromServer: Boolean = false) = setPanValue(pan, fromServer)
     fun setActive(active: Boolean, fromServer: Boolean = false) = activateChannel(active, fromServer)

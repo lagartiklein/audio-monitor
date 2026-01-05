@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import kotlin.math.pow
 
 class NativeAudioStreamActivity : AppCompatActivity() {
 
@@ -65,9 +66,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     private lateinit var latencyText: TextView
 
-    private lateinit var rfStatusText: TextView
+    // private lateinit var rfStatusText: TextView
 
-    private lateinit var webControlText: TextView
+    // private lateinit var webControlText: TextView
 
     private lateinit var infoText: TextView
 
@@ -86,67 +87,72 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private var serviceBound = false
 
     private val serviceConnection =
-            object : android.content.ServiceConnection {
+        object : android.content.ServiceConnection {
 
-                override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
 
-                    val binder = service as AudioStreamForegroundService.AudioStreamBinder
+                val binder = service as AudioStreamForegroundService.AudioStreamBinder
 
-                    audioService = binder.getService()
+                audioService = binder.getService()
 
-                    serviceBound = true
+                serviceBound = true
 
-                    audioService?.onDisconnectRequested = { lifecycleScope.launch { disconnect() } }
-                }
-
-                override fun onServiceDisconnected(name: android.content.ComponentName?) {
-
-                    audioService = null
-
-                    serviceBound = false
-                }
+                audioService?.onDisconnectRequested = { lifecycleScope.launch { disconnect() } }
             }
+
+            override fun onServiceDisconnected(name: android.content.ComponentName?) {
+
+                audioService = null
+
+                serviceBound = false
+            }
+        }
 
     private val uiHandler = Handler(Looper.getMainLooper())
 
     private var metricsUpdateRunnable: Runnable? = null
 
     private val channelViews: MutableMap<Int, ChannelView> =
-            mutableMapOf() // Asegúrate de poblar esto según tus canales
+        mutableMapOf() // Asegúrate de poblar esto según tus canales
 
     private val monitorReceiver =
-            object : BroadcastReceiver() {
+        object : BroadcastReceiver() {
 
-                override fun onReceive(context: Context?, intent: Intent?) {
+            override fun onReceive(context: Context?, intent: Intent?) {
 
-                    if (intent?.action == AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE
-                    ) {
+                if (intent?.action == AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE
+                ) {
 
-                        val jsonStr = intent.getStringExtra("channelStates") ?: return
+                    val jsonStr = intent.getStringExtra("channelStates") ?: return
 
-                        val json = JSONObject(jsonStr)
+                    val json = JSONObject(jsonStr)
 
-                        for (key in json.keys()) {
+                    for (key in json.keys()) {
 
-                            val channel = key.toIntOrNull() ?: continue
+                        val channel = key.toIntOrNull() ?: continue
 
-                            val state = json.getJSONObject(key)
+                        val state = json.getJSONObject(key)
 
-                            val rms = state.optDouble("rmsLevel", 0.0).toFloat()
+                        val rms = state.optDouble("rmsLevel", 0.0).toFloat()
 
-                            val peak = state.optDouble("peakLevel", 0.0).toFloat()
+                        val peak = state.optDouble("peakLevel", 0.0).toFloat()
 
-                            val isActive = state.optBoolean("isActive", false)
+                        val isActive = state.optBoolean("isActive", false)
 
-                            channelViews[channel]?.updateMonitor(rms, peak, isActive)
-                        }
+                        channelViews[channel]?.updateMonitor(rms, peak, isActive)
                     }
                 }
             }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
+
+        // ✅ Modo inmersivo: dibujar detrás de la barra de estado y navegación
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        }
 
         // ✅ OPTIMIZACIÓN LATENCIA FASE 1: Prioridad urgente de audio
         // Reduce jitter y variabilidad en timing (~0.5-1ms)
@@ -177,7 +183,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                android.content.pm.PackageManager.PERMISSION_GRANTED
             ) {
 
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
@@ -200,7 +206,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             val sampleRateStr = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
 
             val framesPerBufferStr =
-                    audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+                audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
 
             val optimalSampleRate = sampleRateStr?.toIntOrNull() ?: 48000
 
@@ -236,9 +242,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         latencyText = findViewById(R.id.latencyText)
 
-        rfStatusText = findViewById(R.id.rfStatusText)
+        // rfStatusText = findViewById(R.id.rfStatusText)
 
-        webControlText = findViewById(R.id.webControlText)
+        // webControlText = findViewById(R.id.webControlText)
 
         infoText = findViewById(R.id.infoText)
 
@@ -259,28 +265,28 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         masterVolumeSeekBar.progress = 60 // 0dB por defecto
 
         masterVolumeSeekBar.setOnSeekBarChangeListener(
-                object : SeekBar.OnSeekBarChangeListener {
+            object : SeekBar.OnSeekBarChangeListener {
 
-                    override fun onProgressChanged(
-                            seekBar: SeekBar?,
-                            progress: Int,
-                            fromUser: Boolean
-                    ) {
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean
+                ) {
 
-                        masterVolumeDb = (progress - 60).toFloat()
+                    masterVolumeDb = (progress - 60).toFloat()
 
-                        masterVolumeText.text = String.format("%.0f dB", masterVolumeDb)
+                    masterVolumeText.text = String.format("%.0f dB", masterVolumeDb)
 
-                        audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
-                    }
-
-                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-
-                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
-
-                        saveSessionPreferences()
-                    }
+                    audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
                 }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {
+
+                    saveSessionPreferences()
+                }
+            }
         )
 
         muteButton.setOnClickListener { toggleMute() }
@@ -308,111 +314,111 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun initializeAudioComponents() {
 
         audioClient =
-                NativeAudioClient().apply {
-                    onAudioData = { audioData -> handleAudioData(audioData) }
+            NativeAudioClient().apply {
+                onAudioData = { audioData -> handleAudioData(audioData) }
 
-                    onConnectionStatus = { connected, message ->
-                        updateConnectionStatus(connected, message)
-                    }
+                onConnectionStatus = { connected, message ->
+                    updateConnectionStatus(connected, message)
+                }
 
-                    onServerInfo = { info -> handleServerInfo(info) }
+                onServerInfo = { info -> handleServerInfo(info) }
 
-                    onError = { error ->
-                        lifecycleScope.launch {
-                            if (!isFinishing && !isDestroyed) {
+                onError = { error ->
+                    lifecycleScope.launch {
+                        if (!isFinishing && !isDestroyed) {
 
-                                showError("Error: $error")
-                            }
+                            showError("Error: $error")
                         }
                     }
+                }
 
-                    // ✅ NUEVO: Recibir actualizaciones de canal desde web
-                    onChannelUpdate = { channel, gainDb, pan, active ->
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            if (!isFinishing && !isDestroyed) {
-                                channelViews[channel]?.let { view ->
-                                    gainDb?.let {
-                                        val gainLinear = dbToLinear(it)
-                                        view.setGainLinear(gainLinear, fromServer = true)
-                                        audioRenderer.updateChannelGain(channel, it)
+                // ✅ NUEVO: Recibir actualizaciones de canal desde web
+                onChannelUpdate = { channel, gainDb, pan, active ->
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            channelViews[channel]?.let { view ->
+                                gainDb?.let {
+                                    val gainLinear = dbToLinear(it)
+                                    view.setGainLinear(gainLinear, fromServer = true)
+                                    audioRenderer.updateChannelGain(channel, it)
+                                }
+                                pan?.let {
+                                    view.setPan(it, fromServer = true)
+                                    audioRenderer.updateChannelPan(channel, it)
+                                }
+                                active?.let {
+                                    view.setActive(it, fromServer = true)
+                                    audioRenderer.setChannelActive(channel, it)
+                                }
+                            }
+                            Log.d(
+                                TAG,
+                                "✅ Canal $channel actualizado desde web: gain=${gainDb}dB pan=$pan"
+                            )
+                        }
+                    }
+                }
+
+                // ✅ NUEVO: Recibir actualización de ganancia maestra desde web
+                onMasterGainUpdate = { gainDb ->
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            masterVolumeDb = gainDb
+                            audioRenderer.setMasterGain(gainDb)
+                            masterVolumeSeekBar.progress = (gainDb + 60).toInt()
+                            masterVolumeText.text = String.format("%.0f dB", gainDb)
+                            Log.d(TAG, "✅ Master gain actualizado desde web: ${gainDb}dB")
+                        }
+                    }
+                }
+
+                // ✅ NUEVO: Recibir estado completo de mezcla desde web
+                onMixStateUpdate = { mixState ->
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            val channels = mixState["channels"] as? List<Int> ?: emptyList()
+                            val gains = mixState["gains"] as? Map<Int, Float> ?: emptyMap()
+                            val pans = mixState["pans"] as? Map<Int, Float> ?: emptyMap()
+
+                            // Aplicar todos los cambios
+                            for (ch in 0 until 8) {
+                                val isActive = channels.contains(ch)
+                                channelViews[ch]?.setActive(isActive, fromServer = true)
+                                audioRenderer.setChannelActive(ch, isActive)
+
+                                if (isActive) {
+                                    gains[ch]?.let { gainLinear ->
+                                        val gainDb = linearToDb(gainLinear)
+                                        channelViews[ch]?.setGainLinear(
+                                            gainLinear,
+                                            fromServer = true
+                                        )
+                                        audioRenderer.updateChannelGain(ch, gainDb)
                                     }
-                                    pan?.let {
-                                        view.setPan(it, fromServer = true)
-                                        audioRenderer.updateChannelPan(channel, it)
-                                    }
-                                    active?.let {
-                                        view.setActive(it, fromServer = true)
-                                        audioRenderer.setChannelActive(channel, it)
+                                    pans[ch]?.let { pan ->
+                                        channelViews[ch]?.setPan(pan, fromServer = true)
+                                        audioRenderer.updateChannelPan(ch, pan)
                                     }
                                 }
-                                Log.d(
-                                        TAG,
-                                        "✅ Canal $channel actualizado desde web: gain=${gainDb}dB pan=$pan"
-                                )
                             }
-                        }
-                    }
 
-                    // ✅ NUEVO: Recibir actualización de ganancia maestra desde web
-                    onMasterGainUpdate = { gainDb ->
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            if (!isFinishing && !isDestroyed) {
+                            // Master gain si existe
+                            (mixState["master_gain"] as? Float)?.let { gainLinear ->
+                                val gainDb = linearToDb(gainLinear)
                                 masterVolumeDb = gainDb
                                 audioRenderer.setMasterGain(gainDb)
                                 masterVolumeSeekBar.progress = (gainDb + 60).toInt()
                                 masterVolumeText.text = String.format("%.0f dB", gainDb)
-                                Log.d(TAG, "✅ Master gain actualizado desde web: ${gainDb}dB")
                             }
-                        }
-                    }
 
-                    // ✅ NUEVO: Recibir estado completo de mezcla desde web
-                    onMixStateUpdate = { mixState ->
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            if (!isFinishing && !isDestroyed) {
-                                val channels = mixState["channels"] as? List<Int> ?: emptyList()
-                                val gains = mixState["gains"] as? Map<Int, Float> ?: emptyMap()
-                                val pans = mixState["pans"] as? Map<Int, Float> ?: emptyMap()
-
-                                // Aplicar todos los cambios
-                                for (ch in 0 until 8) {
-                                    val isActive = channels.contains(ch)
-                                    channelViews[ch]?.setActive(isActive, fromServer = true)
-                                    audioRenderer.setChannelActive(ch, isActive)
-
-                                    if (isActive) {
-                                        gains[ch]?.let { gainLinear ->
-                                            val gainDb = linearToDb(gainLinear)
-                                            channelViews[ch]?.setGainLinear(
-                                                    gainLinear,
-                                                    fromServer = true
-                                            )
-                                            audioRenderer.updateChannelGain(ch, gainDb)
-                                        }
-                                        pans[ch]?.let { pan ->
-                                            channelViews[ch]?.setPan(pan, fromServer = true)
-                                            audioRenderer.updateChannelPan(ch, pan)
-                                        }
-                                    }
-                                }
-
-                                // Master gain si existe
-                                (mixState["master_gain"] as? Float)?.let { gainLinear ->
-                                    val gainDb = linearToDb(gainLinear)
-                                    masterVolumeDb = gainDb
-                                    audioRenderer.setMasterGain(gainDb)
-                                    masterVolumeSeekBar.progress = (gainDb + 60).toInt()
-                                    masterVolumeText.text = String.format("%.0f dB", gainDb)
-                                }
-
-                                Log.d(
-                                        TAG,
-                                        "✅ Mix state completo actualizado desde web: ${channels.size} canales"
-                                )
-                            }
+                            Log.d(
+                                TAG,
+                                "✅ Mix state completo actualizado desde web: ${channels.size} canales"
+                            )
                         }
                     }
                 }
+            }
 
         // ✅ FIXED: Sin Context - Auto-recreación en fallos
 
@@ -554,14 +560,8 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun handleServerInfo(info: Map<String, Any>) {
 
         runOnUiThread {
-            val webControlled = info["web_controlled"] as? Boolean ?: false
-
-            if (webControlled) {
-
-                webControlText.text = "🌐 Control desde WEB ✅"
-
-                webControlText.setTextColor(getColor(android.R.color.holo_green_light))
-            }
+            // Eliminado: webControlText.text = "🌐 Control desde WEB ✅"
+            // Eliminado: webControlText.setTextColor(getColor(android.R.color.holo_green_light))
 
             // ✅ NUEVO: Mostrar versión del servidor
 
@@ -570,10 +570,10 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             if (serverVersion != null) {
 
                 infoText.text =
-                        "• Servidor: $serverVersion\n" +
-                                "• Canales gestionados desde WEB\n" +
-                                "• Auto-recreación de streams: HABILITADA\n" +
-                                "• Mantén presionado la latencia para recrear streams"
+                    "• Servidor: $serverVersion\n" +
+                            "• Canales gestionados desde WEB\n" +
+                            "• Auto-recreación de streams: HABILITADA\n" +
+                            "• Mantén presionado la latencia para recrear streams"
             }
         }
     }
@@ -643,9 +643,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         try {
 
             val serviceIntent =
-                    Intent(this, AudioStreamForegroundService::class.java).apply {
-                        action = AudioStreamForegroundService.ACTION_START
-                    }
+                Intent(this, AudioStreamForegroundService::class.java).apply {
+                    action = AudioStreamForegroundService.ACTION_START
+                }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
@@ -690,61 +690,61 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun startMetricsUpdates() {
 
         metricsUpdateRunnable =
-                object : Runnable {
+            object : Runnable {
 
-                    override fun run() {
+                override fun run() {
 
-                        runOnUiThread {
-                            if (isFinishing || isDestroyed) {
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) {
 
-                                stopMetricsUpdates()
+                            stopMetricsUpdates()
 
-                                return@runOnUiThread
-                            }
-
-                            if (isConnected) {
-
-                                val latency = audioRenderer.getLatencyMs()
-
-                                latencyText.text = "${latency.toInt()} ms"
-
-                                latencyText.setTextColor(
-                                        when {
-                                            latency < 15 ->
-                                                    getColor(android.R.color.holo_green_light)
-                                            latency < 30 ->
-                                                    getColor(android.R.color.holo_orange_light)
-                                            else -> getColor(android.R.color.holo_red_light)
-                                        }
-                                )
-
-                                rfStatusText.text = audioClient.getRFStatus()
-
-                                // ✅ NUEVO: Detectar si hay streams con fallos
-
-                                val stats = audioRenderer.getRFStats()
-
-                                val totalFailures = stats["total_failures"] as? Int ?: 0
-
-                                if (totalFailures > 5) {
-
-                                    statusText.text = "⚠️ Streams con errores (long press latencia)"
-
-                                    statusText.setTextColor(
-                                            getColor(android.R.color.holo_orange_light)
-                                    )
-                                }
-                            } else {
-
-                                latencyText.text = "-- ms"
-
-                                rfStatusText.text = audioClient.getRFStatus()
-                            }
+                            return@runOnUiThread
                         }
 
-                        uiHandler.postDelayed(this, 100)
+                        if (isConnected) {
+
+                            val latency = audioRenderer.getLatencyMs()
+
+                            latencyText.text = "${latency.toInt()} ms"
+
+                            latencyText.setTextColor(
+                                when {
+                                    latency < 15 ->
+                                        getColor(android.R.color.holo_green_light)
+                                    latency < 30 ->
+                                        getColor(android.R.color.holo_orange_light)
+                                    else -> getColor(android.R.color.holo_red_light)
+                                }
+                            )
+
+                            // rfStatusText.text = audioClient.getRFStatus()
+
+                            // ✅ NUEVO: Detectar si hay streams con fallos
+
+                            val stats = audioRenderer.getRFStats()
+
+                            val totalFailures = stats["total_failures"] as? Int ?: 0
+
+                            if (totalFailures > 5) {
+
+                                statusText.text = "⚠️ Streams con errores (long press latencia)"
+
+                                statusText.setTextColor(
+                                    getColor(android.R.color.holo_orange_light)
+                                )
+                            }
+                        } else {
+
+                            latencyText.text = "-- ms"
+
+                            // rfStatusText.text = audioClient.getRFStatus()
+                        }
                     }
+
+                    uiHandler.postDelayed(this, 100)
                 }
+            }
 
         uiHandler.post(metricsUpdateRunnable!!)
     }
@@ -780,17 +780,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         super.onResume()
 
         if (android.os.Build.VERSION.SDK_INT >= 33) {
-
             registerReceiver(
-                    monitorReceiver,
-                    IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
-                    Context.RECEIVER_NOT_EXPORTED
+                monitorReceiver,
+                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
+                Context.RECEIVER_NOT_EXPORTED
             )
         } else {
-
             registerReceiver(
-                    monitorReceiver,
-                    IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
+                monitorReceiver,
+                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
             )
         }
     }
@@ -799,6 +797,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         super.onPause()
 
+        // Para evitar el error de registro de broadcast en Android 13+ (API 33),
+        // se debe usar el flag Context.RECEIVER_NOT_EXPORTED o Context.RECEIVER_EXPORTED
+        // tanto al registrar como al desregistrar el receiver.
         unregisterReceiver(monitorReceiver)
     }
 
@@ -818,7 +819,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun dbToLinear(db: Float): Float = 10.0f.pow(db / 20.0f)
 
     private fun linearToDb(linear: Float): Float =
-            if (linear > 0) 20.0f * Math.log10(linear.toDouble()).toFloat() else -60f
+        if (linear > 0) 20.0f * Math.log10(linear.toDouble()).toFloat() else -60f
 
     /**
      *
@@ -830,20 +831,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         if (mainContainer != null) {
 
-            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainContainer) {
-                    view,
-                    windowInsets ->
-                val sysBarInsets =
-                        windowInsets.getInsets(
-                                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
-                                        androidx.core.view.WindowInsetsCompat.Type.displayCutout()
-                        )
-
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainContainer) { view, windowInsets ->
+                // Para máxima compatibilidad con modo inmersivo, NO aplicar padding superior/inferior
                 view.setPadding(
-                        view.paddingLeft,
-                        sysBarInsets.top,
-                        view.paddingRight,
-                        view.paddingBottom
+                    view.paddingLeft,
+                    0,
+                    view.paddingRight,
+                    0
                 )
 
                 windowInsets
@@ -853,4 +847,14 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     // ✅ UI: barras del sistema visibles para controles de volumen y notificaciones
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemUI()
+    }
+
+    private fun hideSystemUI() {
+        val controller = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
 }

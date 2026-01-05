@@ -1,5 +1,5 @@
-// native_audio_engine.cpp - VERSIÓN FASE 3 OPTIMIZADA
-// Bridge JNI entre Kotlin y Oboe - ULTRA LOW LATENCY + NEON SIMD
+// native_audio_engine.cpp - VERSIÓN CORREGIDA
+// Bridge JNI entre Kotlin y Oboe - ULTRA LOW LATENCY
 
 #include <jni.h>
 #include <oboe/Oboe.h>
@@ -7,14 +7,6 @@
 #include <memory>
 #include <map>
 #include "audio_callback.h"
-
-// ✅ FASE 3: NEON SIMD para ARM processors
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-#include <arm_neon.h>
-#define HAS_NEON 1
-#else
-#define HAS_NEON 0
-#endif
 
 #define LOG_TAG "NativeAudioEngine"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -28,8 +20,8 @@ struct AudioStreamWrapper {
     int channelId;
 
     AudioStreamWrapper(std::shared_ptr<oboe::AudioStream> s,
-                       std::shared_ptr<AudioCallback> c,
-                       int id)
+            std::shared_ptr<AudioCallback> c,
+            int id)
             : stream(std::move(s)), callback(std::move(c)), channelId(id) {}
 };
 
@@ -116,7 +108,7 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeCreateStream
 
         if (result != oboe::Result::OK) {
             LOGE("❌ Error abriendo stream canal %d: %s",
-                 channelId, oboe::convertToText(result));
+                    channelId, oboe::convertToText(result));
             return 0;
         }
 
@@ -129,7 +121,7 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeCreateStream
 
         if (bufferResult.error() == oboe::Result::OK) {
             LOGI("📦 Buffer size: %d frames (burst=%d)",
-                 bufferResult.value(), framesPerBurst);
+                    bufferResult.value(), framesPerBurst);
         }
 
         auto wrapper = std::make_shared<AudioStreamWrapper>(
@@ -142,16 +134,16 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeCreateStream
 
         // ✅ Log detallado de configuración
         LOGI("✅ Stream canal %d creado %s",
-             channelId, isUsingMMAP ? "con MMAP ⚡" : "(Legacy mode)");
+                channelId, isUsingMMAP ? "con MMAP ⚡" : "(Legacy mode)");
         LOGI("   Sample Rate: %d Hz", stream->getSampleRate());
         LOGI("   Buffer Size: %d frames", stream->getBufferSizeInFrames());
         LOGI("   Frames/Burst: %d", framesPerBurst);
         LOGI("   Performance: %s",
-             stream->getPerformanceMode() == oboe::PerformanceMode::LowLatency ?
-             "LOW_LATENCY" : "POWER_SAVING");
+                stream->getPerformanceMode() == oboe::PerformanceMode::LowLatency ?
+                        "LOW_LATENCY" : "POWER_SAVING");
         LOGI("   Sharing: %s",
-             stream->getSharingMode() == oboe::SharingMode::Exclusive ?
-             "EXCLUSIVE (MMAP)" : "SHARED");
+                stream->getSharingMode() == oboe::SharingMode::Exclusive ?
+                        "EXCLUSIVE (MMAP)" : "SHARED");
 
         // ✅ Calcular latencia estimada
         float latencyMs = (float)stream->getBufferSizeInFrames() * 1000.0f / stream->getSampleRate();
@@ -179,8 +171,8 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeStartStream(
     if (result == oboe::Result::OK) {
         bool isMMAP = (wrapper->stream->getSharingMode() == oboe::SharingMode::Exclusive);
         LOGD("▶️ Stream canal %d iniciado (%s)",
-             wrapper->channelId,
-             isMMAP ? "MMAP" : "Legacy");
+                wrapper->channelId,
+                isMMAP ? "MMAP" : "Legacy");
     } else {
         LOGE("❌ Error iniciando stream: %s", oboe::convertToText(result));
     }
@@ -314,8 +306,8 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeDestroyStrea
     }
 
     LOGD("🗑️ Destruyendo stream canal %d (%s)",
-         wrapper->channelId,
-         isMMAP ? "MMAP" : "Legacy");
+            wrapper->channelId,
+            isMMAP ? "MMAP" : "Legacy");
 
     if (wrapper->stream) {
         wrapper->stream->requestStop();
@@ -352,106 +344,11 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeSetBufferSiz
 
     if (result.error() == oboe::Result::OK) {
         LOGD("📦 Buffer size: %d frames (canal %d)",
-             result.value(), wrapper->channelId);
+                result.value(), wrapper->channelId);
     } else {
         LOGE("❌ Error configurando buffer size: %s",
-             oboe::convertToText(result.error()));
+                oboe::convertToText(result.error()));
     }
 }
-
-// ✅ FASE 3: Funciones optimizadas con NEON SIMD
-#if HAS_NEON
-
-/**
- * Procesar audio estéreo con NEON SIMD
- * Aplica gain L/R y soft-clip en una sola pasada
- * ~4x más rápido que versión escalar
- */
-inline void processAudioNEON(float* dst, const float* src, float gainL, float gainR, int samples) {
-    // Vectores de ganancias
-    float32x4_t vGainL = vdupq_n_f32(gainL);
-    float32x4_t vGainR = vdupq_n_f32(gainR);
-
-    // Límites para soft-clip [-1.0, 1.0]
-    float32x4_t vMin = vdupq_n_f32(-1.0f);
-    float32x4_t vMax = vdupq_n_f32(1.0f);
-
-    int i = 0;
-    const int simdLimit = (samples / 4) * 4;
-
-    // Procesamiento vectorizado: 4 samples a la vez
-    for (; i < simdLimit; i += 4) {
-        // Cargar 4 samples mono
-        float32x4_t vSrc = vld1q_f32(src + i);
-
-        // Multiplicar por ganancias L/R
-        float32x4_t vLeft = vmulq_f32(vSrc, vGainL);
-        float32x4_t vRight = vmulq_f32(vSrc, vGainR);
-
-        // Soft-clip con vmin/vmax (saturación rápida)
-        vLeft = vmaxq_f32(vMin, vminq_f32(vMax, vLeft));
-        vRight = vmaxq_f32(vMin, vminq_f32(vMax, vRight));
-
-        // Interleave L/R para salida estéreo
-        float32x4x2_t vInterleaved = vzipq_f32(vLeft, vRight);
-
-        // Almacenar 8 valores (4 pares L/R)
-        vst1q_f32(dst + i*2, vInterleaved.val[0]);
-        vst1q_f32(dst + i*2 + 4, vInterleaved.val[1]);
-    }
-
-    // Procesar samples restantes (escalar)
-    for (; i < samples; i++) {
-        float sample = src[i];
-        float left = sample * gainL;
-        float right = sample * gainR;
-
-        // Clamp [-1.0, 1.0]
-        left = (left < -1.0f) ? -1.0f : (left > 1.0f ? 1.0f : left);
-        right = (right < -1.0f) ? -1.0f : (right > 1.0f ? 1.0f : right);
-
-        dst[i*2] = left;
-        dst[i*2 + 1] = right;
-    }
-}
-
-/**
- * Conversión Int16 -> Float32 con NEON (4x más rápido)
- */
-inline void convertInt16ToFloatNEON(float* dst, const int16_t* src, int samples) {
-    const float scale = 1.0f / 32768.0f;
-    float32x4_t vScale = vdupq_n_f32(scale);
-
-    int i = 0;
-    const int simdLimit = (samples / 8) * 8;
-
-    // Procesar 8 samples a la vez
-    for (; i < simdLimit; i += 8) {
-        // Cargar 8 int16
-        int16x8_t vSrc = vld1q_s16(src + i);
-
-        // Convertir a int32 (necesario para vcvtq_f32)
-        int32x4_t vLow = vmovl_s16(vget_low_s16(vSrc));
-        int32x4_t vHigh = vmovl_s16(vget_high_s16(vSrc));
-
-        // Convertir a float y escalar
-        float32x4_t vFloatLow = vcvtq_f32_s32(vLow);
-        float32x4_t vFloatHigh = vcvtq_f32_s32(vHigh);
-
-        vFloatLow = vmulq_f32(vFloatLow, vScale);
-        vFloatHigh = vmulq_f32(vFloatHigh, vScale);
-
-        // Almacenar
-        vst1q_f32(dst + i, vFloatLow);
-        vst1q_f32(dst + i + 4, vFloatHigh);
-    }
-
-    // Resto
-    for (; i < samples; i++) {
-        dst[i] = src[i] * scale;
-    }
-}
-
-#endif // HAS_NEON
 
 } // extern "C"

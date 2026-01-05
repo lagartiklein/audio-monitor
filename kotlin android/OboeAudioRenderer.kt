@@ -78,19 +78,19 @@ class OboeAudioRenderer(private val context: Context? = null) {
     private var deviceFramesPerBurst = 0
 
     data class StreamState(
-            val handle: Long,
-            var consecutiveFailures: Int = 0,
-            var lastWriteTime: Long = System.currentTimeMillis(),
-            var lastClearTime: Long = 0
+        val handle: Long,
+        var consecutiveFailures: Int = 0,
+        var lastWriteTime: Long = System.currentTimeMillis(),
+        var lastClearTime: Long = 0
     )
 
     data class ChannelState(
-            var gainDb: Float = 0f,
-            var pan: Float = 0f,
-            var isActive: Boolean = true,
-            var peakLevel: Float = 0f,
-            var rmsLevel: Float = 0f,
-            var packetsReceived: Int = 0
+        var gainDb: Float = 0f,
+        var pan: Float = 0f,
+        var isActive: Boolean = true,
+        var peakLevel: Float = 0f,
+        var rmsLevel: Float = 0f,
+        var packetsReceived: Int = 0
     )
 
     init {
@@ -108,8 +108,8 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
             if (isInitialized) {
                 Log.d(
-                        TAG,
-                        """
+                    TAG,
+                    """
                     ✅ Oboe Engine ULTRA-LOW LATENCY
                        📊 Sample Rate: $OPTIMAL_SAMPLE_RATE Hz ${if (context != null) "(nativo)" else "(default)"}
                        🎵 Canales: $CHANNELS
@@ -135,31 +135,31 @@ class OboeAudioRenderer(private val context: Context? = null) {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             if (audioManager != null) {
                 audioManager
-                        .getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
-                        ?.toIntOrNull()
-                        ?.let { if (it in 44100..96000) OPTIMAL_SAMPLE_RATE = it }
+                    .getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+                    ?.toIntOrNull()
+                    ?.let { if (it in 44100..96000) OPTIMAL_SAMPLE_RATE = it }
                 audioManager
-                        .getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
-                        ?.toIntOrNull()
-                        ?.let {
-                            if (it in 64..512) {
-                                deviceFramesPerBurst = it
-                                OPTIMAL_BUFFER_SIZE =
-                                        when {
-                                            deviceFramesPerBurst <= 96 -> 64
-                                            deviceFramesPerBurst <= 192 -> 128
-                                            else -> 256
-                                        }.coerceIn(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE)
-                            }
+                    .getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+                    ?.toIntOrNull()
+                    ?.let {
+                        if (it in 64..512) {
+                            deviceFramesPerBurst = it
+                            OPTIMAL_BUFFER_SIZE =
+                                when {
+                                    deviceFramesPerBurst <= 96 -> 64
+                                    deviceFramesPerBurst <= 192 -> 128
+                                    else -> 256
+                                }.coerceIn(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE)
                         }
+                    }
                 deviceSupportsMMAP =
-                        context.packageManager.hasSystemFeature(
-                                "android.hardware.audio.low_latency"
-                        ) || context.packageManager.hasSystemFeature("android.hardware.audio.pro")
+                    context.packageManager.hasSystemFeature(
+                        "android.hardware.audio.low_latency"
+                    ) || context.packageManager.hasSystemFeature("android.hardware.audio.pro")
 
                 Log.d(
-                        TAG,
-                        "🔍 Audio: $OPTIMAL_SAMPLE_RATE Hz, ${OPTIMAL_BUFFER_SIZE}f buffer, MMAP=$deviceSupportsMMAP"
+                    TAG,
+                    "🔍 Audio: $OPTIMAL_SAMPLE_RATE Hz, ${OPTIMAL_BUFFER_SIZE}f buffer, MMAP=$deviceSupportsMMAP"
                 )
             }
         } catch (e: Exception) {
@@ -177,8 +177,8 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
         if (streamState != null) {
             Log.w(
-                    TAG,
-                    "🔄 Recreando stream canal $channel (${streamState.consecutiveFailures} fallos)"
+                TAG,
+                "🔄 Recreando stream canal $channel (${streamState.consecutiveFailures} fallos)"
             )
             destroyStream(channel)
         }
@@ -229,8 +229,8 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 val latencyEstimate = (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE).format(1)
 
                 Log.d(
-                        TAG,
-                        """
+                    TAG,
+                    """
                     ✅ Stream canal $channel creado
                        Buffer: $OPTIMAL_BUFFER_SIZE frames (~${latencyEstimate}ms)
                        Sample Rate: $OPTIMAL_SAMPLE_RATE Hz
@@ -406,12 +406,12 @@ class OboeAudioRenderer(private val context: Context? = null) {
     /** ✅ CORREGIDO: Obtener info sin campos MMAP custom */
     fun getDeviceInfo(): Map<String, Any> {
         return mapOf(
-                "sample_rate" to OPTIMAL_SAMPLE_RATE,
-                "buffer_size" to OPTIMAL_BUFFER_SIZE,
-                "estimated_latency_ms" to (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE),
-                "mmap_support" to deviceSupportsMMAP,
-                "frames_per_burst" to deviceFramesPerBurst,
-                "active_streams" to streamHandles.size
+            "sample_rate" to OPTIMAL_SAMPLE_RATE,
+            "buffer_size" to OPTIMAL_BUFFER_SIZE,
+            "estimated_latency_ms" to (OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE),
+            "mmap_support" to deviceSupportsMMAP,
+            "frames_per_burst" to deviceFramesPerBurst,
+            "active_streams" to streamHandles.size
         )
     }
 
@@ -421,14 +421,14 @@ class OboeAudioRenderer(private val context: Context? = null) {
         return try {
             val stats = nativeGetRFStats(streamState.handle)
             mapOf(
-                    "available_frames" to stats[0],
-                    "latency_ms" to stats[1],
-                    "is_receiving" to (stats[2] == 1),
-                    "underruns" to stats[3],
-                    "drops" to stats[4],
-                    "buffer_usage" to stats[5],
-                    "resets" to (stats.getOrNull(6) ?: 0),
-                    "consecutive_failures" to streamState.consecutiveFailures
+                "available_frames" to stats[0],
+                "latency_ms" to stats[1],
+                "is_receiving" to (stats[2] == 1),
+                "underruns" to stats[3],
+                "drops" to stats[4],
+                "buffer_usage" to stats[5],
+                "resets" to (stats.getOrNull(6) ?: 0),
+                "consecutive_failures" to streamState.consecutiveFailures
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error obteniendo stats RF: ${e.message}")
@@ -495,22 +495,22 @@ class OboeAudioRenderer(private val context: Context? = null) {
         val totalFramesDropped = totalDrops + totalPacketsDropped
 
         return mapOf(
-                "total_packets" to totalPacketsReceived,
-                "dropped_frames" to totalFramesDropped,
-                "drop_rate" to
-                        if (totalPacketsReceived > 0)
-                                (totalFramesDropped.toFloat() / totalPacketsReceived * 100f)
-                        else 0f,
-                "avg_latency_ms" to avgLatency,
-                "available_frames" to totalAvailable,
-                "underruns" to totalUnderruns,
-                "resets" to totalResets,
-                "active_streams" to streamHandles.size,
-                "is_initialized" to isInitialized,
-                "total_failures" to totalFailures,
-                "device_sample_rate" to OPTIMAL_SAMPLE_RATE,
-                "device_buffer_size" to OPTIMAL_BUFFER_SIZE,
-                "mmap_capable" to deviceSupportsMMAP
+            "total_packets" to totalPacketsReceived,
+            "dropped_frames" to totalFramesDropped,
+            "drop_rate" to
+                    if (totalPacketsReceived > 0)
+                        (totalFramesDropped.toFloat() / totalPacketsReceived * 100f)
+                    else 0f,
+            "avg_latency_ms" to avgLatency,
+            "available_frames" to totalAvailable,
+            "underruns" to totalUnderruns,
+            "resets" to totalResets,
+            "active_streams" to streamHandles.size,
+            "is_initialized" to isInitialized,
+            "total_failures" to totalFailures,
+            "device_sample_rate" to OPTIMAL_SAMPLE_RATE,
+            "device_buffer_size" to OPTIMAL_BUFFER_SIZE,
+            "mmap_capable" to deviceSupportsMMAP
         )
     }
 
@@ -583,11 +583,11 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
 
         return mapOf(
-                "buffered_frames" to totalBufferedFrames,
-                "active_streams" to streamHandles.size,
-                "packets_received" to totalPacketsReceived,
-                "packets_dropped" to totalPacketsDropped,
-                "is_initialized" to isInitialized
+            "buffered_frames" to totalBufferedFrames,
+            "active_streams" to streamHandles.size,
+            "packets_received" to totalPacketsReceived,
+            "packets_dropped" to totalPacketsDropped,
+            "is_initialized" to isInitialized
         )
     }
 

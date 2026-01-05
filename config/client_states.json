@@ -778,7 +778,7 @@
       "7": false
     },
     "master_gain": 1.0,
-    "last_seen": 1767642037.1215057,
+    "last_seen": 1767644169.300048,
     "reconnection_count": 0,
     "client_type": "native"
   },
@@ -796,12 +796,14 @@
       "1": false
     },
     "master_gain": 1.0,
-    "last_seen": 1767641974.7759552,
+    "last_seen": 1767644168.199104,
     "reconnection_count": 0,
     "client_type": "native"
   },
   "2c0b900e-2c9f-496e-8cde-0e2afc4a14a2": {
-    "channels": [],
+    "channels": [
+      1
+    ],
     "gains": {
       "0": 1.0,
       "1": 1.0,
@@ -833,7 +835,7 @@
       "7": false
     },
     "master_gain": 1.0,
-    "last_seen": 1767642037.1648161,
+    "last_seen": 1767645159.2657828,
     "reconnection_count": 0,
     "client_type": "native"
   },
@@ -871,6 +873,70 @@
     "master_gain": 1.0,
     "last_seen": 1767640515.8236096,
     "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "38b9bd54-2331-4b4a-96f7-31ca07890b75": {
+    "channels": [],
+    "gains": {},
+    "pans": {},
+    "mutes": {},
+    "master_gain": 1.0,
+    "last_seen": 1767643826.8890984,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "19f86481-20d9-4f68-bb46-e5d31c21468a": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767644208.2031336,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "ef0e6647-dc20-4f79-b38d-3b161faba742": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767644332.4188497,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "d3145f81-5c61-4e0a-937f-4577e1ab077b": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 3.9810717055349722
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767645383.0687273,
+    "reconnection_count": 1,
     "client_type": "native"
   }
 }
