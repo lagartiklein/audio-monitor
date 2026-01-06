@@ -68,11 +68,10 @@ class AudioMixer:
             
             num_samples = audio_data.shape[0]
             
-            # Crear buffer stereo de salida
-            output_L = np.zeros(num_samples, dtype=np.float32)
-            output_R = np.zeros(num_samples, dtype=np.float32)
+            # ✅ MONO OUTPUT: Crear buffer mono de salida
+            output_mono = np.zeros(num_samples, dtype=np.float32)
             
-            # Mezclar canales activos
+            # Mezclar canales activos en MONO (ignorar panorama)
             for ch in channels:
                 if ch >= audio_data.shape[1]:
                     continue
@@ -80,29 +79,18 @@ class AudioMixer:
                 # ✅ ZERO-COPY: Sin .copy() - acceso directo con slice
                 channel_data = audio_data[:, ch]
                 
-                # Aplicar ganancia individual + panorama
+                # Aplicar ganancia individual (sin panorama para mono)
                 gain = gains.get(ch, 1.0) * master_gain
-                pan = pans.get(ch, 0.0)  # -1.0 = left, 1.0 = right
-                pan_normalized = (pan + 1.0) / 2.0  # 0.0 a 1.0
-                gain_L = np.cos(pan_normalized * np.pi / 2) * gain
-                gain_R = np.sin(pan_normalized * np.pi / 2) * gain
                 
                 # ✅ ZERO-COPY: Operación directa sin buffers intermedios
-                np.add(output_L, channel_data * gain_L, out=output_L)
-                np.add(output_R, channel_data * gain_R, out=output_R)
+                np.add(output_mono, channel_data * gain, out=output_mono)
             
             # Limitar para evitar clipping (in-place)
-            np.clip(output_L, -1.0, 1.0, out=output_L)
-            np.clip(output_R, -1.0, 1.0, out=output_R)
+            np.clip(output_mono, -1.0, 1.0, out=output_mono)
             
-            # ✅ ZERO-COPY: Intercalar y convertir en un solo paso
-            stereo_data = np.empty(num_samples * 2, dtype=np.float32)
-            stereo_data[0::2] = output_L
-            stereo_data[1::2] = output_R
-            
-            # ✅ ZERO-COPY: Operación in-place para conversión
-            np.multiply(stereo_data, 32767, out=stereo_data)
-            audio_int16 = stereo_data.astype(np.int16)  # Conversión directa
+            # ✅ ZERO-COPY: Convertir a int16 mono
+            np.multiply(output_mono, 32767, out=output_mono)
+            audio_int16 = output_mono.astype(np.int16)  # Conversión directa
             audio_bytes = audio_int16.tobytes()
             
             # Debouncing: no enviar más de una vez cada 50ms
@@ -111,7 +99,7 @@ class AudioMixer:
                 self.broadcast_callback(
                     audio_bytes,
                     self.sample_rate,
-                    2,  # stereo
+                    1,  # ✅ MONO (APK lo convertirá a estéreo)
                     master_client_id
                 )
                 self.last_broadcast_time = current_time

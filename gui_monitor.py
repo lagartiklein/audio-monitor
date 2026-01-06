@@ -224,7 +224,7 @@ class AudioMonitorGUI:
         
         ctk.CTkLabel(
             header,
-            text="🎙️ DISPOSITIVO DE AUDIO",
+            text="DISPOSITIVO DE AUDIO",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=self.text_secondary
         ).pack(anchor="w")
@@ -253,7 +253,7 @@ class AudioMonitorGUI:
         # Botón para cambiar dispositivo
         self.change_device_btn = ctk.CTkButton(
             device_frame,
-            text="🔄 CAMBIAR DISPOSITIVO",
+            text="CAMBIAR DISPOSITIVO",
             command=self.show_device_selector,
             fg_color=self.bg_dark,
             hover_color="#1a1a28",
@@ -274,7 +274,7 @@ class AudioMonitorGUI:
         # Botón de inicio - Grande y llamativo
         self.start_btn = ctk.CTkButton(
             buttons_frame,
-            text="🚀 INICIAR SERVIDOR",
+            text="INICIAR SERVIDOR",
             command=self.start_server,
             fg_color=self.accent_success,
             hover_color="#00cc70",
@@ -288,7 +288,7 @@ class AudioMonitorGUI:
         # Botón de detener
         self.stop_btn = ctk.CTkButton(
             buttons_frame,
-            text="⏹️ DETENER SERVIDOR",
+            text="⏹DETENER SERVIDOR",
             command=self.stop_server,
             fg_color=self.accent_error,
             hover_color="#cc0000",
@@ -303,7 +303,7 @@ class AudioMonitorGUI:
         # Botón de salir
         exit_btn = ctk.CTkButton(
             buttons_frame,
-            text="👋 SALIR",
+            text="SALIR",
             command=self.on_closing,
             fg_color=self.bg_dark,
             hover_color=self.bg_card_hover,
@@ -339,7 +339,7 @@ class AudioMonitorGUI:
         # Tarjeta 1: Clientes RF
         self.rf_card = self.create_stat_card(
             stats_container,
-            "📡 CLIENTES RF",
+            "CLIENTES RF",
             "0",
             self.accent_primary
         )
@@ -348,7 +348,7 @@ class AudioMonitorGUI:
         # Tarjeta 2: Clientes Web
         self.web_card = self.create_stat_card(
             stats_container,
-            "🌐 CLIENTES WEB",
+            "CLIENTES WEB",
             "0",
             self.accent_secondary
         )
@@ -409,7 +409,7 @@ class AudioMonitorGUI:
         
         ctk.CTkLabel(
             header,
-            text="📊 LOGS DEL SISTEMA",
+            text="LOGS DEL SISTEMA",
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=self.text_primary
         ).pack(side="left")

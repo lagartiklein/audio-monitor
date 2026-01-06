@@ -745,7 +745,8 @@ class ChannelManager:
                 'pans': sub['pans'],
                 'active_channels': len(sub['channels']),
                 'master_gain': sub.get('master_gain', 1.0),
-                'last_update': sub.get('last_update', 0),
+                'last_activity': sub.get('last_update', 0),  # ✅ RENOMBRADO: last_update -> last_activity
+                'last_update': sub.get('last_update', 0),     # ✅ Mantener para compatibilidad
                 'connected': connected,
                 'is_master': is_master  # ✅ NUEVO: Flag para identificar cliente maestro
             })

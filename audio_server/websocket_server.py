@@ -54,10 +54,20 @@ def _load_ui_state_from_disk():
         order = data.get('client_order', [])
         if not isinstance(order, list):
             order = []
+
+        # Si el cliente maestro está deshabilitado, eliminarlo del orden persistido
+        if not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+            master_uuid = getattr(config, 'MASTER_CLIENT_UUID', '__master_server_client__')
+            order = [x for x in order if str(x) != str(master_uuid)]
+
         with ui_state_lock:
             ui_state['client_order'] = order
             ui_state['updated_at'] = int(data.get('updated_at') or 0)
         logger.info(f"[WebSocket] 🧭 UI state cargado: {len(order)} items")
+
+        # Persistir limpieza si se removió el maestro
+        if not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+            _save_ui_state_to_disk()
     except Exception as e:
         logger.debug(f"[WebSocket] UI state load failed: {e}")
 
@@ -194,6 +204,8 @@ def broadcast_master_audio(audio_data: bytes, sample_rate: int, channels: int):
         channels: número de canales en la mezcla
     """
     try:
+        if not getattr(config, 'MASTER_CLIENT_ENABLED', False) or not getattr(config, 'WEB_AUDIO_STREAM_ENABLED', False):
+            return
         with master_audio_lock:
             if not master_audio_listeners:
                 return
@@ -221,6 +233,8 @@ def broadcast_master_audio_internal(audio_data: bytes, sample_rate: int, channel
     Encapsula audio en base64 si es necesario para transmisión WebSocket
     """
     try:
+        if not getattr(config, 'MASTER_CLIENT_ENABLED', False) or not getattr(config, 'WEB_AUDIO_STREAM_ENABLED', False):
+            return
         import base64
         
         with master_audio_lock:
@@ -358,11 +372,12 @@ def init_server(manager, native_server=None):
     if hasattr(channel_manager, 'set_socketio'):
         channel_manager.set_socketio(socketio)
     
-    # ✅ NUEVO: Conectar audio mixer
-    audio_mixer = get_audio_mixer()
-    if audio_mixer:
-        audio_mixer.set_audio_callback(broadcast_master_audio_internal)
-        logger.info(f"[WebSocket] ✅ Audio Mixer conectado")
+    # ✅ Conectar audio mixer SOLO si está habilitado el cliente maestro
+    if getattr(config, 'MASTER_CLIENT_ENABLED', False) and getattr(config, 'WEB_AUDIO_STREAM_ENABLED', False):
+        audio_mixer = get_audio_mixer()
+        if audio_mixer:
+            audio_mixer.set_audio_callback(broadcast_master_audio_internal)
+            logger.info(f"[WebSocket] ✅ Audio Mixer conectado")
     
     logger.info(f"[WebSocket] ✅ Inicializado (Control Central)")
     logger.info(f"[WebSocket]    Puerto: {config.WEB_PORT}")
@@ -456,10 +471,12 @@ def handle_connect(auth=None):
 
     auth = auth or {}
     web_device_uuid = auth.get('device_uuid')
+    uuid_assigned = False
     
     # ✅ NUEVO: Si no hay device_uuid, generar uno único para este web
     if not web_device_uuid:
         web_device_uuid = f"web-{uuid.uuid4().hex[:12]}"
+        uuid_assigned = True
     
     # ✅ Registrar cliente web
     with web_clients_lock:
@@ -498,6 +515,12 @@ def handle_connect(auth=None):
         }
         emit('device_info', device_info)
 
+        # ✅ Informar al frontend del UUID asignado (si se generó uno nuevo)
+        emit('device_uuid_assigned', {
+            'device_uuid': web_device_uuid,
+            'assigned': uuid_assigned
+        })
+
         # --- Restaurar configuración persistente de canales si existe en device_registry ---
         restored_from_registry = False
         if web_device_uuid and getattr(channel_manager, 'device_registry', None):
@@ -513,11 +536,22 @@ def handle_connect(auth=None):
                         client_type="web",
                         device_uuid=web_device_uuid
                     )
+                    # subscribe_client no acepta mutes/master_gain: aplicar por update_client_mix
+                    try:
+                        channel_manager.update_client_mix(
+                            client_id,
+                            mutes=config_prev.get('mutes', {}),
+                            master_gain=config_prev.get('master_gain')
+                        )
+                    except Exception:
+                        pass
                     logger.info(f"[WebSocket] 🔄 Cliente restaurado desde device_registry: {len(config_prev.get('channels', []))} canales")
                     emit('auto_resubscribed', {
                         'channels': config_prev.get('channels', []),
                         'gains': config_prev.get('gains', {}),
-                        'pans': config_prev.get('pans', {})
+                        'pans': config_prev.get('pans', {}),
+                        'mutes': config_prev.get('mutes', {}),
+                        'master_gain': config_prev.get('master_gain', 1.0)
                     })
                     restored_from_registry = True
                 except Exception as e:
@@ -809,17 +843,31 @@ def handle_update_client_mix(data):
 @socketio.on('get_clients')
 def handle_get_clients():
     """
-    ✅ Obtener lista completa de clientes (nativos + web)
+    ✅ Obtener lista completa de clientes ACTIVOS (sin duplicados)
     """
     update_client_activity(request.sid)
     
     try:
         clients_info = get_all_clients_info()
+        
+        # ✅ NUEVO: Deduplicar por ID
+        seen_ids = set()
+        unique_clients = []
+        
+        for client in clients_info:
+            client_id = client.get('id')
+            if client_id not in seen_ids:
+                seen_ids.add(client_id)
+                unique_clients.append(client)
+        
         emit('clients_list', {
-            'clients': clients_info,
+            'clients': unique_clients,
             'order': _get_client_order(),
-            'timestamp': int(time.time() * 1000)
+            'timestamp': int(time.time() * 1000),
+            'total': len(unique_clients)
         })
+        
+        logger.debug(f"[WebSocket] ✅ Lista de clientes enviada: {len(unique_clients)} activos")
         
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en get_clients: {e}")
@@ -891,21 +939,40 @@ def handle_set_client_name(data):
             emit('error', {'message': 'Channel manager not available'})
             return
         
-        # Obtener device_uuid del cliente
+        # Resolver: puede venir client_id (runtime) o directamente device_uuid
         subscription = channel_manager.get_client_subscription(client_id)
-        if not subscription:
-            emit('error', {'message': f'Client {client_id} not found'})
-            return
-        
-        device_uuid = subscription.get('device_uuid')
-        
+
+        resolved_client_id = client_id
+        resolved_device_uuid = None
+
+        if subscription:
+            resolved_device_uuid = subscription.get('device_uuid')
+        else:
+            # Intentar mapear device_uuid -> client_id activo
+            try:
+                mapped_client_id = None
+                if hasattr(channel_manager, 'get_client_by_device_uuid'):
+                    mapped_client_id = channel_manager.get_client_by_device_uuid(client_id)
+                if mapped_client_id:
+                    resolved_client_id = mapped_client_id
+                    subscription = channel_manager.get_client_subscription(mapped_client_id)
+                    if subscription:
+                        resolved_device_uuid = subscription.get('device_uuid')
+            except Exception:
+                pass
+
+        # Permitir renombrar dispositivo aunque no esté conectado: asumir device_uuid
+        if not resolved_device_uuid:
+            resolved_device_uuid = client_id
+
         # Guardar nombre personalizado en device_registry
-        if device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
-            success = channel_manager.device_registry.set_custom_name(device_uuid, custom_name)
+        if hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            success = channel_manager.device_registry.set_custom_name(resolved_device_uuid, custom_name)
             if success:
-                logger.info(f"[WebSocket] 📝 Nombre personalizado guardado: {client_id[:8]} = {custom_name}")
+                logger.info(f"[WebSocket] 📝 Nombre personalizado guardado: {str(resolved_device_uuid)[:12]} = {custom_name}")
                 emit('client_name_saved', {
-                    'client_id': client_id,
+                    'client_id': resolved_client_id,
+                    'device_uuid': resolved_device_uuid,
                     'custom_name': custom_name,
                     'status': 'ok'
                 })
@@ -915,7 +982,7 @@ def handle_set_client_name(data):
             else:
                 emit('error', {'message': 'Failed to save custom name'})
         else:
-            emit('error', {'message': 'Device registry not available or no device_uuid'})
+            emit('error', {'message': 'Device registry not available'})
     
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en set_client_name: {e}")
@@ -1346,6 +1413,10 @@ def handle_start_master_audio():
     """
     client_id = request.sid
     update_client_activity(client_id)
+
+    if not getattr(config, 'MASTER_CLIENT_ENABLED', False) or not getattr(config, 'WEB_AUDIO_STREAM_ENABLED', False):
+        emit('error', {'message': 'Master client disabled'})
+        return
     
     if not channel_manager:
         emit('error', {'message': 'Channel manager not available'})
@@ -1410,6 +1481,13 @@ def handle_get_master_client_info():
     if not channel_manager:
         emit('error', {'message': 'Channel manager not available'})
         return
+
+    if not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+        emit('master_client_info', {
+            'enabled': False,
+            'message': 'Master client disabled'
+        })
+        return
     
     try:
         master_id = channel_manager.get_master_client_id()
@@ -1460,6 +1538,9 @@ def _save_client_config_to_registry(client_id):
         subscription = channel_manager.get_client_subscription(client_id)
         if not subscription:
             return
+
+        # ✅ Clave estable para persistencia (evita guardar por SID efímero)
+        persistent_key = subscription.get('device_uuid') or client_id
         
         # ✅ NUEVO: Guardar en channels_state para persistencia global
         state_to_save = {
@@ -1474,8 +1555,8 @@ def _save_client_config_to_registry(client_id):
         
         # Guardar en device_registry
         if hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
-            channel_manager.device_registry.update_channels_state(client_id, state_to_save)
-            logger.debug(f"[WebSocket] 💾 Estado de canales guardado para {client_id[:12]}")
+            channel_manager.device_registry.update_channels_state(persistent_key, state_to_save)
+            logger.debug(f"[WebSocket] 💾 Estado de canales guardado para {str(persistent_key)[:12]}")
         
         # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry (deshabilitado)
         if False:  # DISABLED FOR SESSION-ONLY CONFIG
@@ -1487,14 +1568,18 @@ def _save_client_config_to_registry(client_id):
 
 def get_all_clients_info():
     """
-    ✅ Obtener información de clientes para mostrar en web
+    ✅ Obtener información de clientes ACTIVOS para mostrar en web
     ✅ FILTRO ESTRICTO: Solo mostrar:
-       1. Cliente maestro (servidor - monitor sonidista)
-       2. Clientes Android nativos ACTIVOS
-    ✅ NO mostrar: Web, dispositivos inactivos, fantasmas, etc.
+       1. Cliente maestro (servidor - monitor sonidista) si está habilitado
+       2. Clientes Android nativos ACTIVOS CONECTADOS (con conexión real)
+    ✅ NO mostrar: 
+       - Clientes web (solo aplicaciones nativas)
+       - Clientes inactivos/fantasmas (sin actividad reciente)
+       - Clientes que nunca se han conectado
     """
-    # Obtener clientes activos en memoria (incluye el maestro)
     result_clients = []
+    current_time = time.time()
+    activity_timeout = 180.0  # 3 minutos sin actividad = considerado desconectado
     
     if channel_manager:
         try:
@@ -1503,28 +1588,62 @@ def get_all_clients_info():
             for c in all_info:
                 client_type = c.get('type', 'unknown')
                 is_master = c.get('is_master', False)
-                # Mostrar cliente maestro
+                is_connected = c.get('connected', False)  # ✅ NUEVO: verificar estado conexión
+                last_activity = c.get('last_activity', 0)
+                
+                # ✅ MOSTRAR: Cliente maestro si está habilitado
                 if is_master:
-                    result_clients.append(c)
+                    if getattr(config, 'MASTER_CLIENT_ENABLED', False):
+                        result_clients.append(c)
                     continue
-                # Mostrar todos los clientes android y native (sin importar estado conectado)
+                
+                # ✅ MOSTRAR: Clientes native/android SOLO si:
+                #   1. Están marcados como conectados
+                #   2. Tienen actividad reciente (últimos 3 minutos)
+                #   3. NO son dispositivos zombies
                 if client_type in ('native', 'android'):
-                    result_clients.append(c)
+                    # Verificar que esté realmente conectado y activo
+                    if is_connected and (current_time - last_activity) < activity_timeout:
+                        result_clients.append(c)
+                        logger.debug(f"[WebSocket] ✅ Cliente activo mostrado: {c.get('id', 'unknown')[:12]} "
+                                   f"(tipo: {client_type}, actividad: {current_time - last_activity:.1f}s)")
+                    else:
+                        # ✅ NUEVO: Log para debugging de clientes filtrados
+                        reason = "desconectado" if not is_connected else f"inactivo ({current_time - last_activity:.1f}s)"
+                        logger.debug(f"[WebSocket] ⊘ Cliente ignorado ({reason}): {c.get('id', 'unknown')[:12]} "
+                                   f"(tipo: {client_type})")
                     continue
-                # No mostrar otros tipos
+                
+                # ✅ NO mostrar otros tipos (web, etc)
                 
         except Exception as e:
             logger.error(f"[WebSocket] Error obteniendo clientes activos: {e}")
 
-    # ✅ Orden final: Maestro primero, luego Android nativos activos
-    # Separar maestro del resto
-    master_clients = [c for c in result_clients if c.get('is_master', False)]
-    other_clients = [c for c in result_clients if not c.get('is_master', False)]
+    # ✅ Deduplicar por device_uuid para evitar duplicados
+    seen_uuids = set()
+    deduped_clients = []
     
-    # Ordenar Android nativos por actividad reciente
+    for client in result_clients:
+        uuid = client.get('device_uuid') or client.get('id')
+        if uuid and uuid not in seen_uuids:
+            seen_uuids.add(uuid)
+            deduped_clients.append(client)
+        elif uuid:
+            logger.debug(f"[WebSocket] ⚠️ Cliente duplicado filtrado: {uuid[:12]}")
+    
+    # ✅ Orden final: Maestro primero, luego Android nativos ordenados por actividad
+    master_clients = [c for c in deduped_clients if c.get('is_master', False)]
+    other_clients = [c for c in deduped_clients if not c.get('is_master', False)]
+    
+    # Ordenar Android nativos por actividad reciente (más reciente primero)
     other_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
     
-    return master_clients + other_clients
+    final_result = master_clients + other_clients
+    
+    logger.debug(f"[WebSocket] 📊 Lista de clientes activos: {len(final_result)} "
+               f"(maestro: {len(master_clients)}, nativos: {len(other_clients)})")
+    
+    return final_result
 
 
 def get_server_stats():
@@ -1567,15 +1686,36 @@ def get_server_stats():
 
 
 def broadcast_clients_update():
-    """Optimización de la actualización de clientes."""
+    """
+    ✅ Optimización de la actualización de clientes.
+    ✅ MEJORADO: Deduplicación automática y validación de clientes activos
+    """
     try:
         clients_info = get_all_clients_info()
+        
+        # ✅ NUEVO: Deduplicar antes de enviar (por si acaso hay duplicados)
+        seen_ids = set()
+        unique_clients = []
+        
+        for client in clients_info:
+            client_id = client.get('id')
+            if client_id not in seen_ids:
+                seen_ids.add(client_id)
+                unique_clients.append(client)
+            else:
+                logger.warning(f"[WebSocket] ⚠️ Duplicado detectado en broadcast: {client_id[:12]}")
+        
         socketio.emit('clients_update', {
-            'clients': clients_info,
+            'clients': unique_clients,
             'order': _get_client_order(),
-            'timestamp': int(time.time() * 1000)
+            'timestamp': int(time.time() * 1000),
+            'count': len(unique_clients)
         })
-        logger.info(f"[WebSocket] 📡 Actualización enviada: {len(clients_info)} clientes")
+        
+        if len(unique_clients) != len(clients_info):
+            logger.warning(f"[WebSocket] ⚠️ Se filtraron {len(clients_info) - len(unique_clients)} duplicados")
+        
+        logger.info(f"[WebSocket] 📡 Actualización enviada: {len(unique_clients)} clientes activos")
     except Exception as e:
         logger.error(f"[WebSocket] ❌ Error en broadcast_clients_update: {e}")
 

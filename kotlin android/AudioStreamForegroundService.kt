@@ -305,11 +305,12 @@ class AudioStreamForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        // Moderniza: fondo negro semitransparente y estilo visual
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(message)
-            .setSmallIcon(R.drawable.logooficialdemo) // Tu icono de app
-            .setOngoing(true) // No se puede deslizar para cerrar
+            .setSmallIcon(R.drawable.logooficialdemo)
+            .setOngoing(true) // Persistente, no se puede deslizar para cerrar
             .setContentIntent(openPendingIntent)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
@@ -317,10 +318,17 @@ class AudioStreamForegroundService : Service() {
                 disconnectPendingIntent
             )
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+            .setColor(0xCC000000.toInt()) // Negro semitransparente
+            .setColorized(true)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+
+        // Para Android 8+ (Oreo), canal ya tiene IMPORTANCE_LOW, pero la notificación es Ongoing
+        // Para Android 11+ (API 30+), se puede usar setBubbleMetadata si se desea (opcional)
+
+        return builder.build()
     }
 
     override fun onBind(intent: Intent?): IBinder {

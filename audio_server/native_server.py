@@ -44,7 +44,7 @@ class NativeClient:
         self.connection_time = time.time()
         self.reconnection_count = 0
         self.consecutive_send_failures = 0
-        self.max_consecutive_failures = 5
+        self.max_consecutive_failures = 10  # ✅ AUMENTADO: 5 → 10 (más tolerante con buffers llenos)
         
         # ✅ ZERO-LATENCY: Sin cola - envío directo (tipo RF)
         # self.send_queue = ELIMINADO
@@ -124,26 +124,28 @@ class NativeClient:
             self.consecutive_send_failures += 1
             return False
     
-    def is_alive(self, timeout: float = 30.0) -> bool:
+    def is_alive(self, timeout: float = 30.0, buffer_grace: float = 30.0) -> bool:
         """✅ FIXED: Verificar que el cliente está REALMENTE vivo"""
         if self.status == 0:
             return False
-        
         # ✅ Verificar socket
         if not self._is_socket_alive():
             return False
-        
         # ✅ Verificar actividad reciente
         time_since_activity = time.time() - self.last_activity
         if time_since_activity > timeout:
             logger.warning(f"⚠️ Cliente {self.id[:15]} inactivo por {time_since_activity:.1f}s")
             return False
-        
-        # ✅ Verificar fallos consecutivos
+        # ✅ Verificar si el buffer está lleno por mucho tiempo
         if self.consecutive_send_failures >= self.max_consecutive_failures:
-            logger.warning(f"⚠️ Cliente {self.id[:15]} con {self.consecutive_send_failures} fallos consecutivos")
-            return False
-        
+            now = time.time()
+            if self.first_buffer_full_time is None:
+                self.first_buffer_full_time = now
+            elif now - self.first_buffer_full_time > buffer_grace:
+                logger.warning(f"⚠️ Cliente {self.id[:15]} buffer lleno por más de {buffer_grace}s")
+                return False
+        else:
+            self.first_buffer_full_time = None
         return True
     
     def _is_socket_alive(self) -> bool:
@@ -1143,7 +1145,8 @@ class NativeAudioServer:
             if config.DEBUG:
                 logger.error(f"Error notificando web: {e}")
     
-    def broadcast_control_update(self, channel: int, source: str, gain: float = None, pan: float = None, active: bool = None, mute: bool = None):
+    from typing import Optional
+    def broadcast_control_update(self, channel: int, source: str, gain: Optional[float] = None, pan: Optional[float] = None, active: Optional[bool] = None, mute: Optional[bool] = None):
         """
         ✅ NUEVO: Propagar cambio de control a todos los clientes nativos conectados
         Usado cuando web UI cambia un control y necesitamos sincronizar Android
@@ -1285,7 +1288,7 @@ class NativeAudioServer:
         
         # ✅ FASE 2: Procesar sin lock global
         for client_id, client, subscription in active_clients:
-            if not client.is_alive():
+            if not client.is_alive(buffer_grace=30.0):
                 clients_to_remove.append(client_id)
                 continue
             
@@ -1333,8 +1336,7 @@ class NativeAudioServer:
                 if client.send_bytes_direct(packet_bytes):
                     sent += 1
                 else:
-                    if client.consecutive_send_failures >= client.max_consecutive_failures:
-                        clients_to_remove.append(client_id)
+                    # No desconectar aquí, dejar que is_alive() lo haga por tiempo
                     self.update_stats(packets_dropped=1)
             except Exception as e:
                 if config.DEBUG:

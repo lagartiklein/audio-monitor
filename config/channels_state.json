@@ -1,42 +1,6 @@
 {
-  "timestamp": 1767645750,
+  "timestamp": 1767669861,
   "channels_state": {
-    "__master_server_client__": {
-      "channels": [],
-      "gains": {
-        "0": 1.0,
-        "1": 1.7782794100389228,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
-      },
-      "pans": {
-        "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "0": false,
-        "1": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
-      "solos": [],
-      "master_gain": 1.0,
-      "timestamp": 1767642156215
-    },
     "045e8e48-0d4b-446a-ae0e-73a022686016": {
       "channels": [
         1
@@ -55,12 +19,10 @@
       "timestamp": 1767644273970
     },
     "2c0b900e-2c9f-496e-8cde-0e2afc4a14a2": {
-      "channels": [
-        1
-      ],
+      "channels": [],
       "gains": {
-        "1": 1.0,
-        "0": 1.0,
+        "1": 3.9810717055349722,
+        "0": 3.9810717055349722,
         "2": 1.0,
         "3": 1.0,
         "4": 1.0,
@@ -69,7 +31,7 @@
         "7": 1.0
       },
       "pans": {
-        "1": 0.0,
+        "1": 0.08,
         "0": 0.0,
         "2": 0.0,
         "3": 0.0,
@@ -90,7 +52,7 @@
       },
       "solos": [],
       "master_gain": 1.0,
-      "timestamp": 1767645314392
+      "timestamp": 1767668285988
     },
     "9ec784d0-84b9-4ca2-9ce8-293a0add4319": {
       "channels": [],
@@ -268,6 +230,917 @@
       "solos": [],
       "master_gain": 1.0,
       "timestamp": 1767645750836
+    },
+    "78bc7fc5-79c7-4d60-beaf-58b21a67b772": {
+      "channels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "gains": {
+        "1": 1.6788040181225603,
+        "0": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "1": 0.0,
+        "0": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "1": false,
+        "0": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767646182015
+    },
+    "17af2645-35d8-4838-9158-5b117d09f49e": {
+      "channels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "gains": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767647394246
+    },
+    "a7050db4-cb69-4e2e-b01b-0753bef01576": {
+      "channels": [],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767648292251
+    },
+    "d119f6e8-a8d5-41dd-a286-34d0793dd5a2": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767648341458
+    },
+    "ef2ea406-7474-449d-9765-f7e9446ddd96": {
+      "channels": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        0,
+        1
+      ],
+      "gains": {
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "0": 1.0,
+        "1": 1.0
+      },
+      "pans": {
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0,
+        "0": 0.0,
+        "1": 0.0
+      },
+      "mutes": {
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false,
+        "0": false,
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767649265368
+    },
+    "7961f73b-d7fe-496a-8b11-c4d53cf2daf5": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767650050351
+    },
+    "81b8d614-f446-4207-a844-3fcb40e316f3": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767649791551
+    },
+    "33910eca-a8ee-4f50-aae5-aa0804185d4a": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "0": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "1": 1.0
+      },
+      "pans": {
+        "0": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0,
+        "1": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false,
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767650301159
+    },
+    "088d3340-42f5-49ee-9aa7-a79aa4e108d3": {
+      "channels": [],
+      "gains": {
+        "0": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "1": 1.0
+      },
+      "pans": {
+        "0": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0,
+        "1": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false,
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767651893176
+    },
+    "35762902-57db-4ca9-8d58-0e81a53e1c1a": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 0.06309573444801933,
+        "0": 0.06309573444801933
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767652487002
+    },
+    "4e00af0f-0f69-427d-a40c-ffd78fcebb50": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767652949305
+    },
+    "667ed771-755c-4eff-ad3e-4187fcec754e": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 0.06309573444801933
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767653143544
+    },
+    "8aa16ae5-8421-4f56-83e0-22080c1b4201": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767653071129
+    },
+    "41c88569-1b38-4e3e-b3ea-e38ff48c9fce": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767653357891
+    },
+    "e91e23a9-767b-414f-a905-e42c8d912372": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767653703151
+    },
+    "68490945-e447-4746-b901-ba30f83f91c8": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767654096104
+    },
+    "ffaddfd9-8677-49c5-aa00-87831349fbb3": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767654093843
+    },
+    "2c6b9fd9-aef0-4c88-8b8e-cf89f99e9b1c": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767654227150
+    },
+    "2f700e57-701d-49fd-ba2c-7bebe1405dfe": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767654327205
+    },
+    "a8b5cbaa-a9f0-4ca0-905a-17768f237c64": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 2.113489039836647
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767654641808
+    },
+    "0434d684-5ecd-4434-af96-76b13ff326f5": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767654834279
+    },
+    "b0bd6644-4496-4dc9-9a8e-649ddc05ffac": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767655646703
+    },
+    "bb5ccb4a-a245-4f59-bfd3-56e1b01ec06b": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767655869358
+    },
+    "7f04026c-5a2b-4685-93e9-3bbde4f2ac6d": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767655997100
+    },
+    "805004a0-b1cc-4267-976c-a7851f9c5b96": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767656133732
+    },
+    "1a517172-82c8-4035-8ed1-be3798284bac": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767656236084
+    },
+    "422a3ced-4f86-4a92-a795-269cf1cde51d": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767656432234
+    },
+    "2dbfd0ef-69fc-443c-95cb-e367c633fdc2": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0,
+        "0": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "1": 0.0,
+        "0": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "1": false,
+        "0": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767656653925
+    },
+    "b0acb29f-239b-46e5-b1c0-83f247e53791": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767656751000
+    },
+    "4624b34c-c873-49f9-8e0b-7fc53bf3ed95": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767657218738
+    },
+    "e3e3bee6-eb84-481e-b30a-0925056ce187": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722,
+        "0": 0.09440608762859236,
+        "2": 3.9810717055349722,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "1": 0.0,
+        "0": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "1": false,
+        "0": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767657747200
+    },
+    "0ae73ff4-52e1-48bb-93dd-66fb2be08cef": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767659007100
+    },
+    "0c7432db-ef43-4f51-9673-11c6f626b617": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 2.371373705661655
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767659108550
+    },
+    "4269ac16-b6db-47d0-93a1-a21711c8c02f": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767659012787
+    },
+    "1984f785-c641-4139-b541-395773147d83": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767665532902
+    },
+    "43aa9033-d64d-4a7b-bc98-491ca97ab813": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767660556557
+    },
+    "f556de82-1170-45ca-af18-235d0e6a2310": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767662983818
+    },
+    "24609774-d229-4f49-9f2d-8071a8bfd27f": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 2.8183829312644537
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767662982816
+    },
+    "cf5d5a98-24e1-4496-bca8-27b089b715f2": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767662038854
+    },
+    "6889d093-bdbd-4217-ac36-b6c73e1e230a": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767667215262
+    },
+    "c129693b-f73a-4bc4-bc05-03bb30348132": {
+      "channels": [],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767668287576
+    },
+    "a4ebc3d1-3182-4727-b923-556b8526f9e0": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767668028217
+    },
+    "0025a2ef-2d89-42af-9ff6-75729d5f5c71": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767668288701
+    },
+    "c70df1c0-7aa2-45fd-98d6-05458c255c2e": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 1.0
+      },
+      "pans": {
+        "1": -0.03
+      },
+      "mutes": {
+        "1": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1767669861616
     }
   }
 }

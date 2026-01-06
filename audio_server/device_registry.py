@@ -8,6 +8,8 @@ import logging
 import uuid as uuid_module
 from typing import Dict, Optional, List
 
+import config
+
 logger = logging.getLogger(__name__)
 
 class DeviceRegistry:
@@ -330,6 +332,7 @@ class DeviceRegistry:
                             'uuid': device['uuid'],
                             'type': device['type'],
                             'name': device['name'],
+                            'custom_name': device.get('custom_name'),
                             'mac_address': device.get('mac_address'),
                             'primary_ip': device.get('primary_ip'),
                             'device_info': device.get('device_info', {}),
@@ -362,6 +365,17 @@ class DeviceRegistry:
             try:
                 with open(self.persistence_file, 'r') as f:
                     devices_data = json.load(f)
+
+                # ✅ Si el cliente maestro está deshabilitado, eliminarlo de persistencia
+                if not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+                    master_uuid = getattr(config, 'MASTER_CLIENT_UUID', '__master_server_client__')
+                    if isinstance(devices_data, dict) and master_uuid in devices_data:
+                        devices_data.pop(master_uuid, None)
+                        try:
+                            with open(self.persistence_file, 'w') as wf:
+                                json.dump(devices_data, wf, indent=2)
+                        except Exception:
+                            pass
                 
                 with self.device_lock:
                     self.devices = devices_data
@@ -410,8 +424,24 @@ class DeviceRegistry:
             try:
                 with open(self.channels_state_file, 'r') as f:
                     state_data = json.load(f)
-                
-                self.channels_state = state_data.get('channels_state', {})
+
+                channels_state = state_data.get('channels_state', {})
+
+                # ✅ Si el cliente maestro está deshabilitado, eliminar su estado persistido
+                if not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+                    master_uuid = getattr(config, 'MASTER_CLIENT_UUID', '__master_server_client__')
+                    if isinstance(channels_state, dict) and master_uuid in channels_state:
+                        channels_state.pop(master_uuid, None)
+                        try:
+                            state_data['channels_state'] = channels_state
+                            tmp_path = self.channels_state_file + '.tmp'
+                            with open(tmp_path, 'w') as wf:
+                                json.dump(state_data, wf, indent=2)
+                            os.replace(tmp_path, self.channels_state_file)
+                        except Exception:
+                            pass
+
+                self.channels_state = channels_state
                 
                 logger.info(f"[Device Registry] ✅ Estado de canales cargado: {len(self.channels_state)} clientes")
                 return True

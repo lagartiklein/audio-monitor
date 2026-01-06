@@ -1007,7 +1007,9 @@
                 this.draggedClientId = null;
                 this.inactivityTimeouts = {}; // Track timeouts per client
                 this.inactivityThreshold = 5 * 60 * 1000; // 5 minutes
+                this.clientInactivityTimeout = 30 * 1000; // Show clients for 30s after going idle
                 this.editingClientId = null; // Track inline name edits
+                this.pendingOrderUpdate = null;
                 
                 // ✅ NUEVO: Audio del cliente maestro
                 this.masterAudioContext = null;
@@ -1029,6 +1031,16 @@
                     localStorage.setItem(key, v);
                 }
                 return v;
+            }
+
+            updateStoredDeviceUuid(newUuid) {
+                if (!newUuid) return;
+                this.webDeviceUuid = newUuid;
+                try {
+                    localStorage.setItem('fichatech_web_device_uuid', newUuid);
+                } catch {
+                    // ignore
+                }
             }
 
             init() {
@@ -1361,6 +1373,12 @@
                     }
                 });
 
+                this.socket.on('device_uuid_assigned', (data) => {
+                    if (data && data.device_uuid) {
+                        this.updateStoredDeviceUuid(data.device_uuid);
+                    }
+                });
+
                 this.socket.on('operational_channels_updated', (data) => {
                     if (this.deviceInfo) {
                         this.deviceInfo.operational_channels = data.operational_channels;
@@ -1393,11 +1411,15 @@
                     const prevSignature = prevSelected ? this.mixStateSignature(prevSelected) : null;
                     
                     if (data && Array.isArray(data.order)) {
-                        this.clientOrder = data.order;
-                        try {
-                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
-                        } catch {
-                            // ignore
+                        if (this.editingClientId) {
+                            this.pendingOrderUpdate = data.order;
+                        } else {
+                            this.clientOrder = data.order;
+                            try {
+                                localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                            } catch {
+                                // ignore
+                            }
                         }
                     }
                     
@@ -1406,6 +1428,15 @@
                         data.clients.forEach(client => {
                             const id = this.getClientId(client);
                             if (id) this.clients[id] = client;
+
+                            // Persistir custom_name del servidor como fallback local
+                            if (id && client && client.custom_name && String(client.custom_name).trim()) {
+                                try {
+                                    localStorage.setItem(`client_custom_name_${id}`, String(client.custom_name).trim());
+                                } catch {
+                                    // ignore
+                                }
+                            }
                         });
                     }
                     
@@ -1416,6 +1447,13 @@
                     if (!this.editingClientId && this.selectedClientId) {
                         const nextSelected = this.clients[this.selectedClientId];
                         const nextSignature = nextSelected ? this.mixStateSignature(nextSelected) : null;
+
+                        // ✅ Siempre refrescar título por cambios de nombre/estado
+                        if (nextSelected) {
+                            const displayName = this.getDisplayName(nextSelected);
+                            document.getElementById('mixer-title-text').textContent =
+                                `${displayName} - ${nextSelected.active_channels || 0} canales`;
+                        }
                         
                         if (prevSignature !== nextSignature) {
                             console.log('[Sync] Mixer actualizado por cambio externo (nativo/otro web)');
@@ -1436,11 +1474,15 @@
                     const prevSignature = prevSelected ? this.mixStateSignature(prevSelected) : null;
                     
                     if (data && Array.isArray(data.order)) {
-                        this.clientOrder = data.order;
-                        try {
-                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
-                        } catch {
-                            // ignore
+                        if (this.editingClientId) {
+                            this.pendingOrderUpdate = data.order;
+                        } else {
+                            this.clientOrder = data.order;
+                            try {
+                                localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                            } catch {
+                                // ignore
+                            }
                         }
                     }
                     
@@ -1449,6 +1491,15 @@
                         data.clients.forEach(client => {
                             const id = this.getClientId(client);
                             if (id) this.clients[id] = client;
+
+                            // Persistir custom_name del servidor como fallback local
+                            if (id && client && client.custom_name && String(client.custom_name).trim()) {
+                                try {
+                                    localStorage.setItem(`client_custom_name_${id}`, String(client.custom_name).trim());
+                                } catch {
+                                    // ignore
+                                }
+                            }
                         });
                     }
                     
@@ -1457,6 +1508,13 @@
                     if (!this.editingClientId && this.selectedClientId) {
                         const nextSelected = this.clients[this.selectedClientId];
                         const nextSignature = nextSelected ? this.mixStateSignature(nextSelected) : null;
+
+                        // ✅ Siempre refrescar título por cambios de nombre/estado
+                        if (nextSelected) {
+                            const displayName = this.getDisplayName(nextSelected);
+                            document.getElementById('mixer-title-text').textContent =
+                                `${displayName} - ${nextSelected.active_channels || 0} canales`;
+                        }
                         
                         if (prevSignature !== nextSignature) {
                             console.log('[Sync] Mixer actualizado por clients_list');
@@ -1467,13 +1525,17 @@
 
                 this.socket.on('client_order_saved', (data) => {
                     if (data && Array.isArray(data.order)) {
-                        this.clientOrder = data.order;
-                        try {
-                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
-                        } catch {
-                            // ignore
+                        if (this.editingClientId) {
+                            this.pendingOrderUpdate = data.order;
+                        } else {
+                            this.clientOrder = data.order;
+                            try {
+                                localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                            } catch {
+                                // ignore
+                            }
+                            this.reorderClientElements();
                         }
-                        this.updateClientsList(Object.values(this.clients));
                     }
                 });
 
@@ -1541,7 +1603,10 @@
                         // ✅ Actualizar sidebar si hubo cambios visuales
                         if (needsListUpdate) {
                             console.log('[Param Sync] Actualizando lista de clientes');
-                            this.updateClientsList(Object.values(this.clients));
+                            const listItem = document.querySelector(`.client-item[data-client-id="${client_id}"]`);
+                            if (listItem) {
+                                this.updateClientItemUI(listItem, this.clients[client_id]);
+                            }
                         }
                     }
                 });
@@ -1598,41 +1663,55 @@
 
             updateClientsList(clientsData) {
                 const container = document.getElementById('client-list');
+                const now = Date.now();
+                const incomingIds = new Set();
 
-                if (!clientsData || clientsData.length === 0) {
+                if (Array.isArray(clientsData)) {
+                    clientsData.forEach(client => {
+                        const id = this.getClientId(client);
+                        if (!id) return;
+                        incomingIds.add(id);
+                        const existing = this.clients[id] || {};
+                        const merged = {
+                            ...existing,
+                            ...client,
+                            connected: true,
+                            last_seen: now
+                        };
+                        this.clients[id] = merged;
+                    });
+                }
+
+                Object.entries(this.clients).forEach(([id, client]) => {
+                    if (!incomingIds.has(id) && !(client.is_master || client.type === 'master')) {
+                        client.connected = false;
+                    }
+                });
+
+                this.purgeStaleClients(now);
+
+                const visibleClients = this.getVisibleClientsSnapshot(now);
+
+                if (visibleClients.length === 0) {
                     container.innerHTML = '<div class="no-clients">Sin clientes conectados</div>';
-                    this.clientOrder = [];
+                    if (!this.editingClientId) {
+                        this.clientOrder = [];
+                        try {
+                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                        } catch {
+                            // ignore
+                        }
+                    }
                     return;
                 }
 
-                // ✅ Mostrar maestro y todos los clientes android/native (sin importar estado conectado)
-                const realClients = clientsData.filter(c => {
-                    const type = c.type || 'unknown';
-                    const isMaster = c.is_master || type === 'master';
-                    // Mostrar: maestro O (android/native)
-                    return isMaster || type === 'native' || type === 'android';
-                });
-
-                if (realClients.length === 0) {
-                    container.innerHTML = '<div class="no-clients">Sin clientes conectados</div>';
-                    this.clientOrder = [];
-                    return;
+                if (!this.editingClientId) {
+                    this.syncClientOrderWith(visibleClients);
                 }
 
-                this.syncClientOrderWith(realClients);
-                const orderedClients = this.orderClients(realClients);
+                const orderedClients = this.orderClients(visibleClients);
 
-                // Update local cache (keyed by stable id)
-                orderedClients.forEach(client => {
-                    const id = this.getClientId(client);
-                    if (!id) return;
-                    this.clients[id] = client;
-                });
-
-                // Rebuild list in desired order using existing nodes when possible.
-                // Avoid breaking an active inline edit.
                 if (this.editingClientId) {
-                    // Still update data for non-editing items
                     orderedClients.forEach(client => {
                         const id = this.getClientId(client);
                         if (!id || id === this.editingClientId) return;
@@ -1651,7 +1730,6 @@
                     if (!item) {
                         item = this.createClientItem(client);
                     } else {
-                        // ensure class reflects type (incluir master)
                         const isMaster = client.is_master || client.type === 'master';
                         item.classList.remove('native', 'web', 'master');
                         item.classList.add(isMaster ? 'master' : (client.type || 'web'));
@@ -1660,8 +1738,6 @@
                     if (this.selectedClientId === id) item.classList.add('selected');
                     fragment.appendChild(item);
                     if (isNewItem && !client.is_master && client.type !== 'master') {
-                        // Start inactivity timer only on first appearance; user interaction resets it.
-                        // No aplicar al maestro
                         this.resetClientInactivityTimer(id);
                     }
                 }
@@ -1697,6 +1773,83 @@
                 } else {
                     itemElement.classList.remove('disconnected');
                 }
+            }
+
+            purgeStaleClients(now) {
+                Object.keys(this.clients).forEach(id => {
+                    const client = this.clients[id];
+                    if (client.connected) {
+                        return;
+                    }
+                    if (client.is_master || client.type === 'master') {
+                        return;
+                    }
+                    const lastSeen = client.last_seen || 0;
+                    if (now - lastSeen > this.clientInactivityTimeout) {
+                        delete this.clients[id];
+                    }
+                });
+            }
+
+            getVisibleClientsSnapshot(now = Date.now()) {
+                const clients = [];
+                Object.values(this.clients).forEach(client => {
+                    const type = client.type || 'unknown';
+                    const isMaster = client.is_master || type === 'master';
+                    if (!isMaster && type !== 'native' && type !== 'android') {
+                        return;
+                    }
+
+                    if (isMaster) {
+                        clients.push(client);
+                        return;
+                    }
+
+                    if (client.connected) {
+                        clients.push(client);
+                        return;
+                    }
+
+                    const lastSeen = client.last_seen || 0;
+                    if (now - lastSeen <= this.clientInactivityTimeout) {
+                        clients.push(client);
+                    }
+                });
+                return clients;
+            }
+
+            reorderClientElements() {
+                const container = document.getElementById('client-list');
+                if (!container) return;
+
+                const fragment = document.createDocumentFragment();
+                const appendedIds = new Set();
+
+                container.querySelectorAll('.client-item').forEach(item => {
+                    if (item.dataset.isMaster === '1') {
+                        fragment.appendChild(item);
+                        appendedIds.add(item.dataset.clientId);
+                    }
+                });
+
+                for (const id of this.clientOrder) {
+                    const item = container.querySelector(`.client-item[data-client-id="${id}"]`);
+                    if (item && !appendedIds.has(id)) {
+                        fragment.appendChild(item);
+                        appendedIds.add(id);
+                    }
+                }
+
+                container.querySelectorAll('.client-item').forEach(item => {
+                    const id = item.dataset.clientId;
+                    if (!appendedIds.has(id)) {
+                        fragment.appendChild(item);
+                        appendedIds.add(id);
+                    }
+                });
+
+                container.innerHTML = '';
+                container.appendChild(fragment);
             }
 
             renderClientsList(clientsData, container) {
@@ -1757,6 +1910,17 @@
                     itemElement.draggable = true;
                     this.editingClientId = null;
 
+                    if (this.pendingOrderUpdate) {
+                        this.clientOrder = this.pendingOrderUpdate;
+                        this.pendingOrderUpdate = null;
+                        try {
+                            localStorage.setItem('client_order', JSON.stringify(this.clientOrder));
+                        } catch {
+                            // ignore
+                        }
+                        this.reorderClientElements();
+                    }
+
                     if (save) {
                         if (newName && newName !== currentName) {
                             // Save local fallback (only used if server doesn't have custom_name)
@@ -1774,8 +1938,6 @@
                         }
                     }
 
-                    // Refresh UI from current cache
-                    this.updateClientsList(Object.values(this.clients));
                 };
 
                 input.addEventListener('blur', () => finishEdit(true));
@@ -1809,9 +1971,6 @@
                 }
 
                 this.renderMixer(clientId);
-                
-                // Also update sidebar to show selection
-                this.updateClientsList(Object.values(this.clients));
             }
 
             renderMixer(clientId) {

@@ -265,17 +265,20 @@ class AudioServerApp:
                     self.gui.queue_log_message(f"⚠️ Error mapeo de canales: {e}", 'WARNING')
 
             
-            # ✅ NUEVO: Inicializar AudioMixer para cliente maestro
-            audio_mixer = init_audio_mixer(
-                sample_rate=config.SAMPLE_RATE,
-                buffer_size=config.BLOCKSIZE
-            )
-            
-            # Conectar mixer con audio capture
-            self.audio_capture.set_audio_mixer(audio_mixer)
+            # ✅ Inicializar AudioMixer SOLO si está habilitado el cliente maestro
+            audio_mixer = None
+            if getattr(config, 'MASTER_CLIENT_ENABLED', False) and getattr(config, 'WEB_AUDIO_STREAM_ENABLED', False):
+                audio_mixer = init_audio_mixer(
+                    sample_rate=config.SAMPLE_RATE,
+                    buffer_size=config.BLOCKSIZE
+                )
+
+                # Conectar mixer con audio capture
+                self.audio_capture.set_audio_mixer(audio_mixer)
             self.audio_capture.set_channel_manager(self.channel_manager)
             
-            logger.info("[MAIN] ✅ AudioMixer conectado y configurado")
+            if audio_mixer:
+                logger.info("[MAIN] ✅ AudioMixer conectado y configurado")
 
             # Inicializar servidor nativo
 

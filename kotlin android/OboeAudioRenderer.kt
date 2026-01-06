@@ -247,7 +247,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
     }
 
-    /** Renderiza audio (sin cambios) */
+    /** ✅ NUEVO: Renderiza audio MONO y lo convierte a estéreo */
     fun renderChannelRF(channel: Int, audioData: FloatArray, samplePosition: Long) {
         if (!isInitialized || audioData.isEmpty()) {
             return
@@ -276,9 +276,8 @@ class OboeAudioRenderer(private val context: Context? = null) {
         val leftGain = cos(panRad) * linearGain
         val rightGain = sin(panRad) * linearGain
 
-        // ✅ OPTIMIZACIÓN FASE 1: Reutilizar buffer del pool en lugar de crear uno nuevo
-        val bufferSize = audioData.size * 2
-        val stereoBuffer = acquireBuffer(bufferSize)
+        // ✅ MONO TO STEREO: Recibir mono (audioData.size) y convertir a estéreo (audioData.size * 2)
+        val stereoBuffer = acquireBuffer(audioData.size * 2)
 
         var sumSquares = 0f
         var peak = 0f

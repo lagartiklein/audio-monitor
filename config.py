@@ -162,9 +162,9 @@ USE_AUDIO_WORKLET = False
 # - Aparece siempre primero en la lista de clientes
 # - Se reproduce vía Web Audio API en el navegador
 # - Permite al sonidista monitorear sin interferir con Android
-MASTER_CLIENT_ENABLED = True
+MASTER_CLIENT_ENABLED = False
 MASTER_CLIENT_UUID = "__master_server_client__"
 MASTER_CLIENT_NAME = "Control"
 MASTER_CLIENT_DEFAULT_CHANNELS = []  # Empezar sin canales, el usuario selecciona
 WEB_AUDIO_BUFFER_SIZE = 2048  # Buffer para Web Audio (samples)
-WEB_AUDIO_STREAM_ENABLED = True  # Habilitar streaming de audio vía WebSocket
+WEB_AUDIO_STREAM_ENABLED = False  # Desactivado (sin cliente maestro)
