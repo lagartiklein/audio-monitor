@@ -5,6 +5,7 @@ import sounddevice as sd
 import queue
 from datetime import datetime
 import os
+import psutil
 import webbrowser
 import sys
 from PIL import Image
@@ -14,7 +15,8 @@ def get_resource_path(relative_path):
     """ Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller """
     try:
         base_path = sys._MEIPASS
-    except Exception:
+    except AttributeError:
+        # No se está ejecutando con PyInstaller
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
@@ -31,15 +33,24 @@ class AudioMonitorGUI:
         self.root = ctk.CTk()
         self.root.title("Fichatech Retro")
         
-        # Ventana más grande y centrada
-        width, height = 1400, 900
-        self.root.geometry(f"{width}x{height}")
+        # Ventana responsiva basada en el tamaño de pantalla
         self.root.update_idletasks()
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        x = (screen_width // 2) - (width // 2)
-        y = (screen_height // 2) - (height // 2)
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Calcular dimensiones responsivas (80% de la pantalla, min 1000x700)
+        window_width = max(int(screen_width * 0.85), 1000)
+        window_height = max(int(screen_height * 0.85), 700)
+        
+        # Limitar a pantalla completa como máximo
+        window_width = min(window_width, screen_width)
+        window_height = min(window_height, screen_height)
+        
+        # Centrar en pantalla
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.minsize(900, 600)  # Tamaño mínimo para usabilidad
         
         # Establecer icono
         try:
@@ -113,37 +124,42 @@ class AudioMonitorGUI:
         self.text_muted = "#4a5568"
     
     def setup_ui(self):
-        """Configurar interfaz revolucionaria"""
+        """Configurar interfaz revolucionaria y responsiva"""
         # Frame principal con fondo oscuro
         main_frame = ctk.CTkFrame(self.root, fg_color=self.bg_dark, corner_radius=0)
         main_frame.pack(fill="both", expand=True)
         
-        # Grid layout
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=2)
-        main_frame.grid_rowconfigure(1, weight=1)
+        # Grid layout responsivo
+        main_frame.grid_columnconfigure(0, weight=0, minsize=420)  # Sidebar más ancho (antes 300)
+        main_frame.grid_columnconfigure(1, weight=1)  # Panel principal expandible
+        main_frame.grid_rowconfigure(0, weight=1)
         
-        # Panel lateral izquierdo
+        # Panel lateral izquierdo - responsivo
         self.setup_sidebar(main_frame)
         
         # Panel principal derecho
         self.setup_main_panel(main_frame)
     
     def setup_sidebar(self, parent):
-        """Panel lateral con controles principales"""
-        sidebar = ctk.CTkFrame(parent, fg_color=self.bg_card, corner_radius=0, width=450)
-        sidebar.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=0, pady=0)
-        sidebar.grid_propagate(False)
+        """Panel lateral con controles principales - Responsivo"""
+        sidebar = ctk.CTkFrame(parent, fg_color=self.bg_card, corner_radius=0)
+        sidebar.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        sidebar.grid_propagate(True)  # Permitir que se ajuste al contenido
         
-        # Logo y título con efecto glow
-        logo_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
-        logo_frame.pack(pady=(40, 30), padx=30)
+        # Frame scrollable para dispositivos pequeños
+        scroll_frame = ctk.CTkScrollableFrame(sidebar, fg_color=self.bg_card)
+        scroll_frame.pack(fill="both", expand=True)
+        scroll_frame.grid_columnconfigure(0, weight=1)
         
-        # Título principal con efecto
+        # Logo y título con efecto glow (tamaño responsivo)
+        logo_frame = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+        logo_frame.pack(pady=(20, 20), padx=20)
+        
+        # Título principal (tamaño escalable)
         title_label = ctk.CTkLabel(
             logo_frame,
             text="FICHATECH RETRO",
-            font=ctk.CTkFont(size=52, weight="bold"),
+            font=ctk.CTkFont(size=36, weight="bold"),  # Reducido de 52 para mejor escalabilidad
             text_color="#ffe066"
         )
         title_label.pack()
@@ -151,55 +167,55 @@ class AudioMonitorGUI:
         subtitle_label = ctk.CTkLabel(
             logo_frame,
             text="Sistema de monitoreo de audio profesional",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),  # Más pequeño y responsivo
             text_color=self.text_secondary
         )
         subtitle_label.pack(pady=(5, 0))
         
         # Separador con gradiente visual
-        separator = ctk.CTkFrame(sidebar, height=2, fg_color=self.accent_primary)
-        separator.pack(fill="x", padx=40, pady=(0, 30))
+        separator = ctk.CTkFrame(scroll_frame, height=3, fg_color=self.accent_primary)
+        separator.pack(fill="x", padx=20, pady=(18, 28))
         
-        # Estado del servidor con indicador grande
-        self.setup_server_status(sidebar)
+        # Estado del servidor con indicador
+        self.setup_server_status(scroll_frame)
         
         # Información del dispositivo
-        self.setup_device_info(sidebar)
+        self.setup_device_info(scroll_frame)
         
-        # Botones de control grandes
-        self.setup_control_buttons(sidebar)
+        # Botones de control (responsivos)
+        self.setup_control_buttons(scroll_frame)
         
         # Footer con link
-        footer_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
-        footer_frame.pack(side="bottom", pady=30)
+        footer_frame = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+        footer_frame.pack(pady=20, padx=20)
         
         footer_btn = ctk.CTkButton(
             footer_frame,
             text="🌐 www.cepalabs.cl/fichatech",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=10),
             fg_color="transparent",
             hover_color=self.bg_card_hover,
             text_color=self.text_secondary,
             command=lambda: webbrowser.open("https://www.cepalabs.cl/fichatech"),
             height=35
         )
-        footer_btn.pack()
+        footer_btn.pack(fill="x")
     
     def setup_server_status(self, parent):
-        """Estado del servidor con animación"""
-        status_frame = ctk.CTkFrame(parent, fg_color=self.bg_card_hover, corner_radius=15, height=140)
-        status_frame.pack(fill="x", padx=30, pady=(0, 20))
+        """Estado del servidor con animación - Responsivo"""
+        status_frame = ctk.CTkFrame(parent, fg_color=self.bg_card_hover, corner_radius=15, height=120)
+        status_frame.pack(fill="x", padx=20, pady=(0, 15))
         status_frame.pack_propagate(False)
         
         # Contenedor centrado
         content = ctk.CTkFrame(status_frame, fg_color="transparent")
         content.place(relx=0.5, rely=0.5, anchor="center")
         
-        # Indicador circular grande
+        # Indicador circular (tamaño responsivo)
         self.status_indicator = ctk.CTkLabel(
             content,
             text="●",
-            font=ctk.CTkFont(size=60),
+            font=ctk.CTkFont(size=48),  # Reducido de 60 para mejor escala
             text_color=self.text_muted
         )
         self.status_indicator.pack()
@@ -208,49 +224,49 @@ class AudioMonitorGUI:
         self.status_text = ctk.CTkLabel(
             content,
             text="SERVIDOR INACTIVO",
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),  # Responsivo
             text_color=self.text_muted
         )
-        self.status_text.pack(pady=(10, 0))
+        self.status_text.pack(pady=(8, 0))
     
     def setup_device_info(self, parent):
-        """Información del dispositivo de audio"""
+        """Información del dispositivo de audio - Responsivo"""
         device_frame = ctk.CTkFrame(parent, fg_color=self.bg_card_hover, corner_radius=15)
-        device_frame.pack(fill="x", padx=30, pady=(0, 20))
+        device_frame.pack(fill="x", padx=20, pady=(0, 15))
         
         # Header
         header = ctk.CTkFrame(device_frame, fg_color="transparent")
-        header.pack(fill="x", padx=25, pady=(20, 15))
+        header.pack(fill="x", padx=15, pady=(15, 10))
         
         ctk.CTkLabel(
             header,
             text="DISPOSITIVO DE AUDIO",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),  # Responsivo
             text_color=self.text_secondary
         ).pack(anchor="w")
         
-        # Device name
+        # Device name (más compacto)
         self.device_name_label = ctk.CTkLabel(
             device_frame,
             textvariable=self.selected_device_name,
-            font=ctk.CTkFont(size=18, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),  # Reducido
             text_color=self.text_primary,
             anchor="w"
         )
-        self.device_name_label.pack(fill="x", padx=25, pady=(0, 10))
+        self.device_name_label.pack(fill="x", padx=15, pady=(0, 8))
         
         # Specs
         self.device_info_var = ctk.StringVar(value="Canales: -- | Sample Rate: -- Hz")
         device_specs_label = ctk.CTkLabel(
             device_frame,
             textvariable=self.device_info_var,
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=11),  # Responsivo
             text_color=self.text_secondary,
             anchor="w"
         )
-        device_specs_label.pack(fill="x", padx=25, pady=(0, 20))
+        device_specs_label.pack(fill="x", padx=15, pady=(0, 15))
         
-        # Botón para cambiar dispositivo
+        # Botón para cambiar dispositivo (más compacto)
         self.change_device_btn = ctk.CTkButton(
             device_frame,
             text="CAMBIAR DISPOSITIVO",
@@ -259,19 +275,19 @@ class AudioMonitorGUI:
             hover_color="#1a1a28",
             text_color=self.text_primary,
             corner_radius=10,
-            height=45,
-            font=ctk.CTkFont(size=13, weight="bold"),
+            height=40,  # Reducido de 45
+            font=ctk.CTkFont(size=11, weight="bold"),  # Responsivo
             border_width=2,
             border_color=self.accent_primary
         )
-        self.change_device_btn.pack(fill="x", padx=25, pady=(0, 20))
+        self.change_device_btn.pack(fill="x", padx=15, pady=(0, 15))
     
     def setup_control_buttons(self, parent):
-        """Botones de control principales"""
+        """Botones de control principales - Responsivos"""
         buttons_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        buttons_frame.pack(fill="x", padx=30, pady=(0, 20))
+        buttons_frame.pack(fill="x", padx=20, pady=(0, 15))
         
-        # Botón de inicio - Grande y llamativo
+        # Botón de inicio (escalable)
         self.start_btn = ctk.CTkButton(
             buttons_frame,
             text="INICIAR SERVIDOR",
@@ -279,11 +295,11 @@ class AudioMonitorGUI:
             fg_color=self.accent_success,
             hover_color="#00cc70",
             text_color="#000000",
-            height=60,
-            font=ctk.CTkFont(size=18, weight="bold"),
+            height=50,  # Reducido de 60
+            font=ctk.CTkFont(size=14, weight="bold"),  # Responsivo
             corner_radius=15
         )
-        self.start_btn.pack(fill="x", pady=(0, 15))
+        self.start_btn.pack(fill="x", pady=(0, 10))
         
         # Botón de detener
         self.stop_btn = ctk.CTkButton(
@@ -293,14 +309,14 @@ class AudioMonitorGUI:
             fg_color=self.accent_error,
             hover_color="#cc0000",
             text_color=self.text_primary,
-            height=60,
-            font=ctk.CTkFont(size=18, weight="bold"),
+            height=50,  # Reducido de 60
+            font=ctk.CTkFont(size=14, weight="bold"),  # Responsivo
             corner_radius=15,
             state="disabled"
         )
-        self.stop_btn.pack(fill="x", pady=(0, 15))
+        self.stop_btn.pack(fill="x", pady=(0, 10))
         
-        # Botón de salir
+        # Botón de salir (más compacto)
         exit_btn = ctk.CTkButton(
             buttons_frame,
             text="SALIR",
@@ -308,8 +324,8 @@ class AudioMonitorGUI:
             fg_color=self.bg_dark,
             hover_color=self.bg_card_hover,
             text_color=self.text_secondary,
-            height=50,
-            font=ctk.CTkFont(size=15, weight="bold"),
+            height=40,  # Reducido de 50
+            font=ctk.CTkFont(size=12, weight="bold"),  # Responsivo
             corner_radius=15,
             border_width=2,
             border_color=self.text_muted
@@ -317,9 +333,9 @@ class AudioMonitorGUI:
         exit_btn.pack(fill="x")
     
     def setup_main_panel(self, parent):
-        """Panel principal con estadísticas y logs"""
+        """Panel principal con estadísticas y logs - Responsivo"""
         main_panel = ctk.CTkFrame(parent, fg_color="transparent")
-        main_panel.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=30, pady=30)
+        main_panel.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
         main_panel.grid_rowconfigure(1, weight=1)
         main_panel.grid_columnconfigure(0, weight=1)
         
@@ -330,9 +346,9 @@ class AudioMonitorGUI:
         self.setup_logs_panel(main_panel)
     
     def setup_stats_cards(self, parent):
-        """Tarjetas de estadísticas en tiempo real"""
-        stats_container = ctk.CTkFrame(parent, fg_color="transparent", height=200)
-        stats_container.grid(row=0, column=0, sticky="ew", pady=(0, 20))
+        """Tarjetas de estadísticas en tiempo real - Responsivas"""
+        stats_container = ctk.CTkFrame(parent, fg_color="transparent", height=180)
+        stats_container.grid(row=0, column=0, sticky="ew", pady=(0, 15))
         stats_container.grid_columnconfigure((0, 1, 2), weight=1)
         stats_container.grid_propagate(False)
         
@@ -343,7 +359,7 @@ class AudioMonitorGUI:
             "0",
             self.accent_primary
         )
-        self.rf_card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.rf_card.grid(row=0, column=0, sticky="nsew", padx=(0, 7))
         
         # Tarjeta 2: Clientes Web
         self.web_card = self.create_stat_card(
@@ -352,7 +368,7 @@ class AudioMonitorGUI:
             "0",
             self.accent_secondary
         )
-        self.web_card.grid(row=0, column=1, sticky="nsew", padx=10)
+        self.web_card.grid(row=0, column=1, sticky="nsew", padx=7)
         
         # Tarjeta 3: Latencia del Servidor
         self.latency_card = self.create_stat_card(
@@ -361,59 +377,60 @@ class AudioMonitorGUI:
             "-- ms",
             self.accent_success
         )
-        self.latency_card.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
+        self.latency_card.grid(row=0, column=2, sticky="nsew", padx=(7, 0))
     
     def create_stat_card(self, parent, title, value, color):
-        """Crear tarjeta de estadística"""
+        """Crear tarjeta de estadística - Responsiva"""
         card = ctk.CTkFrame(parent, fg_color=self.bg_card, corner_radius=20)
         
         # Container
         container = ctk.CTkFrame(card, fg_color="transparent")
         container.place(relx=0.5, rely=0.5, anchor="center")
         
-        # Título
+        # Título (más compacto)
         title_label = ctk.CTkLabel(
             container,
             text=title,
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),  # Responsivo
             text_color=self.text_secondary
         )
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=(0, 8))
         
-        # Valor grande
+        # Valor grande (escalable)
         value_label = ctk.CTkLabel(
             container,
             text=value,
-            font=ctk.CTkFont(size=42, weight="bold"),
+            font=ctk.CTkFont(size=32, weight="bold"),  # Reducido de 42 para escalabilidad
             text_color=color
         )
         value_label.pack()
         
-        # Guardar referencias
-        card.value_label = value_label
-        card.accent_color = color
+                # Guardar referencias en diccionario
+        if not hasattr(self, 'stat_card_refs'):
+            self.stat_card_refs = {}
+        self.stat_card_refs[title] = {'value_label': value_label, 'accent_color': color}
         
         return card
     
     def setup_logs_panel(self, parent):
-        """Panel de logs moderno"""
+        """Panel de logs mejorado: solo información relevante para el cliente"""
         logs_frame = ctk.CTkFrame(parent, fg_color=self.bg_card, corner_radius=20)
         logs_frame.grid(row=1, column=0, sticky="nsew")
         logs_frame.grid_rowconfigure(1, weight=1)
         logs_frame.grid_columnconfigure(0, weight=1)
-        
+
         # Header
         header = ctk.CTkFrame(logs_frame, fg_color="transparent", height=60)
         header.grid(row=0, column=0, sticky="ew", padx=30, pady=(25, 0))
         header.grid_propagate(False)
-        
+
         ctk.CTkLabel(
             header,
-            text="LOGS DEL SISTEMA",
+            text="ESTADO DEL SERVIDOR",
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=self.text_primary
         ).pack(side="left")
-        
+
         # Indicador de actividad
         self.activity_indicator = ctk.CTkLabel(
             header,
@@ -422,36 +439,114 @@ class AudioMonitorGUI:
             text_color=self.text_muted
         )
         self.activity_indicator.pack(side="right")
-        
+
         # Textbox para logs con diseño mejorado
         self.log_text = ctk.CTkTextbox(
             logs_frame,
             corner_radius=15,
-            font=ctk.CTkFont(family="Consolas", size=12),
+            font=ctk.CTkFont(family="Consolas", size=13),
             wrap="word",
             fg_color=self.bg_dark,
             text_color=self.text_primary,
-            border_width=0
+            border_width=0,
+            state="disabled"
         )
         self.log_text.grid(row=1, column=0, sticky="nsew", padx=25, pady=(15, 25))
-        self.initialize_stats_banner()
+        self.update_logs_panel()
+
+    def update_logs_panel(self):
+        """Actualizar la consola de logs con datos relevantes: estabilidad, CPU, RAM, carga, parámetros clave, audio y clientes"""
+        import platform
+        self.log_text.configure(state="normal")
+        self.log_text.delete("1.0", "end")
+
+        # Info de sistema
+        cpu_percent = psutil.cpu_percent(interval=None)
+        ram = psutil.virtual_memory()
+        ram_percent = ram.percent
+        ram_used = ram.used // (1024 * 1024)
+        ram_total = ram.total // (1024 * 1024)
+        getloadavg = getattr(os, "getloadavg", None)
+        if getloadavg is not None:
+            try:
+                load = getloadavg()[0]
+            except Exception:
+                load = "N/A"
+        else:
+            load = "N/A"
+        uptime = int(time.time() - psutil.boot_time())
+        uptime_h = uptime // 3600
+        uptime_m = (uptime % 3600) // 60
+        uptime_s = uptime % 60
+        platform_info = platform.platform()
+
+        # Parámetros clave del servidor
+        server_status = "Activo" if getattr(self.main_app, "server_running", False) else "Inactivo"
+
+        # Audio stats
+        audio_stats = getattr(self.main_app, "audio_capture", None)
+        audio_info = audio_stats.get_stats() if audio_stats and hasattr(audio_stats, "get_stats") else {}
+
+        # Client stats
+        channel_manager = getattr(self.main_app, "channel_manager", None)
+        client_info = channel_manager.get_stats() if channel_manager and hasattr(channel_manager, "get_stats") else {}
+
+        # Server stats
+        native_server = getattr(self.main_app, "native_server", None)
+        server_info = native_server.get_stats() if native_server and hasattr(native_server, "get_stats") else {}
+
+        # Compose log
+        log_lines = [
+            f"Servidor: {server_status}",
+            f"Sistema: {platform_info}",
+            f"Uptime: {uptime_h:02d}:{uptime_m:02d}:{uptime_s:02d}",
+            f"CPU: {cpu_percent:.1f}%",
+            f"RAM: {ram_used}MB / {ram_total}MB ({ram_percent:.1f}%)",
+            f"Carga: {load}",
+            "",
+            "--- AUDIO ---",
+            f"Canales: {audio_info.get('channels', '-')}  SR: {audio_info.get('sample_rate', '-')} Hz  Blocksize: {audio_info.get('blocksize', '-')}  Latencia: {audio_info.get('latency_ms', '-')} ms",
+            f"Callbacks: {audio_info.get('callbacks', '-')}  RT Priority: {audio_info.get('rt_priority', '-')}  VU: {'Sí' if audio_info.get('vu_enabled', False) else 'No'}  VU Interval: {audio_info.get('vu_update_interval', '-')} ms",
+            f"Running: {'Sí' if audio_info.get('running', False) else 'No'}",
+            "",
+            "--- CLIENTES ---",
+            f"Total: {client_info.get('total_clients', '-')}  Nativos: {client_info.get('native_clients', '-')}  Web: {client_info.get('web_clients', '-')}  Canales suscritos: {client_info.get('total_channels_subscribed', '-')}  Canales disponibles: {client_info.get('available_channels', '-')} ",
+            "",
+            "--- PROCESAMIENTO ---",
+            f"Paquetes enviados: {server_info.get('packets_sent', '-')}  Paquetes perdidos: {server_info.get('packets_dropped', '-')}  Bytes enviados: {server_info.get('bytes_sent', '-')}  Uptime servidor: {server_info.get('uptime', '-')} s",
+            f"Clientes conectados: {server_info.get('active_clients', '-')}  Estados cacheados: {server_info.get('cached_states', '-')}"
+        ]
+        self.log_text.insert("end", "\n".join(log_lines))
+        self.log_text.configure(state="disabled")
+
+        # Refrescar cada 2 segundos
+        self.root.after(2000, self.update_logs_panel)
     
     def animate(self):
         """Animación continua de elementos"""
         if not self.running:
             return
-        
+
         # Animar indicador de actividad si el servidor está activo
         if self.main_app.server_running:
             self.animation_frame += 1
-            alpha = (math.sin(self.animation_frame * 0.1) + 1) / 2
-            
-            # Pulsación del indicador
-            if self.animation_frame % 30 == 0:
-                self.activity_indicator.configure(
-                    text_color=self.accent_success if self.animation_frame % 60 == 0 else self.accent_primary
-                )
-        
+            # Blink effect: smoothly fade between green and transparent
+            blink_speed = 0.15
+            alpha = (math.sin(self.animation_frame * blink_speed) + 1) / 2  # 0..1
+            # Interpolate color between bg and green
+            def blend(c1, c2, t):
+                c1 = c1.lstrip('#'); c2 = c2.lstrip('#')
+                r1, g1, b1 = int(c1[0:2],16), int(c1[2:4],16), int(c1[4:6],16)
+                r2, g2, b2 = int(c2[0:2],16), int(c2[2:4],16), int(c2[4:6],16)
+                r = int(r1 + (r2 - r1) * t)
+                g = int(g1 + (g2 - g1) * t)
+                b = int(b1 + (b2 - b1) * t)
+                return f'#{r:02x}{g:02x}{b:02x}'
+            color = blend(self.bg_card, self.accent_success, alpha)
+            self.activity_indicator.configure(text_color=color)
+        else:
+            self.activity_indicator.configure(text_color=self.text_muted)
+
         # Continuar animación
         self.root.after(50, self.animate)
     
@@ -738,7 +833,7 @@ class AudioMonitorGUI:
             except Exception:
                 pass
             
-            time.sleep(0.5)
+            time.sleep(0.1)
     
     def update_stat_cards(self, stats):
         """Actualizar tarjetas de estadísticas"""
@@ -748,9 +843,9 @@ class AudioMonitorGUI:
             clients_web = stats.get('clients_web', 0)
             latency_ms = stats.get('latency_ms', 0.0)
             
-            self.rf_card.value_label.configure(text=str(clients_rf))
-            self.web_card.value_label.configure(text=str(clients_web))
-            self.latency_card.value_label.configure(text=f"{latency_ms:.1f} ms")
+            self.stat_card_refs['CLIENTES RF']['value_label'].configure(text=str(clients_rf))
+            self.stat_card_refs['CLIENTES WEB']['value_label'].configure(text=str(clients_web))
+            self.stat_card_refs['LATENCIA']['value_label'].configure(text=f"{latency_ms:.1f} ms")
         except Exception:
             pass
     
