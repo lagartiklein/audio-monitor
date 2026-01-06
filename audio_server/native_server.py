@@ -770,11 +770,24 @@ class NativeAudioServer:
     def _handle_control_message(self, client: NativeClient, message: dict):
         msg_type = message.get('type', '')
 
-        if msg_type == 'handshake':
-            # ✅ Preferir device_uuid si viene; fallback a client_id
-            persistent_id = message.get('device_uuid') or message.get('client_id')
-            raw_client_id = message.get('client_id')
 
+        if msg_type == 'handshake':
+            # ✅ Mejorado: Si no viene device_uuid, buscar por IP y tipo en DeviceRegistry
+            device_uuid = message.get('device_uuid')
+            raw_client_id = message.get('client_id')
+            persistent_id = device_uuid
+
+            if not persistent_id:
+                # Buscar por IP y tipo
+                device_registry = getattr(self.channel_manager, 'device_registry', None)
+                if device_registry:
+                    found = device_registry.find_device_by_ip_and_type(client.address[0], 'android')
+                    if found:
+                        persistent_id = found.get('uuid')
+                        logger.info(f"[NativeServer] ♻️ Reasignado UUID persistente por IP: {persistent_id}")
+            if not persistent_id:
+                persistent_id = raw_client_id
+                logger.warning(f"[NativeServer] ⚠️ Usando client_id temporal como UUID: {persistent_id}")
             if not persistent_id:
                 logger.error(f"❌ Handshake sin client_id UUID desde {client.address}")
                 return

@@ -239,10 +239,12 @@ class DeviceRegistry:
         return device.get('configuration', {})
     
     def mark_inactive(self, device_uuid: str):
-        """Marcar dispositivo como inactivo."""
+        """Marcar dispositivo como inactivo y persistir."""
         with self.device_lock:
             if device_uuid in self.devices:
                 self.devices[device_uuid]['active'] = False
+                self.save_to_disk()
+                logger.debug(f"[Device Registry] 📌 Dispositivo marcado inactivo: {device_uuid[:12]}")
     
     def add_tag(self, device_uuid: str, tag: str):
         """Agregar etiqueta a dispositivo."""

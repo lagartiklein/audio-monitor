@@ -1579,43 +1579,45 @@ def get_all_clients_info():
     """
     result_clients = []
     current_time = time.time()
-    activity_timeout = 180.0  # 3 minutos sin actividad = considerado desconectado
+    activity_timeout = 10.0  # 10 segundos sin actividad = considerado desconectado
     
     if channel_manager:
         try:
             all_info = channel_manager.get_all_clients_info()
-            
+            device_registry = getattr(channel_manager, 'device_registry', None)
             for c in all_info:
                 client_type = c.get('type', 'unknown')
                 is_master = c.get('is_master', False)
-                is_connected = c.get('connected', False)  # ✅ NUEVO: verificar estado conexión
+                is_connected = c.get('connected', False)
                 last_activity = c.get('last_activity', 0)
-                
+                device_uuid = c.get('device_uuid')
+                # Verificar activo en DeviceRegistry
+                is_active_registry = True
+                if device_registry and device_uuid:
+                    dev = device_registry.get_device(device_uuid)
+                    is_active_registry = dev.get('active', False) if dev else False
+
                 # ✅ MOSTRAR: Cliente maestro si está habilitado
                 if is_master:
                     if getattr(config, 'MASTER_CLIENT_ENABLED', False):
                         result_clients.append(c)
                     continue
-                
+
                 # ✅ MOSTRAR: Clientes native/android SOLO si:
                 #   1. Están marcados como conectados
                 #   2. Tienen actividad reciente (últimos 3 minutos)
-                #   3. NO son dispositivos zombies
+                #   3. Están activos en DeviceRegistry
                 if client_type in ('native', 'android'):
-                    # Verificar que esté realmente conectado y activo
-                    if is_connected and (current_time - last_activity) < activity_timeout:
+                    if is_connected and (current_time - last_activity) < activity_timeout and is_active_registry:
                         result_clients.append(c)
                         logger.debug(f"[WebSocket] ✅ Cliente activo mostrado: {c.get('id', 'unknown')[:12]} "
-                                   f"(tipo: {client_type}, actividad: {current_time - last_activity:.1f}s)")
+                                   f"(tipo: {client_type}, actividad: {current_time - last_activity:.1f}s, registry: {is_active_registry})")
                     else:
-                        # ✅ NUEVO: Log para debugging de clientes filtrados
-                        reason = "desconectado" if not is_connected else f"inactivo ({current_time - last_activity:.1f}s)"
+                        reason = "desconectado" if not is_connected else (f"inactivo ({current_time - last_activity:.1f}s)" if (current_time - last_activity) >= activity_timeout else "no activo en registry")
                         logger.debug(f"[WebSocket] ⊘ Cliente ignorado ({reason}): {c.get('id', 'unknown')[:12]} "
-                                   f"(tipo: {client_type})")
+                                   f"(tipo: {client_type}, registry: {is_active_registry})")
                     continue
-                
                 # ✅ NO mostrar otros tipos (web, etc)
-                
         except Exception as e:
             logger.error(f"[WebSocket] Error obteniendo clientes activos: {e}")
 
@@ -1747,49 +1749,76 @@ def start_maintenance_thread():
     """
     import threading
     
+
     def maintenance_loop():
         while True:
-            time.sleep(30)  # Cada 30 segundos
-            
+            time.sleep(5)  # Cada 5 segundos para mayor reactividad
             try:
                 current_time = time.time()
-                timeout = 120.0  # 2 minutos sin actividad
-                
+                timeout = 10.0  # 10 segundos sin actividad
+
                 with web_clients_lock:
                     inactive_clients = []
+                    web_clients_snapshot = list(web_clients.items())
                     
-                    for client_id, info in web_clients.items():
+                    for client_id, info in web_clients_snapshot:
                         last_activity = info.get('last_activity', 0)
                         if current_time - last_activity > timeout:
-                            inactive_clients.append(client_id)
-                    
+                            inactive_clients.append((client_id, info))
+
                     if inactive_clients:
                         logger.info(f"[WebSocket] 🧹 Limpiando {len(inactive_clients)} clientes web inactivos")
-                        
-                        for client_id in inactive_clients:
-                            web_clients.pop(client_id, None)
-                            
+                        for client_id, info in inactive_clients:
+                            # Marcar como inactivo en DeviceRegistry si existe device_uuid
+                            device_uuid = info.get('device_uuid')
+                            if device_uuid and getattr(channel_manager, 'device_registry', None):
+                                try:
+                                    channel_manager.device_registry.mark_inactive(device_uuid)
+                                    logger.info(f"[WebSocket] 📌 Dispositivo marcado inactivo: {device_uuid[:12]}")
+                                except Exception as e:
+                                    logger.debug(f"[WebSocket] Error marcando inactivo en DeviceRegistry: {e}")
+
+                            if client_id in web_clients:
+                                web_clients.pop(client_id, None)
                             # Desuscribir del channel manager
                             if channel_manager:
-                                channel_manager.unsubscribe_client(client_id)
-                            
+                                try:
+                                    channel_manager.unsubscribe_client(client_id)
+                                except Exception:
+                                    pass
                             # Desconectar socket
                             try:
                                 disconnect(sid=client_id)
                             except:
                                 pass
-                
-                # Broadcast actualización
-                if inactive_clients:
-                    # broadcast_clients_update()  # ✅ REMOVED: Causa errores de contexto
-                    pass
-                
+
+                # Limpiar clientes nativos desconectados del channel_manager
+                if channel_manager:
+                    try:
+                        device_registry = getattr(channel_manager, 'device_registry', None)
+                        subscriptions_snapshot = list(channel_manager.subscriptions.items())
+                        
+                        for client_id, sub in subscriptions_snapshot:
+                            client_type = channel_manager.client_types.get(client_id, "unknown")
+                            # Si es nativo, verificar que está activo en DeviceRegistry
+                            if client_type in ("native", "android"):
+                                device_uuid = sub.get('device_uuid')
+                                if device_uuid and device_registry:
+                                    dev = device_registry.get_device(device_uuid)
+                                    # Si no existe o no está activo, eliminar
+                                    if not dev or not dev.get('active', False):
+                                        logger.info(f"[WebSocket] 🧹 Eliminando cliente nativo inactivo: {client_id[:12]} (uuid: {device_uuid[:12]})")
+                                        if client_id in channel_manager.subscriptions:
+                                            channel_manager.unsubscribe_client(client_id)
+                    except Exception as e:
+                        logger.debug(f"[WebSocket] Error limpiando nativos inactivos: {e}")
+
                 # ✅ Limpiar estados persistentes expirados
                 cleanup_expired_web_states()
-                    
+
             except Exception as e:
                 logger.error(f"[WebSocket] Error en maintenance: {e}")
-    
+
     thread = threading.Thread(target=maintenance_loop, daemon=True)
     thread.start()
     logger.info("[WebSocket] ✅ Thread de mantenimiento iniciado")

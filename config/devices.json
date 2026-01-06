@@ -3840,42 +3840,15 @@
       "user_agent": null
     },
     "first_seen": 1767634388.5565598,
-    "last_seen": 1767669940.5642204,
-    "reconnections": 2078,
+    "last_seen": 1767671704.9278908,
+    "reconnections": 2842,
     "configuration": {
       "channels": [],
-      "gains": {
-        "1": 3.9810717055349722,
-        "0": 3.9810717055349722,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
-      },
-      "pans": {
-        "1": 0.08,
-        "0": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "1": false,
-        "0": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
+      "gains": {},
+      "pans": {},
+      "mutes": {},
       "master_gain": 1.0,
-      "timestamp": 1767669940533
+      "timestamp": 1767671704927
     },
     "configuration_session_id": null,
     "tags": [],
@@ -5124,8 +5097,8 @@
       "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:146.0) Gecko/20100101 Firefox/146.0"
     },
     "first_seen": 1767652435.2027316,
-    "last_seen": 1767669791.0792804,
-    "reconnections": 58,
+    "last_seen": 1767671603.227066,
+    "reconnections": 65,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -6800,15 +6773,15 @@
       "user_agent": null
     },
     "first_seen": 1767665375.688459,
-    "last_seen": 1767669940.5980172,
-    "reconnections": 677,
+    "last_seen": 1767671705.967695,
+    "reconnections": 1415,
     "configuration": {
       "channels": [],
       "gains": {},
       "pans": {},
       "mutes": {},
       "master_gain": 1.0,
-      "timestamp": 1767669940564
+      "timestamp": 1767671705967
     },
     "configuration_session_id": null,
     "tags": [],
@@ -7082,8 +7055,8 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767669116.6519363,
-    "last_seen": 1767669828.4026678,
-    "reconnections": 5,
+    "last_seen": 1767670413.0342577,
+    "reconnections": 10,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -7106,8 +7079,8 @@
       "user_agent": null
     },
     "first_seen": 1767669205.5372827,
-    "last_seen": 1767669861.582242,
-    "reconnections": 7,
+    "last_seen": 1767670068.6664822,
+    "reconnections": 9,
     "configuration": {
       "channels": [
         1
@@ -7122,10 +7095,235 @@
         "1": false
       },
       "master_gain": 1.0,
-      "timestamp": 1767669861582
+      "timestamp": 1767670068636
     },
     "configuration_session_id": null,
     "tags": [],
     "active": true
+  },
+  "35527cb7-815e-4f3a-9fa3-5240e14f3a9d": {
+    "uuid": "35527cb7-815e-4f3a-9fa3-5240e14f3a9d",
+    "type": "android",
+    "name": "android-35527cb7",
+    "custom_name": "sm52",
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-35527cb7",
+      "primary_ip": null,
+      "client_id": "35527cb7-815e-4f3a-9fa3-5240e14f3a9d",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1767670172.028298,
+    "last_seen": 1767670661.2723699,
+    "reconnections": 27,
+    "configuration": {
+      "channels": [],
+      "gains": {},
+      "pans": {},
+      "mutes": {},
+      "master_gain": 1.0,
+      "timestamp": 1767670661272
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "f35b5309-a642-43e1-87c6-0fd151c76475": {
+    "uuid": "f35b5309-a642-43e1-87c6-0fd151c76475",
+    "type": "web",
+    "name": "control-center",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767670464.6539037,
+    "last_seen": 1767670574.4730008,
+    "reconnections": 1,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "d4873849-e8b2-48b4-98d8-5c19f4b3bc27": {
+    "uuid": "d4873849-e8b2-48b4-98d8-5c19f4b3bc27",
+    "type": "web",
+    "name": "control-center",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767670472.8747823,
+    "last_seen": 1767670572.6006663,
+    "reconnections": 1,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "7756186f-9b3a-4626-9cab-c9cfb46c0e6e": {
+    "uuid": "7756186f-9b3a-4626-9cab-c9cfb46c0e6e",
+    "type": "web",
+    "name": "control-center",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767670667.940567,
+    "last_seen": 1767671606.1526484,
+    "reconnections": 7,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "ab2039b9-751c-424e-9a50-112d04ac4a57": {
+    "uuid": "ab2039b9-751c-424e-9a50-112d04ac4a57",
+    "type": "android",
+    "name": "android-ab2039b9",
+    "custom_name": "GABO",
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-ab2039b9",
+      "primary_ip": null,
+      "client_id": "ab2039b9-751c-424e-9a50-112d04ac4a57",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1767670691.965017,
+    "last_seen": 1767671069.057971,
+    "reconnections": 7,
+    "configuration": {
+      "channels": [
+        1,
+        0
+      ],
+      "gains": {
+        "1": 1.9952623149688795,
+        "0": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "1": 0.0,
+        "0": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "1": false,
+        "0": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "master_gain": 1.0,
+      "timestamp": 1767671069057
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "0bd86aed-2f5f-41bd-81cb-a052ef8035fb": {
+    "uuid": "0bd86aed-2f5f-41bd-81cb-a052ef8035fb",
+    "type": "android",
+    "name": "android-0bd86aed",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-0bd86aed",
+      "primary_ip": null,
+      "client_id": "0bd86aed-2f5f-41bd-81cb-a052ef8035fb",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1767671184.4632823,
+    "last_seen": 1767671435.525244,
+    "reconnections": 11,
+    "configuration": {
+      "channels": [],
+      "gains": {},
+      "pans": {},
+      "mutes": {},
+      "master_gain": 1.0,
+      "timestamp": 1767671435525
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "d14a1a81-fd37-458c-8815-dafaffb2e2ec": {
+    "uuid": "d14a1a81-fd37-458c-8815-dafaffb2e2ec",
+    "type": "android",
+    "name": "android-d14a1a81",
+    "custom_name": "gav",
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-d14a1a81",
+      "primary_ip": null,
+      "client_id": "d14a1a81-fd37-458c-8815-dafaffb2e2ec",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1767671560.5703232,
+    "last_seen": 1767671606.8526542,
+    "reconnections": 7,
+    "configuration": {
+      "channels": [
+        1
+      ],
+      "gains": {
+        "1": 3.9810717055349722
+      },
+      "pans": {
+        "1": 0.0
+      },
+      "mutes": {
+        "1": false
+      },
+      "master_gain": 1.0,
+      "timestamp": 1767671606852
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": false
   }
 }

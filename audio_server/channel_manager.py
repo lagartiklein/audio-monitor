@@ -391,7 +391,7 @@ class ChannelManager:
 
     def unsubscribe_client(self, client_id):
 
-        """Desuscribir cliente"""
+        """Desuscribir cliente y marcarlo como inactivo en DeviceRegistry"""
 
         if client_id in self.subscriptions:
 
@@ -403,6 +403,13 @@ class ChannelManager:
             device_uuid = self.subscriptions[client_id].get('device_uuid')
             if device_uuid and self.device_client_map.get(device_uuid) == client_id:
                 del self.device_client_map[device_uuid]
+                
+                # ✅ NUEVO: Marcar como inactivo en DeviceRegistry
+                if self.device_registry:
+                    try:
+                        self.device_registry.mark_inactive(device_uuid)
+                    except Exception as e:
+                        logger.debug(f"[ChannelManager] Error marcando inactivo en registry: {e}")
 
             del self.subscriptions[client_id]
 
@@ -711,7 +718,7 @@ class ChannelManager:
 
             # ✅ Obtener device_model y custom_name desde device_registry
             device_model = None
-            custom_name = sub.get('custom_name')  # Primero verificar si está en subscription
+            custom_name = None  # SIEMPRE tomar desde DeviceRegistry si existe
             device_name = None
             if device_uuid and self.device_registry and not is_master:
                 try:
@@ -719,10 +726,12 @@ class ChannelManager:
                     if device_info:
                         device_model = device_info.get('device_info', {}).get('model') or \
                                       device_info.get('device_info', {}).get('device_model')
-                        custom_name = custom_name or device_info.get('custom_name')
+                        custom_name = device_info.get('custom_name')  # SIEMPRE tomar el más reciente
                         device_name = device_info.get('name')
                 except Exception as e:
                     logger.debug(f"[ChannelManager] Error getting device info: {e}")
+            else:
+                custom_name = sub.get('custom_name')
 
             # Determinar si está conectado
             connected = False
