@@ -19,14 +19,38 @@ import numpy as np
 import engineio.server
 import math
 import uuid  # ✅ NUEVO: Para generar device_uuid únicos
+import sys
 from audio_server.audio_mixer import get_audio_mixer
+
+# PyInstaller: asegurar que los async drivers de threading se empaqueten.
+# Si PyInstaller no incluye estos submódulos, Engine.IO puede no registrar
+# el modo 'threading' y Flask-SocketIO fallará con:
+# ValueError: Invalid async_mode specified
+try:
+    import engineio.async_drivers.threading  # noqa: F401
+    import socketio.async_drivers.threading  # noqa: F401
+except Exception:
+    pass
 
 # Configurar logging PRIMERO (antes de usarlo)
 logger = logging.getLogger(__name__)
 
-# Configurar rutas
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Configurar rutas (compatibles con PyInstaller onefile)
+if getattr(sys, 'frozen', False):
+    BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Intentar servir frontend desde bundle; fallback a carpeta junto al exe
 FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
+EXE_FRONTEND_DIR = os.path.join(os.path.dirname(sys.executable), 'frontend')
+
+
+def _find_frontend_dir() -> str:
+    for candidate in (FRONTEND_DIR, EXE_FRONTEND_DIR):
+        if candidate and os.path.isdir(candidate):
+            return candidate
+    return FRONTEND_DIR
 
 # ✅ NUEVO: Estado UI global (orden de clientes) compartido entre navegadores
 UI_STATE_FILE = os.path.join(BASE_DIR, 'config', 'web_ui_state.json')
@@ -130,9 +154,12 @@ logging.getLogger('flask.app').setLevel(logging.WARNING)
 logging.getLogger('flask_socketio').setLevel(logging.WARNING)
 
 # Crear aplicación Flask
-app = Flask(__name__, 
-            static_folder=FRONTEND_DIR,
-            template_folder=FRONTEND_DIR)
+_frontend_dir = _find_frontend_dir()
+app = Flask(
+    __name__,
+    static_folder=_frontend_dir,
+    template_folder=_frontend_dir,
+)
 
 app.config['SECRET_KEY'] = 'audio-monitor-key-v2.5-fixed'
 
@@ -142,13 +169,10 @@ socketio = SocketIO(
     async_mode="threading",  # Forzado para compatibilidad con PyInstaller
     ping_timeout=15,  # ✅ REDUCIDO: 15s para detección más rápida de desconexiones
     ping_interval=5,  # ✅ AUMENTADO: 5s (ping cada 5 segundos)
-    compression=False,
     max_http_buffer_size=1000000,
     engineio_logger=False,
     logger=False,
-    always_connect=True,
-    websocket_compression=False,
-    binary=True
+    always_connect=True
 )
 
 # Inicializar SocketIO con la app después
@@ -178,7 +202,7 @@ def broadcast_audio_levels(levels):
         socketio.emit('audio_levels', {
             'levels': levels,
             'timestamp': int(time.time() * 1000)
-        }, broadcast=True, namespace='/')
+        }, namespace='/')
     except Exception as e:
         logger.debug(f"[WebSocket] Error broadcasting audio levels: {e}")
 
@@ -405,7 +429,9 @@ def cleanup_initial_state():
 @app.route('/')
 def index():
     """Página principal"""
-    response = send_from_directory(app.static_folder, 'index.html')
+    # En EXE, static_folder puede ser _MEIPASS; si no existe, fallback junto al exe
+    frontend_dir = _find_frontend_dir()
+    response = send_from_directory(frontend_dir, 'index.html')
     # ✅ No cachear HTML para asegurar cambios inmediatos
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
@@ -417,7 +443,8 @@ def index():
 def static_files(path):
     """Archivos estáticos"""
     try:
-        return send_from_directory(app.static_folder, path)
+        frontend_dir = _find_frontend_dir()
+        return send_from_directory(frontend_dir, path)
     except Exception as e:
         logger.debug(f"Error sirviendo archivo {path}: {e}")
         return "File not found", 404
@@ -426,7 +453,8 @@ def static_files(path):
 @app.errorhandler(404)
 def not_found(e):
     """Redirect 404 a index.html para SPA routing"""
-    return send_from_directory(app.static_folder, 'index.html')
+    frontend_dir = _find_frontend_dir()
+    return send_from_directory(frontend_dir, 'index.html')
 
 
 # ============================================================================

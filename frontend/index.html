@@ -1315,25 +1315,12 @@
                 this.init();
             }
 
+            // Eliminado: device_uuid localStorage. El servidor asigna siempre por IP+UA.
             getOrCreateWebDeviceUuid() {
-                const key = 'fichatech_web_device_uuid';
-                let v = localStorage.getItem(key);
-                if (!v) {
-                    v = window.crypto?.randomUUID?.() || 
-                        'web-' + Math.random().toString(16).slice(2) + Date.now().toString(16);
-                    localStorage.setItem(key, v);
-                }
-                return v;
+                return null;
             }
-
             updateStoredDeviceUuid(newUuid) {
-                if (!newUuid) return;
                 this.webDeviceUuid = newUuid;
-                try {
-                    localStorage.setItem('fichatech_web_device_uuid', newUuid);
-                } catch {
-                    // ignore
-                }
             }
 
             init() {
@@ -1724,13 +1711,13 @@
             }
 
             connectWebSocket() {
+                // No enviar device_uuid, el servidor lo asigna por IP+UA
                 this.socket = io({
                     transports: ['websocket'],
                     upgrade: false,
                     reconnection: true,
                     reconnectionDelay: 1000,
                     auth: {
-                        device_uuid: this.webDeviceUuid,
                         device_name: 'control-center'
                     }
                 });

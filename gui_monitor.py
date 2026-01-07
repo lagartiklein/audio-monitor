@@ -54,11 +54,24 @@ class AudioMonitorGUI:
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.root.minsize(700, 500)  # Tamaño mínimo más grande
         
-        # Establecer icono
+        # Establecer icono (ICO preferido, fallback PNG)
+        icon_loaded = False
         try:
             self.root.iconbitmap(get_resource_path("assets/icono.ico"))
+            icon_loaded = True
         except Exception as e:
-            print(f"No se pudo cargar el icono: {e}")
+            print(f"No se pudo cargar el icono ICO: {e}")
+            # Fallback: intentar PNG si existe
+            try:
+                icon_png_path = get_resource_path("assets/icon.png")
+                if os.path.exists(icon_png_path):
+                    img = Image.open(icon_png_path)
+                    self.root.iconphoto(True, ctk.CTkImage(img))
+                    icon_loaded = True
+            except Exception as e2:
+                print(f"No se pudo cargar el icono PNG: {e2}")
+        if not icon_loaded:
+            print("No se pudo cargar ningún icono para la ventana.")
         
         # Variables de estado
         self.running = True
