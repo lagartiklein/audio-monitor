@@ -10,6 +10,7 @@ import webbrowser
 import sys
 from PIL import Image
 import math
+import socket
 
 def get_resource_path(relative_path):
     """ Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller """
@@ -27,30 +28,31 @@ DEFAULT_BLOCKSIZE = 128
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
+
 class AudioMonitorGUI:
     def __init__(self, main_app):
         self.main_app = main_app
         self.root = ctk.CTk()
         self.root.title("Fichatech Retro")
         
-        # Ventana responsiva basada en el tamaño de pantalla
+        # Ventana más pequeña al iniciar
         self.root.update_idletasks()
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        
-        # Calcular dimensiones responsivas (80% de la pantalla, min 1000x700)
-        window_width = max(int(screen_width * 0.85), 1000)
-        window_height = max(int(screen_height * 0.85), 700)
-        
+
+        # Calcular dimensiones un poco más grandes (65% de la pantalla, min 850x600)
+        window_width = max(int(screen_width * 0.65), 850)
+        window_height = max(int(screen_height * 0.65), 600)
+
         # Limitar a pantalla completa como máximo
         window_width = min(window_width, screen_width)
         window_height = min(window_height, screen_height)
-        
+
         # Centrar en pantalla
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        self.root.minsize(900, 600)  # Tamaño mínimo para usabilidad
+        self.root.minsize(700, 500)  # Tamaño mínimo más grande
         
         # Establecer icono
         try:
@@ -304,7 +306,7 @@ class AudioMonitorGUI:
         # Botón de detener
         self.stop_btn = ctk.CTkButton(
             buttons_frame,
-            text="⏹DETENER SERVIDOR",
+            text="DETENER SERVIDOR",
             command=self.stop_server,
             fg_color=self.accent_error,
             hover_color="#cc0000",
@@ -495,8 +497,27 @@ class AudioMonitorGUI:
         native_server = getattr(self.main_app, "native_server", None)
         server_info = native_server.get_stats() if native_server and hasattr(native_server, "get_stats") else {}
 
+        # Obtener IP local
+        import socket
+        def get_local_ip():
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+            except Exception:
+                ip = "127.0.0.1"
+            finally:
+                s.close()
+            return ip
+
+        ip_local = get_local_ip()
+
         # Compose log
         log_lines = [
+            f"IP local del servidor: {ip_local}",
+            "Para conectarse desde otro dispositivo, ingrese esta IP en el cliente web o nativo, asegurándose de estar en la misma red local.",
+            f"Ejemplo: http://{ip_local}:PUERTO (reemplace PUERTO por el puerto configurado)",
+            "",
             f"Servidor: {server_status}",
             f"Sistema: {platform_info}",
             f"Uptime: {uptime_h:02d}:{uptime_m:02d}:{uptime_s:02d}",
@@ -554,7 +575,8 @@ class AudioMonitorGUI:
         """Mostrar selector de dispositivos mejorado"""
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Seleccionar Interfaz de Audio")
-        dialog.geometry("900x700")
+        # Ventana de selección de dispositivo más pequeña
+        dialog.geometry("600x400")
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.configure(fg_color=self.bg_dark)
@@ -794,6 +816,24 @@ class AudioMonitorGUI:
         )
         
         self.log_message("✅ Servidor iniciado correctamente", 'SUCCESS')
+        
+        # Mostrar IP local y explicación en la consola de logs de la GUI
+        import socket
+        def get_local_ip():
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+            except Exception:
+                ip = "127.0.0.1"
+            finally:
+                s.close()
+            return ip
+
+        ip_local = get_local_ip()
+        self.log_message(f"[INFO] Dirección IP local del servidor: {ip_local}", 'INFO')
+        self.log_message("[INFO] Para conectarse desde otro dispositivo, ingrese esta IP en el cliente web o nativo, asegurándose de estar en la misma red local.", 'INFO')
+        self.log_message(f"[INFO] Ejemplo: http://{ip_local}:PUERTO (reemplace PUERTO por el puerto configurado)", 'INFO')
     
     def stop_server(self):
         """Detener el servidor"""

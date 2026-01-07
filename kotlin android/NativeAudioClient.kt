@@ -170,7 +170,7 @@ class NativeAudioClient {
                 Log.d(TAG, "✅ Conectado RF (ID: ${clientId.take(8)})")
 
                 withContext(Dispatchers.Main) {
-                    onConnectionStatus?.invoke(true, "🔴 ONLINE RF")
+                    onConnectionStatus?.invoke(true, "ONLINE")
                 }
 
                 // ✅ Re-suscribir canales INMEDIATAMENTE (sin delay)
@@ -703,7 +703,7 @@ class NativeAudioClient {
                 val isInt16 = (flags and FLAG_INT16) != 0
 
                 if (isInt16) {
-                    // ✅ Decodificar Int16 → Float32
+                    // ✅ Decodificar Int16 → Float32 (sin ShortArray intermedio)
                     val shortCount = remainingBytes / 2
                     if (shortCount % activeChannels.size != 0) {
                         Log.e(
@@ -713,12 +713,12 @@ class NativeAudioClient {
                         return null
                     }
                     val shortBuffer = buffer.asShortBuffer()
-                    val shortArray = ShortArray(shortCount)
-                    shortBuffer.get(shortArray)
-                    // Convertir Int16 [-32768, 32767] → Float32 [-1.0, 1.0]
-                    FloatArray(shortCount) { i ->
-                        shortArray[i].toFloat() / 32768.0f
+                    val out = FloatArray(shortCount)
+                    for (i in 0 until shortCount) {
+                        // Usamos 32768f para mapear -32768..32767 a ~[-1.0, 1.0)
+                        out[i] = shortBuffer.get(i).toFloat() / 32768.0f
                     }
+                    out
                 } else {
                     // Float32 original
                     val floatCount = remainingBytes / 4
@@ -843,9 +843,9 @@ class NativeAudioClient {
     fun getRFStatus(): String {
 
         return when {
-            isConnected -> "🔴 ONLINE"
+            isConnected -> "ONLINE"
             reconnectJob?.isActive == true -> "🔄 BUSCANDO..."
-            else -> "⚫ OFFLINE"
+            else -> "OFFLINE"
         }
     }
 

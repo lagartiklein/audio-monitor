@@ -418,6 +418,18 @@ class AudioCapture:
     
 
     def start_capture(self, device_id=None):
+        """
+        Inicia la captura de audio utilizando un dispositivo de entrada específico o selecciona automáticamente uno adecuado.
+        Si no se especifica `device_id`, busca el primer dispositivo de entrada con más de 2 canales disponibles.
+        Configura y arranca un flujo de audio (`InputStream`) con los parámetros definidos en la configuración global (`config`).
+        Establece la prioridad del hilo y la afinidad de CPU si está configurado.
+        Imprime información relevante sobre el dispositivo, canales, sample rate, tamaño de bloque, callbacks registrados, modo de captura, VU meters y latencia teórica.
+        Al finalizar, retorna la cantidad real de canales capturados.
+        Args:
+            device_id (int, optional): ID del dispositivo de entrada de audio a utilizar. Si es None, selecciona automáticamente.
+        Returns:
+            int: Número real de canales capturados por el dispositivo seleccionado.
+        """
 
         """Iniciar captura de audio con dispositivo específico"""
 
@@ -425,15 +437,29 @@ class AudioCapture:
 
             # Buscar dispositivo con más de 2 canales
 
-            devices = sd.query_devices()
 
-            device_id = next((i for i, d in enumerate(devices) if d['max_input_channels'] > 2), 0)
+            devices = sd.query_devices()
+            # Buscar el primer dispositivo con más de 2 canales
+            for i, d in enumerate(devices):
+                try:
+                    max_channels = d.get('max_input_channels', 0) if isinstance(d, dict) else getattr(d, 'max_input_channels', 0)
+                except Exception:
+                    max_channels = 0
+                if isinstance(max_channels, (int, float)) and max_channels > 2:
+                    device_id = i
+                    break
+            else:
+                device_id = 0
 
         
 
-        device_info = sd.query_devices(device_id)
 
-        channels = min(device_info['max_input_channels'], 32)
+        device_info = sd.query_devices(device_id)
+        # Acceso seguro al número de canales
+        if isinstance(device_info, dict):
+            channels = device_info.get('max_input_channels', 1)
+        else:
+            channels = getattr(device_info, 'max_input_channels', 1)
 
         
 
@@ -443,7 +469,7 @@ class AudioCapture:
 
         print(f"{'='*70}")
 
-        print(f"   Dispositivo: {device_info['name']}")
+        print(f"   Dispositivo: {device_info.get('name') if isinstance(device_info, dict) else getattr(device_info, 'name', 'Unknown')}")
 
         print(f"   📊 Canales: {channels}")
 
@@ -610,8 +636,11 @@ class AudioCapture:
                 for name, callback in self.callbacks:
 
                     try:
-
-                        callback(audio_to_send.copy())
+                        # Convertir a ndarray para hacer copia si es memoryview
+                        if isinstance(audio_to_send, memoryview):
+                            callback(np.array(audio_to_send))
+                        else:
+                            callback(audio_to_send.copy())
 
                     except Exception as e:
 

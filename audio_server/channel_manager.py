@@ -421,6 +421,21 @@ class ChannelManager:
         """✅ NUEVO: Buscar client_id por device_uuid"""
         return self.device_client_map.get(device_uuid)
 
+    def touch_client_activity(self, client_id: str) -> bool:
+        """Actualizar actividad del cliente sin cambiar su mezcla.
+
+        Se usa para marcar clientes (especialmente nativos) como activos cuando
+        llegan heartbeats/control messages, evitando que desaparezcan del listado.
+        """
+        try:
+            sub = self.subscriptions.get(client_id)
+            if not sub:
+                return False
+            sub['last_update'] = time.time()
+            return True
+        except Exception:
+            return False
+
     
 
     def update_client_mix(self, client_id, channels=None, gains=None, pans=None, 

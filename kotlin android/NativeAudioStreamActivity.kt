@@ -159,8 +159,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
         // Evita recreación de la actividad al rotar: mantiene la conexión y el audio
-
-        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         enableEdgeToEdge()
 
@@ -304,11 +303,11 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             true
         }
 
-        statusText.text = "⭕ RECEPTOR RF - FIXED"
+        statusText.text = "FICHATECH RETRO"
 
         connectButton.text = "Conectar"
 
-        muteButton.text = "🔊 Audio ON"
+        muteButton.text = "Audio ON"
     }
 
     private fun initializeAudioComponents() {
@@ -479,14 +478,14 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             audioRenderer.setMasterGain(-60f)
 
-            muteButton.text = "🔇 Audio OFF"
+            muteButton.text = "Audio OFF"
 
             muteButton.setBackgroundColor(getColor(android.R.color.holo_red_dark))
         } else {
 
             audioRenderer.setMasterGain(masterVolumeDb)
 
-            muteButton.text = "🔊 Audio ON"
+            muteButton.text = "Audio ON"
 
             muteButton.setBackgroundColor(getColor(android.R.color.holo_green_dark))
         }
@@ -512,15 +511,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         val serverPort = portEditText.text.toString().toIntOrNull() ?: 5101
 
-        Log.d(TAG, "🔌 Conectando RF a $serverIp:$serverPort...")
+        Log.d(TAG, "🔌 Conectando a $serverIp:$serverPort...")
 
         isConnecting = true
 
         connectButton.isEnabled = false
 
-        connectButton.text = "🔄 Conectando..."
+        connectButton.text = "Conectando..."
 
-        statusText.text = "🔄 Buscando señal RF..."
+        statusText.text = "Buscando señal..."
 
         lifecycleScope.launch {
             try {
@@ -551,7 +550,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
                     connectButton.isEnabled = true
 
-                    connectButton.text = if (isConnected) "🔴 Desconectar" else "⚫ Conectar"
+                    connectButton.text = if (isConnected) "Desconectar" else "Conectar"
                 }
             }
         }
@@ -570,10 +569,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             if (serverVersion != null) {
 
                 infoText.text =
-                    "• Servidor: $serverVersion\n" +
-                            "• Canales gestionados desde WEB\n" +
-                            "• Auto-recreación de streams: HABILITADA\n" +
-                            "• Mantén presionado la latencia para recrear streams"
+                            "• Conecta a la misma red WiFi que el servidor.\n" +
+                            "• Mantén el punto de acceso cerca del escenario."
+
             }
         }
     }
@@ -599,22 +597,22 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             if (connected) {
 
-                statusText.text = "🔴 $message"
+                statusText.text = "$message"
 
                 statusText.setTextColor(getColor(android.R.color.holo_green_light))
 
-                connectButton.text = "🔴 Desconectar"
+                connectButton.text = "Desconectar"
 
                 connectButton.setBackgroundColor(getColor(android.R.color.holo_green_dark))
 
-                updateServiceNotification("🔴 Recibiendo", "Audio RF en vivo")
+                updateServiceNotification("Recibiendo", "FICHATECH RETRO")
             } else {
 
                 statusText.text = message
 
                 statusText.setTextColor(getColor(android.R.color.holo_orange_light))
 
-                connectButton.text = "⚫ Conectar"
+                connectButton.text = "Conectar"
 
                 connectButton.setBackgroundColor(getColor(android.R.color.holo_red_light))
 
@@ -630,7 +628,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         stopForegroundService()
 
         runOnUiThread {
-            statusText.text = "⚫ OFFLINE"
+            statusText.text = "OFFLINE"
 
             connectButton.text = "Conectar"
 
@@ -776,21 +774,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     }
 
     override fun onResume() {
-
         super.onResume()
-
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(
-                monitorReceiver,
-                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
-                Context.RECEIVER_NOT_EXPORTED
-            )
-        } else {
-            registerReceiver(
-                monitorReceiver,
-                IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE)
-            )
-        }
+        registerReceiver(
+            monitorReceiver,
+            IntentFilter(AudioStreamForegroundService.ACTION_CHANNEL_MONITOR_UPDATE),
+            Context.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onPause() {

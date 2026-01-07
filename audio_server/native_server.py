@@ -1,4 +1,4 @@
-# native_server.py - FASE 4: AUDIO COMPRESSION + ULTRA LOW LATENCY + ZERO-LATENCY
+# native_server.py - FASE 4: ULTRA LOW LATENCY + ZERO-LATENCY
 import socket, threading, time, json, struct, numpy as np, logging, os
 import select
 # ✅ ZERO-LATENCY: Queue eliminado - envío directo sin buffers
@@ -7,26 +7,16 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import config
 
-from audio_server.audio_compression import get_audio_compressor
-COMPRESSION_AVAILABLE = True
-
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL), format='[RF-SERVER] %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
- # ✅ FASE 4: Configuración de compresión solo zlib
-AUDIO_COMPRESSOR = get_audio_compressor(
-    sample_rate=config.SAMPLE_RATE,
-    channels=1,
-    bitrate=32000  # Valor fijo, ignorado en zlib
-)
-logger.info(f"[NativeServer] ✅ Audio Compression enabled (zlib)")
 
 # ✅ ZERO-LATENCY: Sin colas/buffers - envío directo tipo RF
 # El audio se corta si la red es mala (preferible para músicos en vivo)
 
 
 class NativeClient:
-    def __init__(self, client_id: str, sock: socket.socket, address: tuple, persistent_id: str = None):
+    from typing import Optional
+    def __init__(self, client_id: str, sock: socket.socket, address: tuple, persistent_id: Optional[str] = None):
         self.id = client_id
         self.is_temp_id = True
         self.persistent_id = persistent_id or client_id
@@ -37,6 +27,7 @@ class NativeClient:
         self.last_activity = time.time()
         self.subscribed_channels = set()
         self.rf_mode = False
+        self.preferred_audio_format = "float32"  # Por defecto float32
         self.persistent = False
         self.auto_reconnect = False
         self.packets_sent = 0
@@ -45,6 +36,7 @@ class NativeClient:
         self.reconnection_count = 0
         self.consecutive_send_failures = 0
         self.max_consecutive_failures = 10  # ✅ AUMENTADO: 5 → 10 (más tolerante con buffers llenos)
+        self.first_buffer_full_time = None  # Inicializar para evitar AttributeError
         
         # ✅ ZERO-LATENCY: Sin cola - envío directo (tipo RF)
         # self.send_queue = ELIMINADO
@@ -151,21 +143,20 @@ class NativeClient:
     def _is_socket_alive(self) -> bool:
         """✅ NUEVO: Verificar si socket está realmente conectado"""
         try:
+            if self.socket is None:
+                logger.debug(f"Socket {self.id[:15]} es None")
+                return False
             # Usar select con timeout 0 para verificar si socket está listo
             import select
             _, writable, errors = select.select([], [self.socket], [self.socket], 0)
-            
-            if errors:
+            if errors is not None and len(errors) > 0:
                 logger.debug(f"Socket {self.id[:15]} tiene errores")
                 return False
-            
             # Verificar si socket está cerrado
             if self.socket.fileno() == -1:
                 logger.debug(f"Socket {self.id[:15]} cerrado")
                 return False
-            
             return True
-            
         except (OSError, ValueError, AttributeError):
             return False
     
@@ -191,6 +182,9 @@ class NativeClient:
             self.status = 0
             return False
         
+        if self.socket is None:
+            self.status = 0
+            return False
         try:
             # Temporalmente bloquear socket para envío síncrono
             self.socket.setblocking(True)
@@ -202,8 +196,8 @@ class NativeClient:
                 self.update_activity()
                 return True
             finally:
-                self.socket.setblocking(False)
-                
+                if self.socket is not None:
+                    self.socket.setblocking(False)
         except socket.timeout:
             self.consecutive_send_failures += 1
             return False
@@ -217,60 +211,51 @@ class NativeClient:
             return False
     
     def send_audio_android(self, audio_data, sample_position: int) -> bool:
-        if not self.subscribed_channels or self.status == 0: 
+        if not self.subscribed_channels or self.status == 0:
             return True
-        
+
         if isinstance(audio_data, memoryview):
             num_channels = len(self.subscribed_channels)
-            # ✅ ARREGLO: Validar que num_channels sea válido antes de reshape
             if num_channels <= 0:
-                return True  # Sin canales, no hay nada que enviar
+                return True
             try:
                 audio_data = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, num_channels)
             except (ValueError, RuntimeError) as e:
                 if config.DEBUG:
                     logger.error(f"❌ Error reshape audio: num_channels={num_channels}, error={e}")
                 return False
-        
+
         channels = sorted(list(self.subscribed_channels))
         max_channel = audio_data.shape[1] - 1
         valid_channels = [ch for ch in channels if ch <= max_channel]
-        
+
         if not valid_channels:
             return True
-        
-        # ✅ FASE 4: Aplicar compresión zlib siempre
+
+        # Elegir formato según preferencia del cliente
+        audio_format = getattr(self, 'preferred_audio_format', 'float32')
+        if audio_format not in ('int16', 'float32'):
+            audio_format = 'float32'
+
+        # Loguear preferencia al enviar
+        logger.debug(f"[NativeServer] Enviando audio a {self.id[:15]} en formato: {audio_format}")
+
         try:
-            compressed_data = {}
-            for ch in valid_channels:
-                channel_audio = audio_data[:, ch]
-                compressed = AUDIO_COMPRESSOR.compress(channel_audio)
-                if compressed:
-                    compressed_data[ch] = compressed
-            if compressed_data:
-                packet_bytes = NativeAndroidProtocol.create_audio_packet(
-                    compressed_data, valid_channels, sample_position, 1, self.rf_mode
-                )
-            else:
-                packet_bytes = NativeAndroidProtocol.create_audio_packet(
-                    audio_data, valid_channels, sample_position, 0, self.rf_mode
-                )
+            packet_bytes = NativeAndroidProtocol.create_audio_packet(
+                audio_data, valid_channels, sample_position, 0, self.rf_mode
+            )
         except Exception as e:
-            logger.warning(f"[Compression] Error: {e}, usando sin comprimir")
+            logger.warning(f"[AudioSend] Error: {e}, usando float32 por defecto")
             packet_bytes = NativeAndroidProtocol.create_audio_packet(
                 audio_data, valid_channels, sample_position, 0, self.rf_mode
             )
-            packet_bytes = NativeAndroidProtocol.create_audio_packet(
-                audio_data, valid_channels, sample_position, 0, self.rf_mode
-            )
-        
+
         if packet_bytes:
             if config.DEBUG and config.VALIDATE_PACKETS:
                 valid, error = NativeAndroidProtocol.validate_packet(packet_bytes)
                 if not valid:
                     logger.error(f"❌ {self.id[:15]} - Paquete inválido: {error}")
                     return False
-            
             return self.send_bytes_direct(packet_bytes)
         return False
 
@@ -328,14 +313,12 @@ class NativeClient:
         if self.socket:
             try:
                 self.socket.shutdown(socket.SHUT_RDWR)
-            except (OSError, BrokenPipeError):
-                pass  # Socket ya cerrado o error al cerrar
-            
+            except Exception as e:
+                logger.debug(f"[NativeClient] Error en shutdown: {e}")
             try:
                 self.socket.close()
-            except (OSError, BrokenPipeError):
-                pass
-            
+            except Exception as e:
+                logger.debug(f"[NativeClient] Error en close: {e}")
             self.socket = None
         
         logger.debug(f"✅ {self.id[:15]} - Recursos liberados correctamente")
@@ -358,7 +341,7 @@ class NativeAudioServer:
         self.MAX_PERSISTENT_STATES = 50
         
         # ✅ NUEVO: Referencia a websocket_server para broadcasts
-        self.websocket_server_ref = None
+        self.websocket_server_ref = None  # Asignado dinámicamente en runtime
         
         # ✅ NUEVO: Persistencia en disco
         self.STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'client_states.json')
@@ -604,15 +587,15 @@ class NativeAudioServer:
     def _accept_loop(self):
         while self.running:
             try:
+                if self.server_socket is None:
+                    time.sleep(0.1)
+                    continue
                 client_socket, address = self.server_socket.accept()
                 temp_id = f"temp_{address[0]}_{int(time.time() * 1000)}"
-                
                 client = NativeClient(temp_id, client_socket, address)
-                
                 with self.client_lock:
                     self.clients[temp_id] = client
                     self.stats['clients_connected'] += 1
-                
                 logger.info(f"✅ Cliente RF: {temp_id[:15]} ({address[0]})")
                 threading.Thread(target=self._client_read_loop, args=(temp_id,), daemon=True).start()
                 
@@ -684,6 +667,13 @@ class NativeAudioServer:
                             logger.error(f"❌ Control: {e}")
                 
                 client.update_heartbeat()
+
+                # ✅ Mantener actividad en ChannelManager (evita que el WebSocket filtre al cliente)
+                try:
+                    if self.channel_manager:
+                        self.channel_manager.touch_client_activity(client.id)
+                except Exception:
+                    pass
                 
             except socket.timeout:
                 client.update_activity()
@@ -697,7 +687,8 @@ class NativeAudioServer:
         
         self._disconnect_client(client_id, preserve_state=client.auto_reconnect)
     
-    def _sync_to_magic(self, sock: socket.socket, timeout: float = 2.0) -> bytes:
+    from typing import Optional
+    def _sync_to_magic(self, sock: socket.socket, timeout: float = 2.0) -> Optional[bytes]:
         """
         ✅ FIX: Buscar MAGIC_NUMBER en el stream para resincronización automática.
         Si hay datos corruptos o fuera de sincronización, encuentra el próximo frame válido.
@@ -708,15 +699,19 @@ class NativeAudioServer:
         MAGIC_BYTES = struct.pack('!I', MAGIC_NUMBER)
         buffer = b''
         start = time.time()
-        
+
         while time.time() - start < timeout:
             try:
+                if sock is None:
+                    if config.DEBUG:
+                        logger.warning("Sock es None durante sincronización a MAGIC")
+                    return None
                 byte_chunk = sock.recv(1)
                 if not byte_chunk:
                     return None
-                
+
                 buffer += byte_chunk
-                
+
                 # Buscar MAGIC_NUMBER en los últimos 4 bytes
                 if len(buffer) >= 4:
                     last_4 = buffer[-4:]
@@ -728,13 +723,13 @@ class NativeAudioServer:
                             return magic + rest
                         else:
                             return None
-                    
+
                     # Limpiar buffer si crece demasiado (evitar memory leak)
                     if len(buffer) > 10000:
                         buffer = buffer[-4:]
                         if config.DEBUG:
-                            logger.warning(f"Buffer de sincronización limpiado (datos corruptos?)")
-                            
+                            logger.warning("Buffer de sincronización limpiado (datos corruptos?)")
+
             except socket.timeout:
                 continue
             except (ConnectionError, BrokenPipeError, OSError):
@@ -743,7 +738,7 @@ class NativeAudioServer:
                 if config.DEBUG:
                     logger.debug(f"Sync error: {e}")
                 return None
-        
+
         if config.DEBUG:
             logger.warning(f"⚠️ Timeout sincronizando a MAGIC (buffer: {len(buffer)} bytes)")
         return None
@@ -769,6 +764,20 @@ class NativeAudioServer:
     
     def _handle_control_message(self, client: NativeClient, message: dict):
         msg_type = message.get('type', '')
+
+        if msg_type == 'handshake':
+            # Leer preferencia de formato de audio si viene en handshake (opcional)
+            audio_format = message.get('audio_format')
+            if audio_format in ('int16', 'float32'):
+                client.preferred_audio_format = audio_format
+                logger.info(f"[NativeServer] 🎵 Cliente {client.id[:15]} handshake formato: {audio_format}")
+        if msg_type == 'subscribe':
+            # Leer preferencia de formato de audio en subscribe
+            audio_format = message.get('audio_format')
+            if audio_format in ('int16', 'float32'):
+                client.preferred_audio_format = audio_format
+                logger.info(f"[NativeServer] 🎵 Cliente {client.id[:15]} suscrito con formato: {audio_format}")
+        # ...existing code...
 
 
         if msg_type == 'handshake':

@@ -10,15 +10,8 @@ import logging
 import zlib
 import struct
 
-import config
 
-# Intentar importar pyogg y soundfile para Opus
-try:
-    import pyogg
-    import soundfile as sf
-    OPUS_AVAILABLE = True
-except ImportError:
-    OPUS_AVAILABLE = False
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -30,92 +23,67 @@ class AudioCompressor:
         self.sample_rate = sample_rate
         self.channels = channels
         self.bitrate = bitrate
-        self.use_opus = bool(getattr(config, 'ENABLE_OPUS_COMPRESSION', False)) and OPUS_AVAILABLE
-        if self.use_opus:
-            self.compression_method = "opus"
-            logger.info(f"[AudioCompressor] ✅ Opus: {channels}ch, {sample_rate}Hz, {bitrate}kbps")
-        else:
-            self.compression_method = "zlib"
-            logger.info(f"[AudioCompressor] ✅ Zlib: {channels}ch, {sample_rate}Hz")
+        # Solo zlib, sin lógica de pyogg
+        self._max_compressed_size = 2_000_000  # Máximo 2MB para prevenir OOM
+        self.compression_method = "zlib"
+        logger.info(f"[AudioCompressor] ✅ Zlib: {channels}ch, {sample_rate}Hz")
+
 
     def compress(self, audio_data: np.ndarray) -> bytes:
-        if self.use_opus:
-            return self._compress_opus(audio_data)
-        else:
-            return self._compress_zlib(audio_data)
+        return self._compress_zlib(audio_data)
+
 
     def decompress(self, compressed_data: bytes) -> np.ndarray:
-        if self.use_opus:
-            return self._decompress_opus(compressed_data)
-        else:
-            return self._decompress_zlib(compressed_data)
+        return self._decompress_zlib(compressed_data)
 
     def _compress_zlib(self, audio_data: np.ndarray) -> bytes:
-        # ✅ ZERO-COPY: Minimizar copias - conversión directa optimizada
-        # Crear buffer int16 y multiplicar in-place si es posible
-        if audio_data.dtype == np.float32:
-            # Multiplicar y convertir en un solo paso
-            pcm_int16 = (audio_data * 32767).astype(np.int16)
-        else:
-            # Convertir primero a float32 si no lo es
-            pcm_int16 = (audio_data.astype(np.float32) * 32767).astype(np.int16)
-        
-        pcm_data = pcm_int16.tobytes()
-        compressed = zlib.compress(pcm_data, 6)
-        header = struct.pack('>I', len(pcm_data))
-        return header + compressed
+        """Comprime datos de audio con zlib usando nivel 4 para baja latencia"""
+        try:
+            # ✅ ZERO-COPY: Minimizar copias - conversión directa optimizada
+            # Usar 32768 (2^15) en lugar de 32767 para correcta conversión
+            if audio_data.dtype == np.float32:
+                pcm_int16 = np.clip(audio_data * 32768, -32768, 32767).astype(np.int16)
+            else:
+                pcm_int16 = np.clip(audio_data.astype(np.float32) * 32768, -32768, 32767).astype(np.int16)
+            
+            pcm_data = pcm_int16.tobytes()
+            # Usar nivel 4 en lugar de 6 para baja latencia (mejor trade-off)
+            compressed = zlib.compress(pcm_data, 4)
+            
+            # Validar tamaño máximo
+            if len(compressed) > self._max_compressed_size:
+                logger.warning(f"[Zlib] Datos comprimidos exceden límite: {len(compressed)}")
+                return b''
+            
+            header = struct.pack('>I', len(pcm_data))
+            return header + compressed
+        except Exception as e:
+            logger.error(f"[ZlibCompress] Error: {e}")
+            return b''
 
     def _decompress_zlib(self, compressed_data: bytes) -> np.ndarray:
+        """Descomprime datos de audio con zlib"""
         try:
             if len(compressed_data) < 4:
-                raise ValueError("Datos inválidos")
+                raise ValueError("Datos inválidos - header incompleto")
+            
             original_size = struct.unpack('>I', compressed_data[:4])[0]
+            
+            # Validar tamaño
+            if original_size > self._max_compressed_size or original_size <= 0:
+                raise ValueError(f"Tamaño original inválido: {original_size}")
+            
             pcm_data = zlib.decompress(compressed_data[4:])
-            audio_int16 = np.frombuffer(pcm_data, dtype=np.int16)
-            return audio_int16.astype(np.float32) / 32767.0
+            
+            if len(pcm_data) != original_size:
+                logger.warning(f"[ZlibDecompress] Tamaño descomprimido mismatch: esperado {original_size}, obtenido {len(pcm_data)}")
+            
+            audio_int16 = np.frombuffer(pcm_data, dtype=np.int16).copy()
+            return audio_int16.astype(np.float32) / 32768.0
         except Exception as e:
             logger.error(f"[ZlibDecompress] Error: {e}")
             return np.zeros(512, dtype=np.float32)
 
-    def _compress_opus(self, audio_data: np.ndarray) -> bytes:
-        # Convertir a int16 PCM
-        pcm_data = (audio_data * 32767).astype(np.int16)
-        # pyogg espera shape (frames, channels)
-        if pcm_data.ndim == 1:
-            pcm_data = pcm_data.reshape(-1, 1)
-        try:
-            encoder = pyogg.OpusEncoder()
-            encoder.set_application("audio")
-            encoder.set_sampling_frequency(self.sample_rate)
-            encoder.set_channels(self.channels)
-            encoder.set_bitrate(self.bitrate * 1000)
-            encoded = encoder.encode(pcm_data)
-            # Guardar header con tamaño original (2 bytes canales, 4 bytes samples)
-            header = struct.pack('>HI', self.channels, pcm_data.shape[0])
-            return header + encoded
-        except Exception as e:
-            logger.error(f"[OpusCompress] Error: {e}, usando zlib fallback")
-            return self._compress_zlib(audio_data)
-
-    def _decompress_opus(self, compressed_data: bytes) -> np.ndarray:
-        try:
-            if len(compressed_data) < 6:
-                raise ValueError("Datos Opus inválidos")
-            channels, num_samples = struct.unpack('>HI', compressed_data[:6])
-            encoded = compressed_data[6:]
-            decoder = pyogg.OpusDecoder()
-            decoder.set_sampling_frequency(self.sample_rate)
-            decoder.set_channels(channels)
-            decoded = decoder.decode(encoded)
-            # Convertir a float32
-            audio_int16 = np.frombuffer(decoded, dtype=np.int16)
-            audio_float = audio_int16.astype(np.float32) / 32767.0
-            if channels > 1:
-                audio_float = audio_float.reshape(-1, channels)
-            return audio_float
-        except Exception as e:
-            logger.error(f"[OpusDecompress] Error: {e}, usando zlib fallback")
-            return self._decompress_zlib(compressed_data)
 
 
 def compress_audio_channels(audio_data: np.ndarray, channels_to_compress: list, 
@@ -153,10 +121,22 @@ def decompress_audio_channels(compressed_dict: dict, compressor: AudioCompressor
 
 # Singleton compressor
 _audio_compressor = None
+_audio_compressor_params = {}
 
 def get_audio_compressor(sample_rate=48000, channels=1, bitrate=32000) -> AudioCompressor:
-    """Obtener instancia global de compressor zlib"""
-    global _audio_compressor
-    if _audio_compressor is None:
+    """
+    Obtener instancia global de compressor zlib
+    ⚠️ Recrea el compressor si los parámetros cambian
+    """
+    global _audio_compressor, _audio_compressor_params
+    
+    current_params = {'sample_rate': sample_rate, 'channels': channels, 'bitrate': bitrate}
+    
+    # Recrear si los parámetros cambiaron
+    if _audio_compressor is None or _audio_compressor_params != current_params:
         _audio_compressor = AudioCompressor(sample_rate, channels, bitrate)
+        _audio_compressor_params = current_params
+        if _audio_compressor_params != current_params:
+            logger.info(f"[get_audio_compressor] Parámetros actualizados: {current_params}")
+    
     return _audio_compressor

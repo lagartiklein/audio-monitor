@@ -29,8 +29,10 @@ def get_base_path():
     if getattr(sys, 'frozen', False):
 
         # Ejecutando como exe de PyInstaller
-
-        return sys._MEIPASS
+        try:
+            return getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        except:
+            return os.path.dirname(sys.executable)
 
     else:
 
@@ -72,7 +74,7 @@ class AudioServerApp:
 
         self.native_server = None
 
-        self.web_handler = None
+        self.web_handler = None  # Asignado en setup_web_handler_optimized
 
         self.channel_manager = None
 
@@ -147,7 +149,9 @@ class AudioServerApp:
 
             'packets_sent': 0,
 
-            'packets_dropped': 0
+            'packets_dropped': 0,
+
+            'latency_ms': 0.0
 
         }
 
@@ -187,11 +191,15 @@ class AudioServerApp:
 
         if self.audio_capture:
 
-            stats['latency_ms'] = self.audio_capture.get_average_latency()
+            latency = self.audio_capture.get_average_latency()
 
-        else:
+            if isinstance(latency, (int, float)):
 
-            stats['latency_ms'] = 0.0
+                stats['latency_ms'] = float(latency)
+
+            else:
+
+                stats['latency_ms'] = 0.0
 
         
 
@@ -314,7 +322,7 @@ class AudioServerApp:
             
             # ✅ NUEVO: Inyectar referencia al websocket_server en native_server para broadcasts
             from audio_server import websocket_server
-            self.native_server.websocket_server_ref = websocket_server
+            self.native_server.websocket_server_ref = websocket_server  # type: ignore
             
             # ✅ VU METERS DESACTIVADOS para ultra-baja latencia
             if not getattr(config, 'VU_ENABLED', False):
@@ -326,7 +334,7 @@ class AudioServerApp:
 
             self.audio_capture.register_callback(
 
-                self.web_handler.on_audio_data,
+                self.web_handler.on_audio_data,  # type: ignore
 
                 name="web_server"
 
@@ -454,7 +462,7 @@ class AudioServerApp:
 
                 self.packet_count = 0
 
-                self.channel_manager = None
+                self.channel_manager = None  # Asignado después
 
                 
 
@@ -610,7 +618,7 @@ class AudioServerApp:
 
                     pass
             
-            def _send_master_audio(self, audio_data, channels, gains, pans):
+            def _send_master_audio(self, audio_data, channels, gains, pans, subscription):
                 """✅ NUEVO: Enviar audio mezclado para el cliente maestro vía WebSocket"""
                 try:
                     from audio_server import websocket_server
@@ -722,7 +730,7 @@ class AudioServerApp:
 
                         
 
-                        # ✅ Usar binary mode para evitar conversión base64
+                        # ✅ Enviar datos de audio al cliente
 
                         socketio.emit('audio_channel', {
 
@@ -732,7 +740,7 @@ class AudioServerApp:
 
                             'data': audio_bytes
 
-                        }, to=client_id, binary=True)
+                        }, to=client_id)
 
                         
 
@@ -756,7 +764,7 @@ class AudioServerApp:
 
         self.web_handler = WebAudioHandler()
 
-        self.web_handler.channel_manager = self.channel_manager
+        self.web_handler.channel_manager = self.channel_manager  # type: ignore
 
         
 

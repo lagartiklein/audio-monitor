@@ -10,6 +10,7 @@
 
 html {
     scroll-behavior: smooth;
+    font-size: clamp(14px, 2vw, 16px); /* Escalado dinámico de fuente base */
 }
 
 body {
@@ -24,70 +25,70 @@ body {
 .container {
     max-width: 1800px;
     margin: 0 auto;
-    padding: 24px;
-    padding-bottom: 20px;
+    padding: clamp(16px, 4vw, 24px);
+    padding-bottom: clamp(16px, 3vw, 20px);
 }
 
 /* Header */
 header {
     text-align: center;
-    padding: 40px 24px;
+    padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 24px);
     background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
-    border-radius: 16px;
-    margin-bottom: 32px;
+    border-radius: clamp(12px, 2vw, 16px);
+    margin-bottom: clamp(20px, 4vw, 32px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(79, 70, 229, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-    font-size: 2.5em;
+    font-size: clamp(1.8em, 5vw, 2.5em);
     font-weight: 700;
     letter-spacing: -0.5px;
     background: linear-gradient(135deg, #4f46e5, #6366f1);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin-bottom: 8px;
+    margin-bottom: clamp(6px, 1vw, 8px);
 }
 
 .header-subtitle {
     color: #9ca3af;
-    font-size: 1em;
+    font-size: clamp(0.9em, 1.5vw, 1em);
     font-weight: 500;
 }
 
 .device-info {
-    font-size: 0.9em;
+    font-size: clamp(0.8em, 1.2vw, 0.9em);
     color: #a5b4fc;
-    margin-top: 12px;
+    margin-top: clamp(8px, 1.5vw, 12px);
     font-weight: 500;
 }
 
 /* Main Layout */
 .main-layout {
     display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 24px;
+    grid-template-columns: clamp(250px, 25vw, 320px) 1fr;
+    gap: clamp(16px, 3vw, 24px);
 }
 
 /* Sidebar */
 .sidebar {
     background: rgba(26, 31, 46, 0.6);
-    padding: 24px;
-    border-radius: 16px;
+    padding: clamp(16px, 3vw, 24px);
+    border-radius: clamp(12px, 2vw, 16px);
     border: 1px solid rgba(45, 55, 72, 0.5);
     backdrop-filter: blur(10px);
     height: fit-content;
     position: sticky;
-    top: 24px;
+    top: clamp(12px, 2vw, 24px);
 }
 
 .sidebar h2 {
     color: #e8eaed;
-    font-size: 1.1em;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+    font-size: clamp(0.9em, 1.3vw, 1.1em);
+    margin-bottom: clamp(12px, 2vw, 16px);
+    padding-bottom: clamp(8px, 1.5vw, 12px);
     border-bottom: 2px solid rgba(79, 70, 229, 0.3);
     font-weight: 600;
 }
@@ -95,16 +96,17 @@ h1 {
 .client-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: clamp(6px, 1vw, 8px);
 }
 
 .client-item {
     background: rgba(45, 55, 72, 0.4);
-    padding: 12px;
-    border-radius: 10px;
+    padding: clamp(10px, 1.5vw, 12px);
+    border-radius: clamp(8px, 1.2vw, 10px);
     border: 2px solid rgba(45, 55, 72, 0.6);
     cursor: pointer;
     transition: all 0.3s ease;
+    font-size: clamp(0.85em, 1vw, 0.95em);
 }
 
 .client-item:hover {
@@ -121,22 +123,22 @@ h1 {
 
 .client-name {
     font-weight: 600;
-    margin-bottom: 4px;
-    font-size: 0.95em;
+    margin-bottom: clamp(2px, 0.5vw, 4px);
+    font-size: clamp(0.9em, 1.1vw, 0.95em);
 }
 
 .client-info {
-    font-size: 0.85em;
+    font-size: clamp(0.8em, 0.95vw, 0.85em);
     color: #9ca3af;
 }
 
 .client-badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: clamp(2px, 0.5vw, 2px) clamp(6px, 1vw, 8px);
     background: rgba(79, 70, 229, 0.2);
-    border-radius: 4px;
-    font-size: 0.75em;
-    margin-top: 4px;
+    border-radius: clamp(4px, 0.5vw, 4px);
+    font-size: clamp(0.7em, 0.85vw, 0.75em);
+    margin-top: clamp(3px, 0.5vw, 4px);
     color: #a5b4fc;
     font-weight: 500;
 }
@@ -144,8 +146,8 @@ h1 {
 /* Mixer Area */
 .mixer-area {
     background: rgba(26, 31, 46, 0.6);
-    padding: 24px;
-    border-radius: 16px;
+    padding: clamp(16px, 3vw, 24px);
+    border-radius: clamp(12px, 2vw, 16px);
     border: 1px solid rgba(45, 55, 72, 0.5);
     backdrop-filter: blur(10px);
 }
@@ -154,36 +156,39 @@ h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
+    margin-bottom: clamp(16px, 3vw, 24px);
+    padding-bottom: clamp(12px, 2vw, 16px);
     border-bottom: 2px solid rgba(79, 70, 229, 0.2);
+    flex-wrap: wrap;
+    gap: clamp(8px, 2vw, 16px);
 }
 
 .mixer-title {
-    font-size: 1.3em;
+    font-size: clamp(1.1em, 1.5vw, 1.3em);
     color: #e8eaed;
     font-weight: 600;
 }
 
 .mixer-controls {
     display: flex;
-    gap: 8px;
+    gap: clamp(6px, 1vw, 8px);
     flex-wrap: wrap;
 }
 
 /* Buttons */
 .btn {
-    padding: 8px 16px;
+    padding: clamp(7px, 1.2vw, 8px) clamp(12px, 2vw, 16px);
     background: rgba(79, 70, 229, 0.1);
     color: #4f46e5;
     border: 2px solid rgba(79, 70, 229, 0.3);
-    border-radius: 8px;
+    border-radius: clamp(6px, 1.2vw, 8px);
     cursor: pointer;
     font-family: inherit;
     font-weight: 600;
-    font-size: 0.9em;
+    font-size: clamp(0.85em, 1vw, 0.9em);
     transition: all 0.3s ease;
     white-space: nowrap;
+    padding: clamp(7px, 1.5vw, 8px) clamp(12px, 2vw, 16px);
 }
 
 .btn:hover {
@@ -202,11 +207,11 @@ h1 {
 /* Channel Grid */
 .channel-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 16px;
-    padding: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(140px, 15vw, 160px), 1fr));
+    gap: clamp(12px, 2vw, 16px);
+    padding: clamp(10px, 2vw, 12px);
     background: rgba(15, 20, 25, 0.3);
-    border-radius: 12px;
+    border-radius: clamp(10px, 1.5vw, 12px);
     border: 1px solid rgba(45, 55, 72, 0.3);
 }
 
@@ -214,13 +219,13 @@ h1 {
 .channel-strip {
     background: linear-gradient(180deg, rgba(45, 55, 72, 0.4) 0%, rgba(26, 31, 46, 0.4) 100%);
     border: 2px solid rgba(45, 55, 72, 0.6);
-    border-radius: 12px;
-    padding: 12px;
+    border-radius: clamp(10px, 1.5vw, 12px);
+    padding: clamp(10px, 1.5vw, 12px);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    min-height: 450px;
+    gap: clamp(10px, 1.5vw, 12px);
+    min-height: clamp(380px, 50vh, 450px);
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
@@ -267,12 +272,12 @@ h1 {
 
 /* Channel Number */
 .channel-number {
-    font-size: 1.05em;
+    font-size: clamp(0.95em, 1.2vw, 1.05em);
     font-weight: 700;
     color: #e8eaed;
-    padding: 6px 12px;
+    padding: clamp(5px, 1vw, 6px) clamp(10px, 1.5vw, 12px);
     background: rgba(45, 55, 72, 0.5);
-    border-radius: 8px;
+    border-radius: clamp(6px, 1vw, 8px);
     border: 1px solid rgba(79, 70, 229, 0.2);
     width: 100%;
     text-align: center;
@@ -287,19 +292,19 @@ h1 {
 /* Channel Buttons */
 .channel-buttons {
     display: flex;
-    gap: 4px;
+    gap: clamp(3px, 0.5vw, 4px);
     width: 100%;
 }
 
 .channel-btn {
     flex: 1;
-    padding: 7px 4px;
+    padding: clamp(6px, 1vw, 7px) clamp(3px, 0.5vw, 4px);
     background: rgba(45, 55, 72, 0.4);
     color: #9ca3af;
     border: 1px solid rgba(45, 55, 72, 0.6);
-    border-radius: 6px;
+    border-radius: clamp(5px, 0.8vw, 6px);
     cursor: pointer;
-    font-size: 0.75em;
+    font-size: clamp(0.7em, 0.9vw, 0.75em);
     font-weight: 600;
     transition: all 0.3s ease;
 }
@@ -319,11 +324,11 @@ h1 {
 
 /* VU Meter */
 .vu-meter {
-    width: 28px;
-    height: 160px;
+    width: clamp(24px, 3vw, 28px);
+    height: clamp(140px, 25vh, 160px);
     background: rgba(15, 20, 25, 0.8);
     border: 1px solid rgba(79, 70, 229, 0.3);
-    border-radius: 6px;
+    border-radius: clamp(5px, 0.8vw, 6px);
     position: relative;
     overflow: hidden;
 }
@@ -342,12 +347,12 @@ h1 {
     flex-direction: column;
     align-items: center;
     width: 100%;
-    gap: 8px;
+    gap: clamp(6px, 1vw, 8px);
 }
 
 .fader {
     width: 100%;
-    height: 130px;
+    height: clamp(110px, 20vh, 130px);
     writing-mode: bt-lr;
     -webkit-appearance: slider-vertical;
     appearance: slider-vertical;
@@ -359,8 +364,8 @@ input[type="range"]::-webkit-slider-thumb {
     appearance: slider-thumb;
     background: linear-gradient(135deg, #4f46e5, #6366f1);
     cursor: pointer;
-    width: 20px;
-    height: 20px;
+    width: clamp(18px, 2vw, 20px);
+    height: clamp(18px, 2vw, 20px);
     border: 2px solid white;
     border-radius: 50%;
 }
@@ -368,8 +373,8 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-moz-range-thumb {
     background: linear-gradient(135deg, #4f46e5, #6366f1);
     cursor: pointer;
-    width: 18px;
-    height: 18px;
+    width: clamp(16px, 2vw, 18px);
+    height: clamp(16px, 2vw, 18px);
     border: 2px solid white;
     border-radius: 50%;
 }
@@ -377,14 +382,14 @@ input[type="range"]::-moz-range-thumb {
 /* dB Display */
 .db-display {
     width: 100%;
-    padding: 6px;
+    padding: clamp(5px, 1vw, 6px);
     background: rgba(15, 20, 25, 0.8);
     border: 1px solid rgba(79, 70, 229, 0.3);
-    border-radius: 6px;
+    border-radius: clamp(5px, 0.8vw, 6px);
     color: #a5b4fc;
     font-weight: 600;
     text-align: center;
-    font-size: 0.85em;
+    font-size: clamp(0.8em, 0.95vw, 0.85em);
 }
 
 /* Pan Control */
@@ -392,14 +397,14 @@ input[type="range"]::-moz-range-thumb {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: clamp(4px, 0.8vw, 6px);
     width: 100%;
     margin-top: auto;
 }
 
 .pan-knob {
-    width: 45px;
-    height: 45px;
+    width: clamp(40px, 6vw, 45px);
+    height: clamp(40px, 6vw, 45px);
     background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.3), rgba(45, 55, 72, 0.6));
     border-radius: 50%;
     border: 2px solid rgba(79, 70, 229, 0.4);
@@ -415,20 +420,20 @@ input[type="range"]::-moz-range-thumb {
 
 .pan-mark {
     position: absolute;
-    top: 4px;
+    top: clamp(3px, 0.5vw, 4px);
     left: 50%;
     transform: translateX(-50%);
     width: 2px;
-    height: 10px;
+    height: clamp(8px, 1vw, 10px);
     background: #a5b4fc;
 }
 
 .pan-value {
-    font-size: 0.8em;
+    font-size: clamp(0.75em, 0.9vw, 0.8em);
     color: #a5b4fc;
-    padding: 3px 8px;
+    padding: clamp(2px, 0.5vw, 3px) clamp(6px, 1vw, 8px);
     background: rgba(15, 20, 25, 0.8);
-    border-radius: 4px;
+    border-radius: clamp(4px, 0.5vw, 4px);
     border: 1px solid rgba(79, 70, 229, 0.2);
     font-weight: 600;
 }
@@ -436,9 +441,9 @@ input[type="range"]::-moz-range-thumb {
 /* No Client Message */
 .no-client-msg {
     text-align: center;
-    padding: 80px 40px;
+    padding: clamp(40px, 8vw, 80px) clamp(20px, 4vw, 40px);
     color: #6b7280;
-    font-size: 1em;
+    font-size: clamp(0.9em, 1.2vw, 1em);
     font-weight: 500;
 }
 
@@ -446,20 +451,20 @@ input[type="range"]::-moz-range-thumb {
 .metrics {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    margin-top: 12px;
+    gap: clamp(6px, 1vw, 8px);
+    margin-top: clamp(10px, 1.5vw, 12px);
     flex-wrap: wrap;
 }
 
 .metric {
     background: rgba(79, 70, 229, 0.1);
     border: 1px solid rgba(79, 70, 229, 0.3);
-    padding: 6px 12px;
-    font-size: 0.85em;
-    border-radius: 6px;
+    padding: clamp(5px, 1vw, 6px) clamp(10px, 1.5vw, 12px);
+    font-size: clamp(0.8em, 0.95vw, 0.85em);
+    border-radius: clamp(5px, 0.8vw, 6px);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: clamp(4px, 0.8vw, 6px);
 }
 
 .metric-label {
@@ -472,15 +477,59 @@ input[type="range"]::-moz-range-thumb {
     font-weight: bold;
 }
 
-/* Responsive */
+/* ===== MEDIA QUERIES - RESPONSIVE DESIGN ===== */
+
+/* Tabletas grandes (hasta 1200px) */
 @media (max-width: 1200px) {
     .main-layout {
+        grid-template-columns: clamp(220px, 22vw, 280px) 1fr;
+        gap: clamp(16px, 2.5vw, 20px);
+    }
+    
+    .sidebar {
+        width: auto;
+        top: clamp(12px, 1.5vw, 16px);
+    }
+    
+    .channel-grid {
+        grid-template-columns: repeat(auto-fill, minmax(clamp(130px, 14vw, 150px), 1fr));
+    }
+    
+    .channel-strip {
+        min-height: clamp(360px, 45vh, 400px);
+    }
+}
+
+/* Tabletas (hasta 768px) */
+@media (max-width: 768px) {
+    html {
+        font-size: clamp(13px, 1.5vw, 14px);
+    }
+    
+    .container {
+        padding: clamp(12px, 3vw, 16px);
+    }
+    
+    header {
+        padding: clamp(20px, 3vw, 28px) clamp(12px, 2.5vw, 16px);
+        margin-bottom: clamp(16px, 3vw, 20px);
+    }
+    
+    h1 {
+        font-size: clamp(1.4em, 4vw, 1.8em);
+    }
+    
+    /* Layout responsivo: cambiar a columna en tablets */
+    .main-layout {
         grid-template-columns: 1fr;
+        gap: clamp(12px, 2vw, 16px);
     }
     
     .sidebar {
         position: relative;
-        top: 0;
+        top: auto;
+        width: 100%;
+        height: auto;
     }
     
     .client-list {
@@ -490,80 +539,220 @@ input[type="range"]::-moz-range-thumb {
     
     .client-item {
         flex: 1;
-        min-width: 150px;
+        min-width: 140px;
     }
     
-    .channel-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    }
-}
-
-@media (max-width: 768px) {
-    .container {
-        padding: 16px;
-    }
-    
-    header {
-        padding: 24px 16px;
-    }
-    
-    h1 {
-        font-size: 1.8em;
+    .mixer-area {
+        padding: clamp(12px, 2vw, 16px);
     }
     
     .mixer-header {
         flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
+        align-items: stretch;
+        gap: clamp(10px, 2vw, 12px);
+    }
+    
+    .mixer-title {
+        font-size: clamp(1em, 1.3vw, 1.1em);
     }
     
     .mixer-controls {
+        flex-direction: row;
+        gap: clamp(6px, 1.5vw, 8px);
         width: 100%;
     }
     
     .channel-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(clamp(110px, 12vw, 130px), 1fr));
+        gap: clamp(10px, 1.5vw, 12px);
+        padding: clamp(8px, 1.5vw, 10px);
     }
     
     .channel-strip {
-        min-height: 400px;
-        padding: 10px;
+        min-height: clamp(320px, 40vh, 360px);
+        padding: clamp(8px, 1vw, 10px);
+        gap: clamp(8px, 1.2vw, 10px);
+    }
+    
+    .btn {
+        font-size: clamp(0.8em, 0.95vw, 0.85em);
+        padding: clamp(6px, 1vw, 7px) clamp(10px, 1.5vw, 12px);
+    }
+    
+    .no-client-msg {
+        padding: clamp(30px, 5vw, 60px) clamp(16px, 3vw, 24px);
+        font-size: clamp(0.85em, 1vw, 0.9em);
     }
 }
 
+/* Teléfonos (hasta 480px) */
 @media (max-width: 480px) {
+    html {
+        font-size: 12px;
+    }
+    
     .container {
-        padding: 12px;
+        padding: clamp(8px, 2vw, 12px);
+        padding-bottom: clamp(8px, 2vw, 12px);
+    }
+    
+    header {
+        padding: clamp(16px, 2.5vw, 20px) clamp(8px, 2vw, 12px);
+        margin-bottom: clamp(12px, 2.5vw, 16px);
     }
     
     h1 {
-        font-size: 1.5em;
+        font-size: clamp(1.2em, 3.5vw, 1.5em);
+        margin-bottom: clamp(4px, 0.8vw, 6px);
+    }
+    
+    .header-subtitle {
+        font-size: clamp(0.8em, 1.2vw, 0.85em);
+    }
+    
+    .device-info {
+        font-size: clamp(0.75em, 1vw, 0.8em);
+        margin-top: clamp(6px, 1vw, 8px);
+    }
+    
+    /* Full width layout en mobile */
+    .main-layout {
+        grid-template-columns: 1fr;
+        gap: clamp(8px, 1.5vw, 10px);
     }
     
     .sidebar {
-        padding: 16px;
+        width: 100%;
+        padding: clamp(12px, 2vw, 14px);
+        border-radius: clamp(8px, 1.5vw, 10px);
     }
     
-    .channel-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        gap: 8px;
+    .sidebar h2 {
+        font-size: clamp(0.85em, 1vw, 0.9em);
+        margin-bottom: clamp(8px, 1.5vw, 10px);
+        padding-bottom: clamp(6px, 1vw, 8px);
     }
     
-    .channel-strip {
-        min-height: 350px;
-        padding: 8px;
-        gap: 10px;
+    .client-list {
+        gap: clamp(4px, 0.8vw, 6px);
+    }
+    
+    .client-item {
+        padding: clamp(8px, 1.2vw, 10px);
+        font-size: clamp(0.8em, 0.95vw, 0.85em);
+    }
+    
+    .client-name {
+        font-size: clamp(0.8em, 0.95vw, 0.85em);
+    }
+    
+    .client-info {
+        font-size: clamp(0.75em, 0.85vw, 0.8em);
+    }
+    
+    .mixer-area {
+        padding: clamp(10px, 1.5vw, 12px);
+        border-radius: clamp(8px, 1.5vw, 10px);
+    }
+    
+    .mixer-header {
+        flex-direction: column;
+        gap: clamp(8px, 1.5vw, 10px);
+        margin-bottom: clamp(12px, 2vw, 14px);
+        padding-bottom: clamp(8px, 1.5vw, 10px);
+    }
+    
+    .mixer-title {
+        font-size: clamp(0.95em, 1.2vw, 1em);
     }
     
     .mixer-controls {
         flex-direction: column;
+        gap: clamp(6px, 1vw, 8px);
         width: 100%;
     }
     
     .btn {
-        flex: 1;
-        min-width: 80px;
+        font-size: clamp(0.75em, 0.9vw, 0.8em);
+        padding: clamp(5px, 0.8vw, 6px) clamp(8px, 1.5vw, 10px);
+        width: 100%;
+    }
+    
+    .channel-grid {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: clamp(8px, 1.2vw, 10px);
+        padding: clamp(6px, 1vw, 8px);
+    }
+    
+    .channel-strip {
+        min-height: clamp(280px, 35vh, 320px);
+        padding: clamp(6px, 0.8vw, 8px);
+        gap: clamp(6px, 0.8vw, 8px);
+    }
+    
+    .channel-number {
+        font-size: clamp(0.85em, 1vw, 0.9em);
+        padding: clamp(4px, 0.6vw, 5px) clamp(8px, 1.2vw, 10px);
+    }
+    
+    .channel-buttons {
+        gap: clamp(2px, 0.3vw, 3px);
+    }
+    
+    .channel-btn {
+        font-size: clamp(0.65em, 0.8vw, 0.7em);
+        padding: clamp(5px, 0.8vw, 6px) clamp(2px, 0.3vw, 3px);
+    }
+    
+    .vu-meter {
+        width: clamp(20px, 2.5vw, 24px);
+        height: clamp(100px, 18vh, 130px);
+    }
+    
+    .fader {
+        height: clamp(80px, 15vh, 110px);
+    }
+    
+    .pan-knob {
+        width: clamp(35px, 5vw, 40px);
+        height: clamp(35px, 5vw, 40px);
+    }
+    
+    .no-client-msg {
+        padding: clamp(20px, 3vw, 40px) clamp(12px, 2vw, 16px);
+        font-size: clamp(0.8em, 0.95vw, 0.85em);
+    }
+    
+    .metrics {
+        gap: clamp(4px, 0.8vw, 6px);
+    }
+    
+    .metric {
+        padding: clamp(4px, 0.6vw, 5px) clamp(8px, 1.2vw, 10px);
+        font-size: clamp(0.75em, 0.9vw, 0.8em);
+    }
+}
+
+/* Teléfonos muy pequeños (hasta 320px) */
+@media (max-width: 320px) {
+    html {
+        font-size: 11px;
+    }
+    
+    h1 {
+        font-size: clamp(1em, 3vw, 1.2em);
+    }
+    
+    .channel-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .channel-strip {
+        min-height: clamp(250px, 30vh, 280px);
+    }
+    
+    .btn {
+        font-size: clamp(0.7em, 0.85vw, 0.75em);
     }
 }
 

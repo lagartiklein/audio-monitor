@@ -21,12 +21,6 @@ import math
 import uuid  # ✅ NUEVO: Para generar device_uuid únicos
 from audio_server.audio_mixer import get_audio_mixer
 
-# ✅ PATCH: Forzar async_modes a solo 'threading' para PyInstaller
-original_async_modes = engineio.base_server.BaseServer.async_modes
-def patched_async_modes(self):
-    return ['threading']
-engineio.base_server.BaseServer.async_modes = patched_async_modes
-
 # Configurar logging PRIMERO (antes de usarlo)
 logger = logging.getLogger(__name__)
 
@@ -145,9 +139,9 @@ app.config['SECRET_KEY'] = 'audio-monitor-key-v2.5-fixed'
 # Configurar SocketIO (sin app para evitar problemas de inicialización en exe)
 socketio = SocketIO(
     cors_allowed_origins="*", 
-    async_mode=None,  # ✅ Auto-detect (ahora forzado a threading por el patch)
-    ping_timeout=30,  # ✅ AUMENTADO: 30s (era 10s)
-    ping_interval=10,  # ✅ Cada 10s
+    async_mode="threading",  # Forzado para compatibilidad con PyInstaller
+    ping_timeout=15,  # ✅ REDUCIDO: 15s para detección más rápida de desconexiones
+    ping_interval=5,  # ✅ AUMENTADO: 5s (ping cada 5 segundos)
     compression=False,
     max_http_buffer_size=1000000,
     engineio_logger=False,
@@ -382,7 +376,7 @@ def init_server(manager, native_server=None):
     logger.info(f"[WebSocket] ✅ Inicializado (Control Central)")
     logger.info(f"[WebSocket]    Puerto: {config.WEB_PORT}")
     logger.info(f"[WebSocket]    Frontend: {FRONTEND_DIR}")
-    logger.info(f"[WebSocket]    Ping interval: 10s, timeout: 30s")
+    logger.info(f"[WebSocket]    Ping interval: 5s, timeout: 15s (MEJORADO PARA DETECCIÓN RÁPIDA)")
 
 
 def cleanup_initial_state():
@@ -1391,13 +1385,17 @@ def handle_get_server_stats():
 @socketio.on('heartbeat')
 def handle_heartbeat(data):
     """
-    ✅ NUEVO: Heartbeat explícito de cliente web
+    ✅ NUEVO: Heartbeat explícito de cliente web (respuesta ultra-rápida)
+    Los clientes web envían esto cada 3 segundos para confirmar conexión activa
     """
     client_id = request.sid
     update_client_activity(client_id)
-    
+    # ✅ Respuesta inmediata sin procesar
     emit('heartbeat_ack', {
-        'timestamp': int(time.time() * 1000)
+        'client_id': client_id[:8],
+        'server_timestamp': int(time.time() * 1000),
+        'client_timestamp': data.get('timestamp', 0) if isinstance(data, dict) else 0,
+        'status': 'alive'
     })
 
 
@@ -1752,7 +1750,7 @@ def start_maintenance_thread():
 
     def maintenance_loop():
         while True:
-            time.sleep(5)  # Cada 5 segundos para mayor reactividad
+            time.sleep(3)  # ✅ Reducido de 5s a 3s para detección más rápida
             try:
                 current_time = time.time()
                 timeout = 10.0  # 10 segundos sin actividad

@@ -504,6 +504,20 @@
             backdrop-filter: blur(5px);
         }
 
+        .channel-strip.disconnected-controls {
+            opacity: 0.65;
+            filter: grayscale(0.35);
+            pointer-events: none;
+        }
+
+        .channel-strip.disconnected-controls .channel-btn,
+        .channel-strip.disconnected-controls .fader,
+        .channel-strip.disconnected-controls .pan-slider {
+            cursor: not-allowed;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
         .channel-strip:hover {
             transform: translateY(-2px);
             border-color: #39ff14 !important;
@@ -768,40 +782,114 @@
         /* Responsive Design */
         @media (max-width: 1200px) {
             .mixer-controls {
-                flex-direction: column;
+                flex-direction: row;
+                gap: clamp(6px, 1vw, 10px);
             }
             
             .btn {
-                width: 100%;
-                justify-content: center;
+                width: auto;
+                padding: clamp(6px, 1vw, 8px) clamp(10px, 1.5vw, 14px);
+            }
+            
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
             }
         }
 
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: clamp(180px, 18vw, 280px);
+            }
+            
+            .channel-grid {
+                grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+                gap: clamp(8px, 1.2vw, 12px);
+            }
+            
+            .channel-strip {
+                padding: clamp(8px, 1vw, 10px);
+                gap: clamp(6px, 0.8vw, 8px);
+                min-height: auto;
+            }
+            
+            .channel-number {
+                font-size: clamp(0.7rem, 1vw, 0.8rem);
+            }
+        }
+
+        /* Tablets (768px and below) */
         @media (max-width: 768px) {
             .container {
                 height: 100vh;
+                padding: clamp(8px, 2vw, 12px);
+            }
+            
+            header {
+                padding: clamp(12px, 2vw, 16px);
+                gap: clamp(8px, 1.5vw, 12px);
+                flex-direction: column;
+                align-items: center;
+                margin-bottom: clamp(10px, 2vw, 14px);
+            }
+            
+            .logo {
+                gap: clamp(6px, 1vw, 10px);
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .logo h1 {
+                font-size: clamp(1rem, 2.5vw, 1.3rem);
+            }
+            
+            .status-badge {
+                padding: clamp(3px, 0.6vw, 5px) clamp(8px, 1.2vw, 10px);
+                font-size: clamp(0.6rem, 0.85vw, 0.7rem);
             }
             
             .sidebar {
                 width: 100%;
-                max-height: 180px;
+                max-height: clamp(140px, 22vh, 200px);
                 border-right: none;
                 border-bottom: 1px solid var(--border-color);
                 flex-direction: row;
+                padding: clamp(8px, 1.5vw, 12px);
             }
             
             .sidebar-header {
-                min-width: 100px;
+                min-width: clamp(80px, 15vw, 120px);
                 border-right: 1px solid var(--border-color);
                 border-bottom: none;
                 display: flex;
                 align-items: center;
+                padding-right: clamp(8px, 1.5vw, 10px);
+            }
+            
+            .sidebar-header h2 {
+                font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+                white-space: nowrap;
             }
             
             .client-list {
                 flex-direction: row;
                 flex-wrap: wrap;
-                gap: clamp(6px, 2vw, 10px);
+                gap: clamp(6px, 1vw, 8px);
+                padding: clamp(6px, 1vw, 8px);
+            }
+            
+            .client-item {
+                flex: 1;
+                min-width: clamp(100px, 18vw, 150px);
+                padding: clamp(8px, 1.2vw, 10px);
+                font-size: clamp(0.75rem, 0.95vw, 0.85rem);
+            }
+            
+            .client-name {
+                font-size: clamp(0.75rem, 1vw, 0.85rem);
+            }
+
+            .client-info {
+                font-size: clamp(0.65rem, 0.85vw, 0.75rem);
             }
             
             .main-layout {
@@ -810,90 +898,294 @@
             
             .mixer-header {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: clamp(10px, 2vw, 14px);
+                align-items: stretch;
+                gap: clamp(8px, 1.5vw, 10px);
+                padding: clamp(10px, 1.5vw, 14px) clamp(12px, 2vw, 16px);
+            }
+            
+            .mixer-title {
+                font-size: clamp(0.9rem, 1.8vw, 1rem);
             }
             
             .mixer-controls {
                 width: 100%;
                 flex-wrap: wrap;
+                flex-direction: row;
+                gap: clamp(6px, 1vw, 8px);
             }
             
             .btn {
                 flex: 1;
-                min-width: 100px;
+                min-width: clamp(70px, 12vw, 100px);
+                font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+                padding: clamp(6px, 1vw, 8px) clamp(8px, 1.2vw, 10px);
+            }
+            
+            .channel-grid-wrapper {
+                padding: clamp(10px, 1.5vw, 14px);
             }
             
             .channel-grid {
-                grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-                gap: clamp(8px, 1vw, 12px);
+                grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
+                gap: clamp(8px, 1.2vw, 10px);
+            }
+            
+            .channel-strip {
+                padding: clamp(8px, 1.2vw, 10px);
+                gap: clamp(6px, 0.8vw, 8px);
+                min-height: clamp(300px, 35vh, 350px);
+            }
+            
+            .channel-number {
+                font-size: clamp(0.7rem, 0.95vw, 0.8rem);
+                padding: clamp(4px, 0.6vw, 5px) clamp(6px, 1vw, 8px);
+            }
+            
+            .channel-buttons {
+                gap: clamp(2px, 0.4vw, 4px);
+            }
+            
+            .channel-btn {
+                font-size: clamp(0.6rem, 0.8vw, 0.65rem);
+                padding: clamp(4px, 0.6vw, 5px) clamp(2px, 0.4vw, 3px);
             }
             
             .fader-section {
-                min-height: 140px;
+                min-height: clamp(120px, 20vh, 150px);
+                gap: clamp(4px, 0.6vw, 6px);
             }
             
             .fader-wrapper {
-                min-height: 100px;
-                max-height: 220px;
+                min-height: clamp(80px, 15vh, 110px);
+                max-height: clamp(150px, 25vh, 200px);
             }
 
             .master-audio-controls {
-                margin-top: 6px;
-                padding-top: 6px;
+                margin-top: clamp(4px, 0.8vw, 6px);
+                padding-top: clamp(4px, 0.8vw, 6px);
+                gap: clamp(4px, 0.6vw, 6px);
             }
 
             .master-audio-btn {
-                padding: clamp(4px, 0.8vw, 8px) clamp(8px, 1.5vw, 12px);
-                font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+                padding: clamp(4px, 0.6vw, 6px) clamp(6px, 1vw, 10px);
+                font-size: clamp(0.6rem, 0.85vw, 0.7rem);
+                min-width: auto;
             }
         }
 
+        /* Smartphones (480px and below) */
         @media (max-width: 480px) {
-            header {
+            .container {
+                height: 100vh;
+                padding: clamp(6px, 1.5vw, 8px);
                 flex-direction: column;
-                gap: 10px;
-                text-align: center;
             }
             
+            header {
+                padding: clamp(10px, 1.5vw, 12px);
+                gap: clamp(6px, 1vw, 8px);
+                text-align: center;
+                flex-direction: column;
+                margin-bottom: clamp(8px, 1.5vw, 10px);
+                border-radius: clamp(8px, 1.2vw, 10px);
+            }
+            
+            .logo {
+                gap: clamp(4px, 0.6vw, 6px);
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+            }
+
             .logo h1 {
-                font-size: 1rem;
+                font-size: clamp(0.9rem, 2vw, 1.1rem);
             }
 
             .status-badge {
-                padding: 3px 8px;
-                font-size: 0.6rem;
+                padding: clamp(2px, 0.4vw, 3px) clamp(6px, 1vw, 8px);
+                font-size: clamp(0.55rem, 0.75vw, 0.65rem);
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: clamp(100px, 18vh, 130px);
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                flex-direction: row;
+                padding: clamp(6px, 1vw, 8px);
+                overflow-x: auto;
+            }
+            
+            .sidebar-header {
+                min-width: clamp(60px, 12vw, 80px);
+                border-right: 1px solid var(--border-color);
+                border-bottom: none;
+                display: flex;
+                align-items: center;
+                padding-right: clamp(6px, 1vw, 8px);
             }
             
             .sidebar-header h2 {
-                font-size: 0.7rem;
+                font-size: clamp(0.6rem, 0.8vw, 0.65rem);
+                white-space: nowrap;
+            }
+            
+            .client-list {
+                flex-direction: row;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                gap: clamp(4px, 0.6vw, 6px);
+                padding: clamp(4px, 0.6vw, 6px);
+                -webkit-overflow-scrolling: touch;
             }
             
             .client-item {
-                padding: 8px;
-                flex: 0 1 calc(50% - 5px);
+                flex: 0 0 auto;
+                min-width: clamp(85px, 22vw, 120px);
+                padding: clamp(6px, 0.8vw, 8px);
+                font-size: clamp(0.65rem, 0.8vw, 0.7rem);
             }
-
+            
             .client-name {
-                font-size: 0.8rem;
+                font-size: clamp(0.65rem, 0.85vw, 0.75rem);
             }
 
             .client-info {
-                font-size: 0.65rem;
+                font-size: clamp(0.6rem, 0.75vw, 0.65rem);
+            }
+
+            .edit-name-btn {
+                font-size: clamp(0.6rem, 0.75vw, 0.65rem);
+            }
+            
+            .main-layout {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .mixer-area {
+                border-radius: 0;
+            }
+            
+            .mixer-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: clamp(6px, 1vw, 8px);
+                padding: clamp(8px, 1.2vw, 10px);
+                border-radius: 0;
+            }
+            
+            .mixer-title {
+                font-size: clamp(0.8rem, 1.5vw, 0.9rem);
+            }
+            
+            .mixer-controls {
+                width: 100%;
+                flex-wrap: wrap;
+                flex-direction: row;
+                gap: clamp(4px, 0.6vw, 6px);
+            }
+            
+            .btn {
+                flex: 1;
+                min-width: clamp(50px, 10vw, 80px);
+                font-size: clamp(0.6rem, 0.75vw, 0.65rem);
+                padding: clamp(5px, 0.8vw, 6px) clamp(6px, 1vw, 8px);
+            }
+            
+            .channel-grid-wrapper {
+                padding: clamp(8px, 1vw, 10px);
             }
             
             .channel-grid {
                 grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-                gap: 8px;
+                gap: clamp(6px, 1vw, 8px);
+            }
+            
+            .channel-strip {
+                padding: clamp(6px, 0.8vw, 8px);
+                gap: clamp(4px, 0.6vw, 6px);
+                min-height: clamp(260px, 32vh, 300px);
+            }
+            
+            .channel-number {
+                font-size: clamp(0.65rem, 0.85vw, 0.7rem);
+                padding: clamp(3px, 0.4vw, 4px) clamp(5px, 0.8vw, 6px);
+            }
+            
+            .channel-buttons {
+                gap: clamp(1px, 0.2vw, 2px);
+            }
+            
+            .channel-btn {
+                font-size: clamp(0.55rem, 0.7vw, 0.6rem);
+                padding: clamp(3px, 0.4vw, 4px) clamp(1px, 0.2vw, 2px);
+            }
+            
+            .fader-section {
+                min-height: clamp(100px, 18vh, 130px);
+                gap: clamp(3px, 0.4vw, 4px);
+            }
+            
+            .fader-wrapper {
+                min-height: clamp(60px, 12vh, 90px);
+                max-height: clamp(120px, 20vh, 160px);
+            }
+
+            .vu-meter {
+                width: clamp(16px, 2vw, 20px);
+                height: clamp(60px, 10vh, 100px);
+            }
+
+            .pan-knob {
+                width: clamp(28px, 4vw, 35px);
+                height: clamp(28px, 4vw, 35px);
+            }
+
+            .master-audio-controls {
+                margin-top: clamp(3px, 0.4vw, 4px);
+                padding-top: clamp(3px, 0.4vw, 4px);
+                gap: clamp(3px, 0.4vw, 4px);
+            }
+
+            .master-audio-btn {
+                padding: clamp(3px, 0.4vw, 4px) clamp(4px, 0.6vw, 6px);
+                font-size: clamp(0.55rem, 0.7vw, 0.6rem);
+                min-width: 0;
+            }
+
+            .no-clients {
+                padding: clamp(20px, 3vw, 30px) clamp(12px, 2vw, 16px);
+                font-size: clamp(0.75rem, 1vw, 0.8rem);
+            }
+        }
+
+        /* Very small phones (320px and below) */
+        @media (max-width: 320px) {
+            html {
+                font-size: 11px;
+            }
+            
+            .logo h1 {
+                font-size: 0.85rem;
+            }
+            
+            .channel-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .channel-strip {
+                min-height: clamp(230px, 28vh, 260px);
             }
             
             .mixer-title {
-                font-size: 0.85rem;
+                font-size: 0.75rem;
             }
-
-            .mixer-header {
-                padding: 8px 12px;
+            
+            .btn {
+                font-size: 0.6rem;
             }
+        }
             
             .channel-strip {
                 padding: 8px;
@@ -1007,7 +1299,7 @@
                 this.draggedClientId = null;
                 this.inactivityTimeouts = {}; // Track timeouts per client
                 this.inactivityThreshold = 5 * 60 * 1000; // 5 minutes
-                this.clientInactivityTimeout = 30 * 1000; // Show clients for 30s after going idle
+                this.clientInactivityTimeout = 5 * 60 * 1000; // Mantener clientes desconectados 5 minutos
                 this.editingClientId = null; // Track inline name edits
                 this.pendingOrderUpdate = null;
                 
@@ -1019,6 +1311,7 @@
                 this.masterNextPlayTime = 0;
                 this.masterScriptProcessor = null;
                 
+                this.heartbeatWorker = null;
                 this.init();
             }
 
@@ -1055,11 +1348,99 @@
                 }
                 this.connectWebSocket();
                 this.setupEventListeners();
+                this.startHeartbeatWorker();
+            }
+
+            startHeartbeatWorker() {
+                if (window.Worker) {
+                    try {
+                        this.heartbeatWorker = new Worker('heartbeat-worker.js');
+                        this.heartbeatWorker.postMessage({ type: 'start', period: 3000 });
+                        this.heartbeatWorker.onmessage = (e) => {
+                            if (e.data && e.data.type === 'heartbeat') {
+                                if (this.socket && this.socket.connected) {
+                                    this.socket.emit('heartbeat', { timestamp: e.data.timestamp });
+                                    console.log('[Heartbeat] Enviado:', new Date(e.data.timestamp).toLocaleTimeString());
+                                }
+                            }
+                        };
+                    } catch (err) {
+                        console.warn('[HeartbeatWorker] No se pudo iniciar:', err);
+                        this.setupFallbackHeartbeat();
+                    }
+                } else {
+                    this.setupFallbackHeartbeat();
+                }
+
+                // ✅ NUEVO: Ajustar heartbeat según visibilidad de página
+                this.setupPageVisibilityHandler();
+            }
+
+            setupFallbackHeartbeat() {
+                this.heartbeatInterval = setInterval(() => {
+                    if (this.socket && this.socket.connected) {
+                        const ts = Date.now();
+                        this.socket.emit('heartbeat', { timestamp: ts });
+                        console.log('[Heartbeat Fallback] Enviado:', new Date(ts).toLocaleTimeString());
+                    }
+                }, 3000);
+            }
+
+            setupPageVisibilityHandler() {
+                let hidden, visibilityChange;
+                if (typeof document.hidden !== "undefined") {
+                    hidden = "hidden";
+                    visibilityChange = "visibilitychange";
+                } else if (typeof document.msHidden !== "undefined") {
+                    hidden = "msHidden";
+                    visibilityChange = "msvisibilitychange";
+                } else if (typeof document.webkitHidden !== "undefined") {
+                    hidden = "webkitHidden";
+                    visibilityChange = "webkitvisibilitychange";
+                }
+
+                if (typeof document.addEventListener === "undefined" || hidden === undefined) {
+                    console.warn('[PageVisibility] API no soportada');
+                    return;
+                }
+
+                document.addEventListener(visibilityChange, () => {
+                    if (document[hidden]) {
+                        // Página oculta: heartbeat más frecuente para mantener conexión
+                        if (this.heartbeatWorker) {
+                            this.heartbeatWorker.postMessage({ type: 'start', period: 2000 }); // Cada 2s
+                        } else if (this.heartbeatInterval) {
+                            clearInterval(this.heartbeatInterval);
+                            this.heartbeatInterval = setInterval(() => {
+                                if (this.socket && this.socket.connected) {
+                                    this.socket.emit('heartbeat', { timestamp: Date.now() });
+                                }
+                            }, 2000);
+                        }
+                        console.log('[Heartbeat] Página oculta: heartbeat cada 2s');
+                    } else {
+                        // Página visible: heartbeat normal
+                        if (this.heartbeatWorker) {
+                            this.heartbeatWorker.postMessage({ type: 'start', period: 3000 }); // Cada 3s
+                        } else if (this.heartbeatInterval) {
+                            clearInterval(this.heartbeatInterval);
+                            this.heartbeatInterval = setInterval(() => {
+                                if (this.socket && this.socket.connected) {
+                                    this.socket.emit('heartbeat', { timestamp: Date.now() });
+                                }
+                            }, 3000);
+                        }
+                        console.log('[Heartbeat] Página visible: heartbeat cada 3s');
+                    }
+                }, false);
             }
 
             getClientId(client) {
-                // Server uses device_uuid as stable id; fall back to id.
-                return (client && (client.device_uuid || client.id)) ?? null;
+                // Siempre usar device_uuid como identificador único y persistente.
+                // Solo usar client.id si no existe device_uuid (caso maestro o legacy).
+                if (client && client.device_uuid) return client.device_uuid;
+                if (client && client.is_master) return client.id;
+                return null;
             }
 
             getClientNameStorageKey(client) {
@@ -1357,7 +1738,23 @@
                 this.socket.on('connect', () => {
                     console.log('[Control] ✅ Conectado');
                     this.updateConnectionStatus(true);
-                    this.socket.emit('get_clients');
+                    // ✅ Forzar actualización inmediata de clientes al conectar
+                    setTimeout(() => {
+                        if (this.socket && this.socket.connected) {
+                            this.socket.emit('get_clients');
+                        }
+                    }, 100); // Pequeño delay para asegurar que el servidor esté listo
+                });
+
+                this.socket.on('reconnect', () => {
+                    console.log('[Control] 🔄 Reconectado');
+                    this.updateConnectionStatus(true);
+                    // ✅ Forzar actualización de clientes al reconectar
+                    setTimeout(() => {
+                        if (this.socket && this.socket.connected) {
+                            this.socket.emit('get_clients');
+                        }
+                    }, 100);
                 });
 
                 this.socket.on('disconnect', () => {
@@ -1406,9 +1803,31 @@
                     console.log('[MasterAudio] Stream detenido:', data);
                 });
 
+                // ✅ NUEVO: Listener para restauración automática de configuración
+                this.socket.on('auto_resubscribed', (data) => {
+                    console.log('[Auto Resubscribed]', data);
+                    const clientId = this.selectedClientId;
+                    if (clientId && this.clients[clientId]) {
+                        // Actualizar estado local con la configuración restaurada
+                        this.clients[clientId].channels = data.channels || [];
+                        this.clients[clientId].gains = data.gains || {};
+                        this.clients[clientId].pans = data.pans || {};
+                        this.clients[clientId].mutes = data.mutes || {};
+                        this.clients[clientId].master_gain = data.master_gain || 1.0;
+                        this.clients[clientId].active_channels = (data.channels || []).length;
+
+                        // Refrescar UI
+                        this.updateClientsList(Object.values(this.clients));
+                        if (this.selectedClientId === clientId) {
+                            this.renderMixer(clientId);
+                        }
+                    }
+                });
+
                 this.socket.on('clients_update', (data) => {
                     const prevSelected = this.selectedClientId ? this.clients[this.selectedClientId] : null;
                     const prevSignature = prevSelected ? this.mixStateSignature(prevSelected) : null;
+                    const wasDisconnected = prevSelected ? prevSelected.connected === false : false;
                     
                     if (data && Array.isArray(data.order)) {
                         if (this.editingClientId) {
@@ -1447,6 +1866,10 @@
                     if (!this.editingClientId && this.selectedClientId) {
                         const nextSelected = this.clients[this.selectedClientId];
                         const nextSignature = nextSelected ? this.mixStateSignature(nextSelected) : null;
+                        const nowConnected = nextSelected ? nextSelected.connected !== false : false;
+
+                        // ✅ Si el cliente estaba desconectado y ahora está conectado, refrescar mixer
+                        const reconnected = wasDisconnected && nowConnected;
 
                         // ✅ Siempre refrescar título por cambios de nombre/estado
                         if (nextSelected) {
@@ -1455,8 +1878,8 @@
                                 `${displayName} - ${nextSelected.active_channels || 0} canales`;
                         }
                         
-                        if (prevSignature !== nextSignature) {
-                            console.log('[Sync] Mixer actualizado por cambio externo (nativo/otro web)');
+                        if (prevSignature !== nextSignature || reconnected) {
+                            console.log('[Sync] Mixer actualizado por cambio externo (nativo/otro web)', reconnected ? '(reconectado)' : '');
                             this.renderMixer(this.selectedClientId);
                             
                             // También actualizar el título con canales activos
@@ -1535,6 +1958,29 @@
                                 // ignore
                             }
                             this.reorderClientElements();
+                        }
+                    }
+                });
+
+                // ✅ NUEVO: Listener para confirmación de nombre guardado
+                this.socket.on('client_name_saved', (data) => {
+                    console.log('[Client Name Saved]', data);
+                    const clientId = data?.client_id || data?.device_uuid;
+                    if (clientId && this.clients[clientId]) {
+                        // Actualizar nombre en cache local
+                        this.clients[clientId].custom_name = data.custom_name;
+                        
+                        // Actualizar UI del cliente si está visible
+                        const item = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
+                        if (item && !this.editingClientId) {
+                            this.updateClientItemUI(item, this.clients[clientId]);
+                        }
+                        
+                        // Si es el cliente seleccionado, actualizar título
+                        if (this.selectedClientId === clientId) {
+                            const displayName = this.getDisplayName(this.clients[clientId]);
+                            document.getElementById('mixer-title-text').textContent = 
+                                `${displayName} - ${this.clients[clientId].active_channels || 0} canales`;
                         }
                     }
                 });
@@ -1744,6 +2190,20 @@
 
                 container.innerHTML = '';
                 container.appendChild(fragment);
+
+                // Auto-select first available client if none selected
+                if (!this.selectedClientId && orderedClients.length > 0) {
+                    const firstConnectedClient = orderedClients.find(client => {
+                        const id = this.getClientId(client);
+                        return id && this.clients[id] && this.clients[id].connected !== false;
+                    });
+                    if (firstConnectedClient) {
+                        const firstClientId = this.getClientId(firstConnectedClient);
+                        if (firstClientId) {
+                            this.selectClient(firstClientId);
+                        }
+                    }
+                }
             }
 
             updateClientItemUI(itemElement, client) {
@@ -1931,8 +2391,11 @@
                             }
 
                             // Notify server (authoritative)
+                            // Include device_uuid if available to ensure proper identification
+                            const clientData = this.clients[clientId];
                             this.socket.emit('set_client_name', {
                                 client_id: clientId,
+                                device_uuid: clientData?.device_uuid,
                                 custom_name: newName
                             });
                         }
@@ -1988,6 +2451,8 @@
                     return;
                 }
 
+                const isDisconnected = client.connected === false;
+                const interactive = !isDisconnected;
                 const numChannels = this.deviceInfo.channels || 8;
                 const gains = client.gains || {};
                 const pans = client.pans || {};
@@ -2011,6 +2476,11 @@
                         strip.classList.add('recognized');
                     } else {
                         strip.classList.add('unrecognized');
+                    }
+                    if (isDisconnected) {
+                        strip.classList.add('disconnected-controls');
+                    } else {
+                        strip.classList.remove('disconnected-controls'); // ✅ Remover si estaba desconectado
                     }
 
                     strip.innerHTML = `
@@ -2037,45 +2507,53 @@
 
                     // ON button
                     const onBtn = strip.querySelector('.on-btn');
-                    onBtn.addEventListener('click', () => this.toggleChannel(clientId, i));
+                    onBtn.disabled = !interactive;
+                    if (interactive) {
+                        onBtn.addEventListener('click', () => this.toggleChannel(clientId, i));
+                    } else {
+                        onBtn.title = 'Cliente desconectado';
+                    }
 
                     // Fader
                     const fader = strip.querySelector('.fader');
-                    let faderDebounce;
-                    fader.addEventListener('input', (e) => {
-                        const db = parseFloat(e.target.value);
-                        // Update display immediately for smooth feedback
-                        const dbDisplay = document.querySelector(`.db-display[data-channel="${i}"]`);
-                        if (dbDisplay) {
-                            dbDisplay.textContent = this.formatDb(db);
-                        }
-                        clearTimeout(faderDebounce);
-                        faderDebounce = setTimeout(() => {
-                            this.updateGain(clientId, i, db);
-                        }, 40); // 25 actualizaciones por segundo máx
-                    });
+                    fader.disabled = !interactive;
+                    if (interactive) {
+                        let faderDebounce;
+                        fader.addEventListener('input', (e) => {
+                            const db = parseFloat(e.target.value);
+                            const dbDisplay = document.querySelector(`.db-display[data-channel="${i}"]`);
+                            if (dbDisplay) {
+                                dbDisplay.textContent = this.formatDb(db);
+                            }
+                            clearTimeout(faderDebounce);
+                            faderDebounce = setTimeout(() => {
+                                this.updateGain(clientId, i, db);
+                            }, 40);
+                        });
+                    }
 
                     // Pan slider
                     const panSlider = strip.querySelector('.pan-slider');
-                    let panDebounce;
-                    panSlider.addEventListener('input', (e) => {
-                        const pan = parseInt(e.target.value) / 100;
-                        // Update display immediately for smooth feedback
-                        const panValue = document.querySelector(`.pan-value[data-channel="${i}"]`);
-                        if (panValue) {
-                            panValue.textContent = this.formatPan(pan);
-                        }
-                        clearTimeout(panDebounce);
-                        panDebounce = setTimeout(() => {
-                            this.updatePan(clientId, i, pan);
-                        }, 40); // 25 actualizaciones por segundo máx
-                    });
+                    panSlider.disabled = !interactive;
+                    if (interactive) {
+                        let panDebounce;
+                        panSlider.addEventListener('input', (e) => {
+                            const pan = parseInt(e.target.value) / 100;
+                            const panValue = document.querySelector(`.pan-value[data-channel="${i}"]`);
+                            if (panValue) {
+                                panValue.textContent = this.formatPan(pan);
+                            }
+                            clearTimeout(panDebounce);
+                            panDebounce = setTimeout(() => {
+                                this.updatePan(clientId, i, pan);
+                            }, 40);
+                        });
 
-                    // Double click pan to reset
-                    panSlider.addEventListener('dblclick', () => {
-                        panSlider.value = 0;
-                        this.updatePan(clientId, i, 0);
-                    });
+                        panSlider.addEventListener('dblclick', () => {
+                            panSlider.value = 0;
+                            this.updatePan(clientId, i, 0);
+                        });
+                    }
 
                     container.appendChild(strip);
                 }
@@ -2084,6 +2562,7 @@
             toggleChannel(clientId, channel) {
                 const client = this.clients[clientId];
                 if (!client) return;
+                if (client.connected === false) return;
 
                 const channels = [...(client.channels || [])];
                 const index = channels.indexOf(channel);
@@ -2108,15 +2587,16 @@
             }
 
             updateGain(clientId, channel, db) {
+                const client = this.clients[clientId];
+                if (!client || client.connected === false) return;
+
                 const gain = this.dbToLinear(db);
                 
                 // ✅ OPTIMIZADO: Actualizar local inmediatamente (sin esperar servidor)
-                if (this.clients[clientId]) {
-                    if (!this.clients[clientId].gains) {
-                        this.clients[clientId].gains = {};
-                    }
-                    this.clients[clientId].gains[channel] = gain;
+                if (!client.gains) {
+                    client.gains = {};
                 }
+                client.gains[channel] = gain;
                 
                 // ✅ Enviar al servidor (no-blocking)
                 this.socket.emit('update_gain', {
@@ -2127,13 +2607,14 @@
             }
 
             updatePan(clientId, channel, pan) {
+                const client = this.clients[clientId];
+                if (!client || client.connected === false) return;
+
                 // ✅ OPTIMIZADO: Actualizar local inmediatamente (sin esperar servidor)
-                if (this.clients[clientId]) {
-                    if (!this.clients[clientId].pans) {
-                        this.clients[clientId].pans = {};
-                    }
-                    this.clients[clientId].pans[channel] = pan;
+                if (!client.pans) {
+                    client.pans = {};
                 }
+                client.pans[channel] = pan;
                 
                 // ✅ Enviar al servidor (no-blocking)
                 this.socket.emit('update_pan', {
@@ -2145,6 +2626,8 @@
 
             selectAllChannels() {
                 if (!this.selectedClientId || !this.deviceInfo) return;
+                const client = this.clients[this.selectedClientId];
+                if (!client || client.connected === false) return;
                 
                 const numChannels = this.deviceInfo.channels || 8;
                 const channels = Array.from({ length: numChannels }, (_, i) => i);
@@ -2165,6 +2648,8 @@
 
             selectNoChannels() {
                 if (!this.selectedClientId) return;
+                const client = this.clients[this.selectedClientId];
+                if (!client || client.connected === false) return;
                 
                 // ✅ OPTIMIZADO: Actualizar UI inmediatamente
                 if (this.clients[this.selectedClientId]) {

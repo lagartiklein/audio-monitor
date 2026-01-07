@@ -6,18 +6,10 @@ import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
 
-/**
- * ✅ VERSIÓN CORREGIDA - Ultra Low Latency
- *
- * CORRECCIONES:
- * 1. Context puede ser null (evita crash si se llama sin context)
- * 2. Métodos nativos corregidos (firma consistente)
- * 3. Validación de AudioManager antes de usar
- */
 class OboeAudioRenderer(private val context: Context? = null) {
-
     companion object {
         private const val TAG = "OboeAudioRenderer"
+        private const val RENDER_STEREO_CHANNEL = 0 // Canal dedicado para render principal
 
         // ✅ Variables mutables con valores por defecto seguros
         private var OPTIMAL_SAMPLE_RATE = 48000
@@ -26,18 +18,16 @@ class OboeAudioRenderer(private val context: Context? = null) {
         private const val MAX_WRITE_FAILURES = 2
         private const val MAX_SIMULTANEOUS_STREAMS = 48
 
-        // ✅ OPTIMIZACIÓN LATENCIA FASE 1: Buffer size reducido para baja latencia
-        // 64 frames @ 48kHz = 1.33ms (vs 2.67ms con 128 frames)
-        // Nota: Requiere WiFi estable, puede aumentar underruns en redes inestables
-        private var OPTIMAL_BUFFER_SIZE = 64 // ⬇️ REDUCIDO de 128 frames
+        // ✅ OPTIMIZACIÓN LATENCIA: preferimos buffers pequeños, pero alineados a framesPerBurst del dispositivo
+        private var OPTIMAL_BUFFER_SIZE = 64 // se recalcula con detectDeviceCapabilities()
         private const val MIN_BUFFER_SIZE = 64
-        private const val MAX_BUFFER_SIZE = 256
+        private const val MAX_BUFFER_SIZE = 128
 
         init {
             try {
                 System.loadLibrary("fichatech_audio")
-                Log.d(TAG, "✅ Biblioteca nativa Oboe cargada (Latencia Fase 1 optimizada)")
-                Log.d(TAG, "   🎯 Buffer: ${OPTIMAL_BUFFER_SIZE} frames = ~1.33ms latencia")
+                Log.d(TAG, "✅ Biblioteca nativa Oboe cargada")
+                Log.d(TAG, "   🎯 Buffer inicial: ${OPTIMAL_BUFFER_SIZE} frames")
             } catch (e: UnsatisfiedLinkError) {
                 Log.e(TAG, "❌ Error cargando biblioteca nativa: ${e.message}", e)
             }
@@ -67,12 +57,13 @@ class OboeAudioRenderer(private val context: Context? = null) {
     private var totalPacketsReceived = 0
     private var totalPacketsDropped = 0
 
-    // ✅ Device capabilities con valores seguros
-    // ✅ OPTIMIZACIÓN LATENCIA FASE 1: Buffer pool para reducir GC pauses
-    // Reutiliza buffers en lugar de crear nuevos en cada frame
-    // Ganancia: 0.2-0.5ms menos variabilidad
-    private val bufferPool = ArrayDeque<FloatArray>()
-    private val MAX_POOLED_BUFFERS = 2 // Mínimo para no desperdiciar memoria
+    // ✅ Deduplicación mínima por canal para evitar audio “doblado” por duplicados de red/hilos.
+    private val lastRenderedSamplePosition = ConcurrentHashMap<Int, Long>()
+
+    // ✅ Pool de buffers por tamaño: evita GC/jitter.
+    // Importante: NO hacemos fill(0f) en release: siempre sobrescribimos todo el buffer al renderizar.
+    private val bufferPoolsBySize = ConcurrentHashMap<Int, ArrayDeque<FloatArray>>()
+    private val maxPooledBuffersPerSize = 2
 
     private var deviceSupportsMMAP = false
     private var deviceFramesPerBurst = 0
@@ -95,14 +86,12 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
     init {
         try {
-            // ✅ CORREGIDO: Detectar capabilities solo si hay context
             if (context != null) {
                 detectDeviceCapabilities()
             } else {
                 Log.w(TAG, "⚠️ Context no disponible, usando configuración por defecto")
             }
 
-            // ✅ CORREGIDO: Usar firma correcta (sin bufferSize)
             engineHandle = nativeCreateEngine(OPTIMAL_SAMPLE_RATE, CHANNELS)
             isInitialized = engineHandle != 0L
 
@@ -114,7 +103,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
                        📊 Sample Rate: $OPTIMAL_SAMPLE_RATE Hz ${if (context != null) "(nativo)" else "(default)"}
                        🎵 Canales: $CHANNELS
                        📦 Buffer Size: $OPTIMAL_BUFFER_SIZE frames (~${(OPTIMAL_BUFFER_SIZE * 1000f / OPTIMAL_SAMPLE_RATE).format(1)}ms)
-                       🚀 MMAP Support: $deviceSupportsMMAP
+                       🚀 MMAP Support (heurístico): $deviceSupportsMMAP
                        ⚡ Frames/Burst: $deviceFramesPerBurst
                        🔧 Engine Handle: $engineHandle
                 """.trimIndent()
@@ -138,28 +127,25 @@ class OboeAudioRenderer(private val context: Context? = null) {
                     .getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
                     ?.toIntOrNull()
                     ?.let { if (it in 44100..96000) OPTIMAL_SAMPLE_RATE = it }
+
                 audioManager
                     .getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
                     ?.toIntOrNull()
-                    ?.let {
-                        if (it in 64..512) {
-                            deviceFramesPerBurst = it
-                            OPTIMAL_BUFFER_SIZE =
-                                when {
-                                    deviceFramesPerBurst <= 96 -> 64
-                                    deviceFramesPerBurst <= 192 -> 128
-                                    else -> 256
-                                }.coerceIn(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE)
+                    ?.let { frames ->
+                        if (frames in 32..1024) {
+                            deviceFramesPerBurst = frames
+                            // ✅ Mejor para latencia: alinear a framesPerBurst (AAudio/Oboe suele trabajar por burst)
+                            OPTIMAL_BUFFER_SIZE = frames.coerceIn(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE)
                         }
                     }
+
                 deviceSupportsMMAP =
-                    context.packageManager.hasSystemFeature(
-                        "android.hardware.audio.low_latency"
-                    ) || context.packageManager.hasSystemFeature("android.hardware.audio.pro")
+                    context.packageManager.hasSystemFeature("android.hardware.audio.low_latency") ||
+                        context.packageManager.hasSystemFeature("android.hardware.audio.pro")
 
                 Log.d(
                     TAG,
-                    "🔍 Audio: $OPTIMAL_SAMPLE_RATE Hz, ${OPTIMAL_BUFFER_SIZE}f buffer, MMAP=$deviceSupportsMMAP"
+                    "🔍 Audio: $OPTIMAL_SAMPLE_RATE Hz, buffer=${OPTIMAL_BUFFER_SIZE}f, framesPerBurst=$deviceFramesPerBurst, lowLatencyFeature=$deviceSupportsMMAP"
                 )
             }
         } catch (e: Exception) {
@@ -176,10 +162,7 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
 
         if (streamState != null) {
-            Log.w(
-                TAG,
-                "🔄 Recreando stream canal $channel (${streamState.consecutiveFailures} fallos)"
-            )
+            Log.w(TAG, "🔄 Recreando stream canal $channel (${streamState.consecutiveFailures} fallos)")
             destroyStream(channel)
         }
 
@@ -199,16 +182,6 @@ class OboeAudioRenderer(private val context: Context? = null) {
         return createNewStream(channel)
     }
 
-    /**
-     * ✅ SIMPLIFICADO: Usar método nativo estándar sin MMAP custom
-     *
-     * RAZÓN: MMAP se activa automáticamente por Oboe cuando:
-     * - Performance mode es LowLatency
-     * - Sharing mode es Exclusive
-     * - El dispositivo lo soporta
-     *
-     * NO necesitamos método nativo custom para MMAP.
-     */
     private fun createNewStream(channel: Int): Long {
         try {
             if (!isInitialized) {
@@ -216,11 +189,10 @@ class OboeAudioRenderer(private val context: Context? = null) {
                 return 0L
             }
 
-            // ✅ Usar método nativo estándar
             val handle = nativeCreateStream(engineHandle, channel)
 
             if (handle != 0L) {
-                // ✅ Configurar buffer size óptimo
+                // ✅ Configurar buffer size óptimo (alineado a framesPerBurst si existe)
                 nativeSetBufferSize(handle, OPTIMAL_BUFFER_SIZE)
 
                 nativeStartStream(handle)
@@ -247,48 +219,42 @@ class OboeAudioRenderer(private val context: Context? = null) {
         }
     }
 
-    /** ✅ NUEVO: Renderiza audio MONO y lo convierte a estéreo */
-    fun renderChannelRF(channel: Int, audioData: FloatArray, samplePosition: Long) {
-        if (!isInitialized || audioData.isEmpty()) {
-            return
-        }
+    // Render principal: MONO (N) -> estéreo interleaved (2N)
+    fun renderStereo(audioData: FloatArray, samplePosition: Long) {
+        if (!isInitialized || audioData.isEmpty()) return
 
-        val state = channelStates.getOrPut(channel) { ChannelState() }
+        val lastPos = lastRenderedSamplePosition[RENDER_STEREO_CHANNEL]
+        if (lastPos != null && samplePosition == lastPos) return
+        lastRenderedSamplePosition[RENDER_STEREO_CHANNEL] = samplePosition
 
-        if (!state.isActive || state.gainDb <= -60f) {
-            return
-        }
+        val state = channelStates.getOrPut(RENDER_STEREO_CHANNEL) { ChannelState() }
+        if (!state.isActive || state.gainDb <= -60f) return
 
         totalPacketsReceived++
 
-        val streamHandle = getOrCreateStream(channel)
+        val streamHandle = getOrCreateStream(RENDER_STEREO_CHANNEL)
         if (streamHandle == 0L) {
             totalPacketsDropped++
             return
         }
 
-        // Calcular ganancias
         val totalGainDb = state.gainDb + masterGainDb
         val linearGain = dbToLinear(totalGainDb)
+        val leftGain = linearGain
+        val rightGain = linearGain
 
-        // Panorama
-        val panRad = ((state.pan + 1f) * Math.PI / 4).toFloat()
-        val leftGain = cos(panRad) * linearGain
-        val rightGain = sin(panRad) * linearGain
-
-        // ✅ MONO TO STEREO: Recibir mono (audioData.size) y convertir a estéreo (audioData.size * 2)
-        val stereoBuffer = acquireBuffer(audioData.size * 2)
+        val outSize = audioData.size * 2
+        val stereoBuffer = acquireBuffer(outSize)
 
         var sumSquares = 0f
         var peak = 0f
 
         for (i in audioData.indices) {
             val sample = audioData[i]
-            val left = sample * leftGain
-            val right = sample * rightGain
-
-            stereoBuffer[i * 2] = softClip(left)
-            stereoBuffer[i * 2 + 1] = softClip(right)
+            val l = sample * leftGain
+            val r = sample * rightGain
+            stereoBuffer[i * 2] = softClip(l)
+            stereoBuffer[i * 2 + 1] = softClip(r)
 
             val absSample = abs(sample * linearGain)
             if (absSample > peak) peak = absSample
@@ -299,7 +265,90 @@ class OboeAudioRenderer(private val context: Context? = null) {
         state.rmsLevel = sqrt(sumSquares / audioData.size)
         state.packetsReceived++
 
-        // Escribir a Oboe
+        try {
+            val written = nativeWriteAudio(streamHandle, stereoBuffer)
+            val streamState = streamHandles[RENDER_STEREO_CHANNEL]
+
+            if (written < stereoBuffer.size) {
+                val dropped = (stereoBuffer.size - written) / 2
+                totalPacketsDropped += dropped
+
+                if (streamState != null) {
+                    streamState.consecutiveFailures++
+                    if (streamState.consecutiveFailures == 1) {
+                        nativeClearBuffer(streamHandle)
+                    } else if (streamState.consecutiveFailures == 3) {
+                        nativeStopStream(streamHandle)
+                        nativeStartStream(streamHandle)
+                    } else if (streamState.consecutiveFailures >= 5) {
+                        destroyStream(RENDER_STEREO_CHANNEL)
+                    }
+                }
+
+                if (dropped > 100) {
+                    Log.d(TAG, "🗑️ Drop: $dropped frames en render estéreo principal")
+                }
+            } else {
+                if (streamState != null) {
+                    streamState.consecutiveFailures = 0
+                    streamState.lastWriteTime = System.currentTimeMillis()
+                }
+            }
+        } finally {
+            releaseBuffer(outSize, stereoBuffer)
+        }
+    }
+
+    /** ✅ NUEVO: Renderiza audio MONO y lo convierte a estéreo */
+    fun renderChannelRF(channel: Int, audioData: FloatArray, samplePosition: Long) {
+        if (channel == RENDER_STEREO_CHANNEL) return
+        if (!isInitialized || audioData.isEmpty()) return
+
+        val lastPos = lastRenderedSamplePosition[channel]
+        if (lastPos != null && samplePosition == lastPos) return
+        lastRenderedSamplePosition[channel] = samplePosition
+
+        val state = channelStates.getOrPut(channel) { ChannelState() }
+        if (!state.isActive || state.gainDb <= -60f) return
+
+        totalPacketsReceived++
+
+        val streamHandle = getOrCreateStream(channel)
+        if (streamHandle == 0L) {
+            totalPacketsDropped++
+            return
+        }
+
+        val totalGainDb = state.gainDb + masterGainDb
+        val linearGain = dbToLinear(totalGainDb)
+
+        val panRad = ((state.pan + 1f) * Math.PI / 4).toFloat()
+        val leftGain = cos(panRad) * linearGain
+        val rightGain = sin(panRad) * linearGain
+
+        val outSize = audioData.size * 2
+        val stereoBuffer = acquireBuffer(outSize)
+
+        var sumSquares = 0f
+        var peak = 0f
+
+        for (i in audioData.indices) {
+            val sample = audioData[i]
+            val l = sample * leftGain
+            val r = sample * rightGain
+
+            stereoBuffer[i * 2] = softClip(l)
+            stereoBuffer[i * 2 + 1] = softClip(r)
+
+            val absSample = abs(sample * linearGain)
+            if (absSample > peak) peak = absSample
+            sumSquares += sample * sample
+        }
+
+        state.peakLevel = peak
+        state.rmsLevel = sqrt(sumSquares / audioData.size)
+        state.packetsReceived++
+
         try {
             val written = nativeWriteAudio(streamHandle, stereoBuffer)
             val streamState = streamHandles[channel]
@@ -310,8 +359,6 @@ class OboeAudioRenderer(private val context: Context? = null) {
 
                 if (streamState != null) {
                     streamState.consecutiveFailures++
-
-                    // ✅ Estrategia de recuperación (sin Log en hotpath para Fase 1)
                     if (streamState.consecutiveFailures == 1) {
                         nativeClearBuffer(streamHandle)
                     } else if (streamState.consecutiveFailures == 3) {
@@ -344,26 +391,25 @@ class OboeAudioRenderer(private val context: Context? = null) {
                     try {
                         nativeClearBuffer(streamHandle)
                         streamState.lastClearTime = System.currentTimeMillis()
-                    } catch (ignored: Exception) {
+                    } catch (_: Exception) {
                         streamState.consecutiveFailures = MAX_WRITE_FAILURES
                     }
                 }
             }
         } finally {
-            // ✅ OPTIMIZACIÓN FASE 1: Devolver buffer al pool
-            releaseBuffer(stereoBuffer)
+            releaseBuffer(outSize, stereoBuffer)
         }
     }
 
-    // ✅ OPTIMIZACIÓN FASE 1: Métodos de pool de buffers
     private fun acquireBuffer(size: Int): FloatArray {
-        return bufferPool.removeFirstOrNull()?.takeIf { it.size == size } ?: FloatArray(size)
+        val q = bufferPoolsBySize.getOrPut(size) { ArrayDeque() }
+        return q.removeFirstOrNull() ?: FloatArray(size)
     }
 
-    private fun releaseBuffer(buffer: FloatArray) {
-        if (bufferPool.size < MAX_POOLED_BUFFERS) {
-            buffer.fill(0f) // Limpiar antes de devolver
-            bufferPool.addLast(buffer)
+    private fun releaseBuffer(size: Int, buffer: FloatArray) {
+        val q = bufferPoolsBySize.getOrPut(size) { ArrayDeque() }
+        if (q.size < maxPooledBuffersPerSize) {
+            q.addLast(buffer)
         }
     }
 
@@ -521,6 +567,8 @@ class OboeAudioRenderer(private val context: Context? = null) {
             it.consecutiveFailures = 0
             it.lastClearTime = 0
         }
+        // ✅ También resetear dedup para no bloquear el primer paquete tras reset
+        lastRenderedSamplePosition.clear()
     }
 
     fun stop() {
