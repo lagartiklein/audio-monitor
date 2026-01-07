@@ -10,7 +10,7 @@ SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 
 # ✅ FASE 4: BLOCKSIZE ultra-reducido para baja latencia
 # 512 samples @ 48kHz ≈ 10.67ms latencia; mejor balance entre latencia y CPU
-BLOCKSIZE = 128
+BLOCKSIZE = 64
 
 # ✅ COMPRESIÓN DE AUDIO: Solo zlib habilitado
 ENABLE_OPUS_COMPRESSION = False  # Opus deshabilitado, solo zlib
@@ -63,6 +63,8 @@ WEB_HOST = '0.0.0.0'
 NATIVE_PORT = 5101
 NATIVE_HOST = '0.0.0.0'
 NATIVE_MAX_CLIENTS = 10
+WEB_HEARTBEAT_TIMEOUT = 60
+NATIVE_HEARTBEAT_TIMEOUT = 120
 
 # 🎚️ CONFIGURACIÓN VU METERS
 # ============================================================================
