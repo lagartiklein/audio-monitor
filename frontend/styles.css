@@ -353,15 +353,13 @@ h1 {
 .fader {
     width: 100%;
     height: clamp(110px, 20vh, 130px);
-    writing-mode: bt-lr;
-    -webkit-appearance: slider-vertical;
-    appearance: slider-vertical;
+    writing-mode: vertical-lr;
+    direction: rtl;
     cursor: pointer;
 }
 
 input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: slider-thumb;
-    appearance: slider-thumb;
+    /* Elimina appearance: slider-thumb; ya que está deprecado */
     background: linear-gradient(135deg, #4f46e5, #6366f1);
     cursor: pointer;
     width: clamp(18px, 2vw, 20px);

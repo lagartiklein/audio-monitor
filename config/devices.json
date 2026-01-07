@@ -8109,8 +8109,8 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     },
     "first_seen": 1767720464.3208725,
-    "last_seen": 1767747693.6183376,
-    "reconnections": 209,
+    "last_seen": 1767748610.1620765,
+    "reconnections": 232,
     "configuration": {},
     "configuration_session_id": null,
     "tags": [],
@@ -8907,8 +8907,8 @@
       "user_agent": null
     },
     "first_seen": 1767744784.857229,
-    "last_seen": 1767747696.6736171,
-    "reconnections": 73,
+    "last_seen": 1767748663.9295394,
+    "reconnections": 95,
     "configuration": {
       "channels": [
         1
@@ -8923,8 +8923,29 @@
         "1": false
       },
       "master_gain": 1.0,
-      "timestamp": 1767747696673
+      "timestamp": 1767748663929
     },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "b9f8999f-e307-488a-8c4a-fe46bc8a2bcb": {
+    "uuid": "b9f8999f-e307-488a-8c4a-fe46bc8a2bcb",
+    "type": "web",
+    "name": "control-center",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": "127.0.0.1",
+    "device_info": {
+      "type": "web",
+      "name": "control-center",
+      "primary_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+    },
+    "first_seen": 1767748614.8376057,
+    "last_seen": 1767748668.4566875,
+    "reconnections": 8,
+    "configuration": {},
     "configuration_session_id": null,
     "tags": [],
     "active": true
