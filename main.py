@@ -1,3 +1,7 @@
+from audio_server.device_registry import init_device_registry
+
+# Obtener ruta base (soporta EXE portable)
+# (Eliminada definición duplicada de get_base_path)
 
 import sys, signal, threading, time, socket, os, webbrowser, uuid
 import logging
@@ -234,9 +238,6 @@ class AudioServerApp:
             self.audio_capture = AudioCapture()
 
             num_channels = self.audio_capture.start_capture(device_id=device_id)
-
-            
-
             # ✅ NUEVO: Inicializar Device Registry
             device_registry = init_device_registry(
                 persistence_file=os.path.join(os.path.dirname(__file__), "config", "devices.json")

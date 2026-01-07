@@ -22,6 +22,11 @@ import uuid  # ✅ NUEVO: Para generar device_uuid únicos
 import sys
 from audio_server.audio_mixer import get_audio_mixer
 
+try:
+    from audio_server.web_identity import derive_web_device_uuid
+except Exception:
+    derive_web_device_uuid = None
+
 # PyInstaller: asegurar que los async drivers de threading se empaqueten.
 # Si PyInstaller no incluye estos submódulos, Engine.IO puede no registrar
 # el modo 'threading' y Flask-SocketIO fallará con:
@@ -410,16 +415,68 @@ def cleanup_initial_state():
     # Limpiar estados persistentes expirados
     cleanup_expired_web_states()
 
-    # Limpiar clientes web desconectados (timeout más agresivo)
-    web_client_timeout = getattr(config, 'WEB_CLIENT_TIMEOUT', 10.0)
-    with web_clients_lock:
-        disconnected_clients = [
-            client_id for client_id, client_info in web_clients.items()
-            if time.time() - client_info['last_activity'] > web_client_timeout
-        ]
-        for client_id in disconnected_clients:
-            logger.info(f"[WebSocket] 🗑️ Cliente web zombie desconectado: {client_id[:8]}")
-            del web_clients[client_id]
+    # No limpiar clientes por inactividad: deben persistir y no desaparecer.
+
+
+def _get_request_ip() -> str:
+    """Mejor esfuerzo para resolver IP real (proxy-friendly)."""
+    try:
+        xff = request.headers.get('X-Forwarded-For')
+        if xff:
+            # Tomar primera IP
+            first = xff.split(',')[0].strip()
+            if first:
+                return first
+    except Exception:
+        pass
+    return request.remote_addr or ''
+
+
+def _derive_web_uuid_for_request() -> str:
+    ip = _get_request_ip()
+    ua = request.headers.get('User-Agent', '') or ''
+    if derive_web_device_uuid:
+        return derive_web_device_uuid(ip, ua)
+    # Fallback local (no debería ocurrir)
+    import hashlib
+    raw_id = f"{ip}|{ua}"
+    hash_id = hashlib.sha256(raw_id.encode('utf-8')).hexdigest()[:16]
+    return f"web-{hash_id}"
+
+
+def _resolve_runtime_client_id(target_client_id: str):
+    """Resolver device_uuid -> client_id runtime si está conectado."""
+    if not target_client_id:
+        return target_client_id
+    if not channel_manager:
+        return target_client_id
+
+    # Si ya existe como subscription key, usarlo tal cual.
+    try:
+        if channel_manager.get_client_subscription(target_client_id):
+            return target_client_id
+    except Exception:
+        pass
+
+    # Mapear device_uuid -> client_id
+    try:
+        if hasattr(channel_manager, 'get_client_by_device_uuid'):
+            mapped = channel_manager.get_client_by_device_uuid(target_client_id)
+            if mapped:
+                return mapped
+    except Exception:
+        pass
+
+    # Mapear web_clients (sid) por device_uuid
+    try:
+        with web_clients_lock:
+            for sid, info in web_clients.items():
+                if info.get('device_uuid') == target_client_id:
+                    return sid
+    except Exception:
+        pass
+
+    return target_client_id
 
 
 # ============================================================================
@@ -492,20 +549,22 @@ def handle_connect(auth=None):
     client_id = request.sid
 
     auth = auth or {}
-    web_device_uuid = auth.get('device_uuid')
-    uuid_assigned = False
-    
-    # ✅ NUEVO: Si no hay device_uuid, generar uno único para este web
-    if not web_device_uuid:
-        web_device_uuid = f"web-{uuid.uuid4().hex[:12]}"
-        uuid_assigned = True
+    requested_name = (auth.get('device_name') or '').strip()
+    normalized_name = ''.join(ch for ch in requested_name.lower() if ch.isalnum())
+    is_control_center = normalized_name in ('controlcenter', 'webcontrol')
+
+    # ✅ Persistencia real: SIEMPRE derivar UUID en el servidor por IP+User-Agent.
+    # Ignorar cualquier UUID enviado por el navegador (cache/localStorage).
+    requested_uuid = auth.get('device_uuid')
+    web_device_uuid = _derive_web_uuid_for_request()
+    uuid_assigned = (requested_uuid != web_device_uuid)
     
     # ✅ Registrar cliente web
     with web_clients_lock:
         web_clients[client_id] = {
             'connected_at': time.time(),
             'last_activity': time.time(),
-            'address': request.remote_addr,
+            'address': _get_request_ip(),
             'user_agent': request.headers.get('User-Agent', 'Unknown'),
             'device_uuid': web_device_uuid  # ✅ SIEMPRE tendrá valor
         }
@@ -545,7 +604,8 @@ def handle_connect(auth=None):
 
         # --- Restaurar configuración persistente de canales si existe en device_registry ---
         restored_from_registry = False
-        if web_device_uuid and getattr(channel_manager, 'device_registry', None):
+        # El Control Center (UI) no es un "cliente" a mostrar ni a suscribir.
+        if (not is_control_center) and web_device_uuid and getattr(channel_manager, 'device_registry', None):
             registry = channel_manager.device_registry
             config_prev = registry.get_configuration(web_device_uuid)
             if config_prev and config_prev.get('channels'):
@@ -595,11 +655,12 @@ def handle_connect(auth=None):
 
         # ✅ Registrar dispositivo web en DeviceRegistry (si existe)
         try:
-            if web_device_uuid and getattr(channel_manager, 'device_registry', None):
+            # El Control Center (UI) no debe existir como dispositivo/cliente persistente.
+            if (not is_control_center) and web_device_uuid and getattr(channel_manager, 'device_registry', None):
                 channel_manager.device_registry.register_device(web_device_uuid, {
                     'type': 'web',
-                    'name': auth.get('device_name') or 'web-control',
-                    'primary_ip': request.remote_addr,
+                    'name': 'web-client',
+                    'primary_ip': _get_request_ip(),
                     'user_agent': request.headers.get('User-Agent', 'Unknown')
                 })
         except Exception as e:
@@ -761,24 +822,23 @@ def handle_update_client_mix(data):
         if not target_client_id:
             emit('error', {'message': 'target_client_id required'})
             return
+
+        runtime_client_id = _resolve_runtime_client_id(target_client_id)
         
         # ✅ Guardar estado previo para detectar cambios
-        prev_subscription = channel_manager.get_client_subscription(target_client_id)
+        prev_subscription = channel_manager.get_client_subscription(runtime_client_id)
         prev_channels = set(prev_subscription.get('channels', [])) if prev_subscription else set()
         
         # ✅ Si el cliente no existe aún, crearlo (suscribción inicial)
         if not prev_subscription:
-            # Get device_uuid from web_clients if available
-            device_uuid = None
-            with web_clients_lock:
-                if target_client_id in web_clients:
-                    device_uuid = web_clients[target_client_id].get('device_uuid')
+            # target_client_id viene como device_uuid (estable)
+            device_uuid = target_client_id
             
             # Create initial subscription with provided channels
             channels = data.get('channels', [])
             try:
                 sub_success = channel_manager.subscribe_client(
-                    target_client_id,
+                    runtime_client_id,
                     channels=channels,
                     gains=data.get('gains'),
                     pans=data.get('pans'),
@@ -796,11 +856,11 @@ def handle_update_client_mix(data):
                 return
             
             # Refresh subscription after creation
-            prev_subscription = channel_manager.get_client_subscription(target_client_id)
+            prev_subscription = channel_manager.get_client_subscription(runtime_client_id)
         
         # ✅ Actualizar mezcla
         success = channel_manager.update_client_mix(
-            target_client_id,
+            runtime_client_id,
             channels=data.get('channels'),
             gains=data.get('gains'),
             pans=data.get('pans'),
@@ -818,7 +878,7 @@ def handle_update_client_mix(data):
             logger.info(f"[WebSocket] 🎛️ Mezcla actualizada para {target_client_id[:15]}")
             
             # ✅ SINCRONIZACIÓN BIDIRECCIONAL: Emitir cambios específicos para actualización inmediata
-            new_subscription = channel_manager.get_client_subscription(target_client_id)
+            new_subscription = channel_manager.get_client_subscription(runtime_client_id)
             if new_subscription:
                 new_channels = set(new_subscription.get('channels', []))
                 
@@ -837,23 +897,23 @@ def handle_update_client_mix(data):
                     }, skip_sid=request.sid)
             
             # ✅ NUEVO: Guardar estado de canales para persistencia
-            _save_client_config_to_registry(target_client_id)
+            _save_client_config_to_registry(runtime_client_id)
             
             # ✅ Broadcast a todos (incluye el cambio completo)
             broadcast_clients_update()
 
             # ✅ Si el target es un cliente nativo conectado, empujar mix_state en tiempo real
             try:
-                subscription = channel_manager.get_client_subscription(target_client_id)
+                subscription = channel_manager.get_client_subscription(runtime_client_id)
                 if subscription and subscription.get('client_type') == 'native':
                     if native_server_instance is not None:
-                        native_server_instance.push_mix_state_to_client(target_client_id)
+                        native_server_instance.push_mix_state_to_client(runtime_client_id)
             except Exception as e:
                 logger.debug(f"[WebSocket] mix_state push failed: {e}")
             
         else:
             # Debug: log what went wrong
-            subscription_check = channel_manager.get_client_subscription(target_client_id)
+            subscription_check = channel_manager.get_client_subscription(runtime_client_id)
             logger.error(f"[WebSocket] update_client_mix failed: subscription_check={subscription_check is not None} for {target_client_id[:15]}")
             emit('error', {'message': f'Failed to update mix for {target_client_id}'})
     
@@ -1022,6 +1082,7 @@ def handle_update_gain(data):
     }
     """
     client_id = data.get('target_client_id') or request.sid
+    client_id = _resolve_runtime_client_id(client_id)
     update_client_activity(request.sid)
     
     if not channel_manager:
@@ -1099,6 +1160,7 @@ def handle_update_pan(data):
     }
     """
     client_id = data.get('target_client_id') or request.sid
+    client_id = _resolve_runtime_client_id(client_id)
     update_client_activity(request.sid)
     
     if not channel_manager:
@@ -1579,10 +1641,13 @@ def _save_client_config_to_registry(client_id):
             'timestamp': int(time.time() * 1000)
         }
         
-        # Guardar en device_registry
+        # Guardar en device_registry (durable entre reinicios)
         if hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+            # 1) Persistencia principal usada por restauración (devices.json)
+            channel_manager.device_registry.update_configuration(persistent_key, state_to_save)
+            # 2) Estado global (channels_state.json) - útil para vistas/telemetría
             channel_manager.device_registry.update_channels_state(persistent_key, state_to_save)
-            logger.debug(f"[WebSocket] 💾 Estado de canales guardado para {str(persistent_key)[:12]}")
+            logger.debug(f"[WebSocket] 💾 Estado de canales guardado (configuration + channels_state) para {str(persistent_key)[:12]}")
         
         # ✅ CONFIGURACIÓN DE SESIÓN: No guardar en device_registry (deshabilitado)
         if False:  # DISABLED FOR SESSION-ONLY CONFIG
@@ -1593,85 +1658,120 @@ def _save_client_config_to_registry(client_id):
 
 
 def get_all_clients_info():
+    """Retorna clientes para UI sin que desaparezcan por timeout/inactividad.
+
+    Fuente de verdad: DeviceRegistry (persistente). Se enriquece con estado runtime
+    (connected/last_activity/config actual) desde ChannelManager cuando esté disponible.
     """
-    ✅ Obtener información de clientes ACTIVOS para mostrar en web
-    ✅ FILTRO ESTRICTO: Solo mostrar:
-       1. Cliente maestro (servidor - monitor sonidista) si está habilitado
-       2. Clientes Android nativos ACTIVOS CONECTADOS (con conexión real)
-    ✅ NO mostrar: 
-       - Clientes web (solo aplicaciones nativas)
-       - Clientes inactivos/fantasmas (sin actividad reciente)
-       - Clientes que nunca se han conectado
-    """
-    result_clients = []
-    current_time = time.time()
-    activity_timeout = 10.0  # 10 segundos sin actividad = considerado desconectado
-    
-    if channel_manager:
+    result = []
+
+    if not channel_manager:
+        return result
+
+    device_registry = getattr(channel_manager, 'device_registry', None)
+    runtime_clients = []
+    runtime_by_device_uuid = {}
+
+    try:
+        runtime_clients = channel_manager.get_all_clients_info() or []
+        for rc in runtime_clients:
+            du = rc.get('device_uuid')
+            if du:
+                runtime_by_device_uuid[str(du)] = rc
+    except Exception as e:
+        logger.debug(f"[WebSocket] get_all_clients_info(runtime) failed: {e}")
+
+    # 1) Maestro (si está habilitado)
+    if getattr(config, 'MASTER_CLIENT_ENABLED', False):
+        for rc in runtime_clients:
+            if rc.get('is_master'):
+                result.append(rc)
+                break
+
+    # 2) Dispositivos persistentes desde registry
+    if device_registry:
         try:
-            all_info = channel_manager.get_all_clients_info()
-            device_registry = getattr(channel_manager, 'device_registry', None)
-            for c in all_info:
-                client_type = c.get('type', 'unknown')
-                is_master = c.get('is_master', False)
-                is_connected = c.get('connected', False)
-                last_activity = c.get('last_activity', 0)
-                device_uuid = c.get('device_uuid')
-                # Verificar activo en DeviceRegistry
-                is_active_registry = True
-                if device_registry and device_uuid:
-                    dev = device_registry.get_device(device_uuid)
-                    is_active_registry = dev.get('active', False) if dev else False
+            devices = device_registry.get_all_devices(active_only=False) or []
+            for d in devices:
+                du = d.get('uuid')
+                if not du:
+                    continue
+                du = str(du)
 
-                # ✅ MOSTRAR: Cliente maestro si está habilitado
-                if is_master:
-                    if getattr(config, 'MASTER_CLIENT_ENABLED', False):
-                        result_clients.append(c)
+                # No mostrar el Control Center (UI) en la lista de clientes.
+                dn = (d.get('name') or '')
+                dn_norm = ''.join(ch for ch in dn.lower() if ch.isalnum())
+                if dn_norm in ('controlcenter', 'webcontrol'):
                     continue
 
-                # ✅ MOSTRAR: Clientes native/android SOLO si:
-                #   1. Están marcados como conectados
-                #   2. Tienen actividad reciente (últimos 3 minutos)
-                #   3. Están activos en DeviceRegistry
-                if client_type in ('native', 'android'):
-                    if is_connected and (current_time - last_activity) < activity_timeout and is_active_registry:
-                        result_clients.append(c)
-                        logger.debug(f"[WebSocket] ✅ Cliente activo mostrado: {c.get('id', 'unknown')[:12]} "
-                                   f"(tipo: {client_type}, actividad: {current_time - last_activity:.1f}s, registry: {is_active_registry})")
-                    else:
-                        reason = "desconectado" if not is_connected else (f"inactivo ({current_time - last_activity:.1f}s)" if (current_time - last_activity) >= activity_timeout else "no activo en registry")
-                        logger.debug(f"[WebSocket] ⊘ Cliente ignorado ({reason}): {c.get('id', 'unknown')[:12]} "
-                                   f"(tipo: {client_type}, registry: {is_active_registry})")
+                # Evitar incluir maestro si está deshabilitado
+                if not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+                    master_uuid = getattr(config, 'MASTER_CLIENT_UUID', '__master_server_client__')
+                    if du == str(master_uuid):
+                        continue
+
+                rc = runtime_by_device_uuid.get(du)
+                if rc:
+                    # Preferir datos runtime actuales
+                    result.append(rc)
                     continue
-                # ✅ NO mostrar otros tipos (web, etc)
+
+                # Offline: construir entrada mínima desde registry + configuración persistida
+                cfg = {}
+                try:
+                    cfg = device_registry.get_configuration(du) or {}
+                except Exception:
+                    cfg = {}
+
+                channels = cfg.get('channels', []) or []
+                entry = {
+                    'id': du,  # estable para UI
+                    'type': d.get('type') or 'unknown',
+                    'device_uuid': du,
+                    'device_model': (d.get('device_info') or {}).get('model') or (d.get('device_info') or {}).get('device_model'),
+                    'custom_name': d.get('custom_name'),
+                    'device_name': d.get('name'),
+                    'channels': channels,
+                    'gains': cfg.get('gains', {}) or {},
+                    'pans': cfg.get('pans', {}) or {},
+                    'mutes': cfg.get('mutes', {}) or {},
+                    'active_channels': len(channels),
+                    'master_gain': cfg.get('master_gain', 1.0),
+                    'last_activity': d.get('last_seen', 0),
+                    'last_update': d.get('last_seen', 0),
+                    'connected': False,
+                    'is_master': False,
+                }
+                result.append(entry)
         except Exception as e:
-            logger.error(f"[WebSocket] Error obteniendo clientes activos: {e}")
+            logger.debug(f"[WebSocket] build clients from registry failed: {e}")
+    else:
+        # Fallback sin registry: mostrar runtime sin filtro por timeout
+        for rc in runtime_clients:
+            if rc.get('is_master') and not getattr(config, 'MASTER_CLIENT_ENABLED', False):
+                continue
+            result.append(rc)
 
-    # ✅ Deduplicar por device_uuid para evitar duplicados
-    seen_uuids = set()
-    deduped_clients = []
-    
-    for client in result_clients:
-        uuid = client.get('device_uuid') or client.get('id')
-        if uuid and uuid not in seen_uuids:
-            seen_uuids.add(uuid)
-            deduped_clients.append(client)
-        elif uuid:
-            logger.debug(f"[WebSocket] ⚠️ Cliente duplicado filtrado: {uuid[:12]}")
-    
-    # ✅ Orden final: Maestro primero, luego Android nativos ordenados por actividad
-    master_clients = [c for c in deduped_clients if c.get('is_master', False)]
-    other_clients = [c for c in deduped_clients if not c.get('is_master', False)]
-    
-    # Ordenar Android nativos por actividad reciente (más reciente primero)
-    other_clients.sort(key=lambda c: -(c.get('last_activity') or 0))
-    
-    final_result = master_clients + other_clients
-    
-    logger.debug(f"[WebSocket] 📊 Lista de clientes activos: {len(final_result)} "
-               f"(maestro: {len(master_clients)}, nativos: {len(other_clients)})")
-    
-    return final_result
+    # Deduplicar por device_uuid/id
+    seen = set()
+    unique = []
+    for c in result:
+        key = str(c.get('device_uuid') or c.get('id') or '')
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(c)
+
+    # Aplicar orden global si existe
+    try:
+        order = _get_client_order()
+        order_index = {str(v): i for i, v in enumerate(order or [])}
+        master = [c for c in unique if c.get('is_master')]
+        rest = [c for c in unique if not c.get('is_master')]
+        rest.sort(key=lambda c: order_index.get(str(c.get('device_uuid') or c.get('id')), 10**9))
+        return master + rest
+    except Exception:
+        return unique
 
 
 def get_server_stats():
@@ -1780,66 +1880,8 @@ def start_maintenance_thread():
         while True:
             time.sleep(3)  # ✅ Reducido de 5s a 3s para detección más rápida
             try:
-                current_time = time.time()
-                timeout = 10.0  # 10 segundos sin actividad
-
-                with web_clients_lock:
-                    inactive_clients = []
-                    web_clients_snapshot = list(web_clients.items())
-                    
-                    for client_id, info in web_clients_snapshot:
-                        last_activity = info.get('last_activity', 0)
-                        if current_time - last_activity > timeout:
-                            inactive_clients.append((client_id, info))
-
-                    if inactive_clients:
-                        logger.info(f"[WebSocket] 🧹 Limpiando {len(inactive_clients)} clientes web inactivos")
-                        for client_id, info in inactive_clients:
-                            # Marcar como inactivo en DeviceRegistry si existe device_uuid
-                            device_uuid = info.get('device_uuid')
-                            if device_uuid and getattr(channel_manager, 'device_registry', None):
-                                try:
-                                    channel_manager.device_registry.mark_inactive(device_uuid)
-                                    logger.info(f"[WebSocket] 📌 Dispositivo marcado inactivo: {device_uuid[:12]}")
-                                except Exception as e:
-                                    logger.debug(f"[WebSocket] Error marcando inactivo en DeviceRegistry: {e}")
-
-                            if client_id in web_clients:
-                                web_clients.pop(client_id, None)
-                            # Desuscribir del channel manager
-                            if channel_manager:
-                                try:
-                                    channel_manager.unsubscribe_client(client_id)
-                                except Exception:
-                                    pass
-                            # Desconectar socket
-                            try:
-                                disconnect(sid=client_id)
-                            except:
-                                pass
-
-                # Limpiar clientes nativos desconectados del channel_manager
-                if channel_manager:
-                    try:
-                        device_registry = getattr(channel_manager, 'device_registry', None)
-                        subscriptions_snapshot = list(channel_manager.subscriptions.items())
-                        
-                        for client_id, sub in subscriptions_snapshot:
-                            client_type = channel_manager.client_types.get(client_id, "unknown")
-                            # Si es nativo, verificar que está activo en DeviceRegistry
-                            if client_type in ("native", "android"):
-                                device_uuid = sub.get('device_uuid')
-                                if device_uuid and device_registry:
-                                    dev = device_registry.get_device(device_uuid)
-                                    # Si no existe o no está activo, eliminar
-                                    if not dev or not dev.get('active', False):
-                                        logger.info(f"[WebSocket] 🧹 Eliminando cliente nativo inactivo: {client_id[:12]} (uuid: {device_uuid[:12]})")
-                                        if client_id in channel_manager.subscriptions:
-                                            channel_manager.unsubscribe_client(client_id)
-                    except Exception as e:
-                        logger.debug(f"[WebSocket] Error limpiando nativos inactivos: {e}")
-
-                # ✅ Limpiar estados persistentes expirados
+                # ✅ Persistencia: NO desconectar/eliminar clientes por inactividad.
+                # Solo limpiar estados persistentes expirados (limpieza de memoria).
                 cleanup_expired_web_states()
 
             except Exception as e:

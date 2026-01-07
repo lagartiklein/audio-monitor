@@ -1298,8 +1298,9 @@
                 this.draggedElement = null;
                 this.draggedClientId = null;
                 this.inactivityTimeouts = {}; // Track timeouts per client
-                this.inactivityThreshold = 5 * 60 * 1000; // 5 minutes
-                this.clientInactivityTimeout = 5 * 60 * 1000; // Mantener clientes desconectados 5 minutos
+                // ✅ Persistencia UX: no desactivar ni ocultar clientes por timeout en el frontend.
+                this.inactivityThreshold = null;
+                this.clientInactivityTimeout = null;
                 this.editingClientId = null; // Track inline name edits
                 this.pendingOrderUpdate = null;
                 
@@ -1324,18 +1325,21 @@
             }
 
             init() {
-                // Restore preferred client order from localStorage (persistent across reloads)
-                try {
-                    const saved = JSON.parse(localStorage.getItem('client_order') || '[]');
-                    if (Array.isArray(saved)) {
-                        this.clientOrder = saved.filter(v => typeof v === 'string' || typeof v === 'number');
-                    }
-                } catch {
+                    // Purge all cached clients and client order on load
+                    this.clients = {};
                     this.clientOrder = [];
-                }
-                this.connectWebSocket();
-                this.setupEventListeners();
-                this.startHeartbeatWorker();
+                    try {
+                        localStorage.removeItem('client_order');
+                    } catch {}
+                    // Remove all custom_name keys
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.startsWith('client_custom_name_')) {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                    this.connectWebSocket();
+                    this.setupEventListeners();
+                    this.startHeartbeatWorker();
             }
 
             startHeartbeatWorker() {
@@ -2105,11 +2109,12 @@
                         if (!id) return;
                         incomingIds.add(id);
                         const existing = this.clients[id] || {};
+                        const serverConnected = client && client.connected !== false;
                         const merged = {
                             ...existing,
                             ...client,
-                            connected: true,
-                            last_seen: now
+                            connected: serverConnected,
+                            last_seen: ('last_seen' in (client || {})) ? client.last_seen : (existing.last_seen ?? now)
                         };
                         this.clients[id] = merged;
                     });
@@ -2120,8 +2125,6 @@
                         client.connected = false;
                     }
                 });
-
-                this.purgeStaleClients(now);
 
                 const visibleClients = this.getVisibleClientsSnapshot(now);
 
@@ -2223,46 +2226,31 @@
             }
 
             purgeStaleClients(now) {
-                Object.keys(this.clients).forEach(id => {
-                    const client = this.clients[id];
-                    if (client.connected) {
-                        return;
-                    }
-                    if (client.is_master || client.type === 'master') {
-                        return;
-                    }
-                    const lastSeen = client.last_seen || 0;
-                    if (now - lastSeen > this.clientInactivityTimeout) {
-                        delete this.clients[id];
-                    }
-                });
+                // ✅ Persistencia UX: nunca eliminar clientes en memoria por timeout.
+                // El servidor es la fuente de verdad del listado persistente.
+                return;
             }
 
             getVisibleClientsSnapshot(now = Date.now()) {
-                const clients = [];
-                Object.values(this.clients).forEach(client => {
-                    const type = client.type || 'unknown';
-                    const isMaster = client.is_master || type === 'master';
-                    if (!isMaster && type !== 'native' && type !== 'android') {
-                        return;
-                    }
-
-                    if (isMaster) {
-                        clients.push(client);
-                        return;
-                    }
-
-                    if (client.connected) {
-                        clients.push(client);
-                        return;
-                    }
-
-                    const lastSeen = client.last_seen || 0;
-                    if (now - lastSeen <= this.clientInactivityTimeout) {
-                        clients.push(client);
-                    }
-                });
-                return clients;
+                    // Exclude all variants of 'control center' and 'web-control' from visible list
+                    const clients = [];
+                    Object.values(this.clients).forEach(client => {
+                        const type = client.type || 'unknown';
+                        const isMaster = client.is_master || type === 'master';
+                        const name = (client.name || '').toLowerCase().replace(/[-_ ]/g, '');
+                        if (
+                            name === 'controlcenter' ||
+                            name === 'webcontrol' ||
+                            name.includes('controlcenter') ||
+                            name.includes('webcontrol')
+                        ) {
+                            return;
+                        }
+                        if (isMaster || type === 'native' || type === 'android' || type === 'web' || type === 'unknown') {
+                            clients.push(client);
+                        }
+                    });
+                    return clients;
             }
 
             reorderClientElements() {
@@ -2300,17 +2288,8 @@
             }
 
             renderClientsList(clientsData, container) {
-                // ✅ FILTRO ESTRICTO: Solo mostrar maestro + Android nativos activos
-                const realClients = clientsData.filter(c => {
-                    const type = c.type || 'unknown';
-                    const isMaster = c.is_master || type === 'master';
-                    const isConnected = c.connected !== false;
-                    
-                    // Mostrar: maestro O (android/native Y conectado)
-                    return isMaster || ((type === 'native' || type === 'android') && isConnected);
-                });
-                
-                const ordered = this.orderClients(realClients);
+                // ✅ Mostrar maestro + clientes persistentes (web/native/android), conectados o no.
+                const ordered = this.orderClients(Array.isArray(clientsData) ? clientsData : []);
                 ordered.forEach(client => {
                     const id = this.getClientId(client);
                     if (!id) return;
@@ -2685,17 +2664,11 @@
             }
 
             resetClientInactivityTimer(clientId) {
-                // Clear existing timer if any
+                // ✅ Persistencia UX: no marcar inactividad ni auto-desactivar.
                 if (this.inactivityTimeouts[clientId]) {
                     clearTimeout(this.inactivityTimeouts[clientId]);
+                    delete this.inactivityTimeouts[clientId];
                 }
-
-                // Set new timer
-                this.inactivityTimeouts[clientId] = setTimeout(() => {
-                    this.deactivateClient(clientId);
-                }, this.inactivityThreshold);
-
-                // Remove inactive class if present
                 const clientItem = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
                 if (clientItem) {
                     clientItem.classList.remove('inactive');
@@ -2703,11 +2676,8 @@
             }
 
             deactivateClient(clientId) {
-                const clientItem = document.querySelector(`.client-item[data-client-id="${clientId}"]`);
-                if (clientItem) {
-                    clientItem.classList.add('inactive');
-                    console.log(`Cliente ${clientId} desactivado por inactividad`);
-                }
+                // ✅ No-op: no desactivar clientes por inactividad.
+                return;
             }
 
             reactivateClient(clientId) {
@@ -2715,7 +2685,7 @@
                 if (clientItem) {
                     clientItem.classList.remove('inactive');
                 }
-                this.resetClientInactivityTimer(clientId);
+                // Sin timers: mantener visible y activo en UI.
             }
 
             // ============================================================================
