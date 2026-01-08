@@ -10,7 +10,7 @@ SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 
 # ✅ FASE 4: BLOCKSIZE ultra-reducido para baja latencia
 # 512 samples @ 48kHz ≈ 10.67ms latencia; mejor balance entre latencia y CPU
-BLOCKSIZE = 64
+BLOCKSIZE = 32
 
 # ✅ COMPRESIÓN DE AUDIO: Solo zlib habilitado
 ENABLE_OPUS_COMPRESSION = False  # Opus deshabilitado, solo zlib
@@ -116,11 +116,18 @@ LOG_QUEUE_STATS = False
 LOG_LEVEL = 'WARNING'
 STATS_INTERVAL = 10.0
 
+
 # ============================================================================
 # VALIDACIONES
 # ============================================================================
 VALIDATE_PACKETS = False
 VALIDATE_AUDIO = False
+
+# ============================================================================
+# FORMATO DE AUDIO
+# ============================================================================
+# Forzar uso de int16 en vez de float32
+USE_INT16_ENCODING = True
 
 # ============================================================================
 # OPTIMIZACIONES DE SISTEMA

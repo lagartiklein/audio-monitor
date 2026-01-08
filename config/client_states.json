@@ -1,0 +1,309 @@
+{
+  "a923f022-bdbb-449f-9107-d11786777b17": {
+    "channels": [],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767763476.8122377,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "db3b90a7-e8d2-4a1e-8d8d-196f6befcfdd": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0592537251772889,
+      "0": 1.0,
+      "2": 1.0,
+      "3": 1.0,
+      "4": 1.0,
+      "5": 1.0,
+      "6": 1.0,
+      "7": 1.0
+    },
+    "pans": {
+      "1": 0.0,
+      "0": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0
+    },
+    "mutes": {
+      "1": false,
+      "0": false,
+      "2": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767785968.5186641,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "d737f6ba-a703-40ea-981f-b568f45f4b93": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767786038.528319,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "08f7a891-8d12-466e-8d70-85d60f876c09": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767786078.5492752,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "bd939521-c2d7-4c76-b3c4-d37cb4359ebc": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767786468.58105,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "8da52c20-c82f-4b08-84b1-35eeb08937ee": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767786788.2483592,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "431e3354-08c7-484c-a997-d30e5655803f": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0,
+      "0": 1.0,
+      "2": 1.0,
+      "3": 1.0,
+      "4": 1.0,
+      "5": 1.0,
+      "6": 1.0,
+      "7": 1.0
+    },
+    "pans": {
+      "1": 0.0,
+      "0": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0
+    },
+    "mutes": {
+      "1": false,
+      "0": false,
+      "2": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767786928.2823284,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "03f2a0cb-1aa7-47a6-b6a6-c5fdb17c17ac": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767787078.3079388,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "74c4ce4f-4950-416d-bfc4-77d686b46815": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0,
+      "2": 1.0,
+      "0": 1.0,
+      "3": 1.0,
+      "4": 1.0,
+      "5": 1.0,
+      "6": 1.0,
+      "7": 1.0
+    },
+    "pans": {
+      "1": 0.0,
+      "2": 0.0,
+      "0": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0
+    },
+    "mutes": {
+      "1": false,
+      "2": false,
+      "0": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767787692.351832,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "ccafd556-08cb-4dc0-8b22-19c2a76aae6b": {
+    "channels": [],
+    "gains": {},
+    "pans": {},
+    "mutes": {},
+    "master_gain": 1.0,
+    "last_seen": 1767788802.5394518,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "1d8afc60-f5a9-4d5a-b272-5937df8d8574": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767789452.6289866,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "9331ab42-bd49-483e-99d2-ae6c134a4dd2": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 1.0
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767789932.713083,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "d420ad40-da93-4b7c-84e6-7fb3fde8c419": {
+    "channels": [],
+    "gains": {},
+    "pans": {},
+    "mutes": {},
+    "master_gain": 1.0,
+    "last_seen": 1767789983.7552567,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "2f0786df-2018-474c-8eb3-c3373998229f": {
+    "channels": [],
+    "gains": {},
+    "pans": {},
+    "mutes": {},
+    "master_gain": 1.0,
+    "last_seen": 1767790263.7053173,
+    "reconnection_count": 0,
+    "client_type": "native"
+  },
+  "ccf60cb2-4bd4-40d5-9fd5-001388cc5cb0": {
+    "channels": [
+      1
+    ],
+    "gains": {
+      "1": 3.9810717055349722
+    },
+    "pans": {
+      "1": 0.0
+    },
+    "mutes": {
+      "1": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1767797729.0928314,
+    "reconnection_count": 0,
+    "client_type": "native"
+  }
+}

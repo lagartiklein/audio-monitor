@@ -427,7 +427,11 @@ class AudioCapture:
         Al finalizar, retorna la cantidad real de canales capturados.
         Args:
             device_id (int, optional): ID del dispositivo de entrada de audio a utilizar. Si es None, selecciona automáticamente.
-        Returns:
+                    if getattr(config, 'USE_INT16_ENCODING', False):
+                        audio_array = np.frombuffer(audio_data, dtype=np.int16).reshape(-1, self.actual_channels)
+                        audio_array = audio_array.astype(np.float32) / 32767.0  # Normalizar para VU
+                    else:
+                        audio_array = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, self.actual_channels)
             int: Número real de canales capturados por el dispositivo seleccionado.
         """
 
@@ -564,10 +568,13 @@ class AudioCapture:
         if self.audio_mixer and self.channel_manager and self.master_client_id:
             try:
                 if isinstance(indata, memoryview):
-                    audio_array = np.frombuffer(indata, dtype=np.float32).reshape(-1, self.actual_channels)
+                    if getattr(config, 'USE_INT16_ENCODING', False):
+                        audio_array = np.frombuffer(indata, dtype=np.int16).reshape(-1, self.actual_channels)
+                        audio_array = audio_array.astype(np.float32) / 32767.0
+                    else:
+                        audio_array = np.frombuffer(indata, dtype=np.float32).reshape(-1, self.actual_channels)
                 else:
                     audio_array = indata
-                
                 self.audio_mixer.process_and_broadcast(
                     audio_array,
                     self.channel_manager,
@@ -653,17 +660,10 @@ class AudioCapture:
         # ✅ Calcular latencia total de procesamiento y envío
 
         process_end = time.time()
-
         total_latency = (process_end - process_start) * 1000  # ms
-
-        
-
         self.latency_measurements.append(total_latency)
-
         if len(self.latency_measurements) > self.max_latency_samples:
-
             self.latency_measurements.pop(0)
-
     
 
     def stop_capture(self):
