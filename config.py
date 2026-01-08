@@ -75,11 +75,10 @@ VU_ENABLED = False  # ⚠️ DESACTIVADO para ultra-baja latencia
 # ============================================================================
 # ✅ OPTIMIZACIONES DE SOCKET - FIXED
 # ============================================================================
-SOCKET_SNDBUF = 65536
-SOCKET_RCVBUF = 32768
+SOCKET_SNDBUF = 4096   # ✅ 8 packets máximo (~5ms)
+SOCKET_RCVBUF = 4096   # ✅ Simétrico
 SOCKET_NODELAY = True
-SOCKET_TIMEOUT = 3.0  # ✅ REDUCIDO: 5s → 3s para detección rápida de errores de red
-
+SOCKET_TIMEOUT = 0.010  # ✅ 10ms (15 packets)
 # TCP Keepalive (más agresivo para detectar clientes muertos)
 TCP_KEEPALIVE = True
 TCP_KEEPIDLE = 10

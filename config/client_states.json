@@ -290,19 +290,22 @@
   },
   "ccf60cb2-4bd4-40d5-9fd5-001388cc5cb0": {
     "channels": [
-      1
+      0
     ],
     "gains": {
+      "0": 3.9810717055349722,
       "1": 3.9810717055349722
     },
     "pans": {
+      "0": 0.0,
       "1": 0.0
     },
     "mutes": {
+      "0": false,
       "1": false
     },
     "master_gain": 1.0,
-    "last_seen": 1767797729.0928314,
+    "last_seen": 1767908638.8193746,
     "reconnection_count": 0,
     "client_type": "native"
   }

@@ -698,24 +698,45 @@
       "user_agent": null
     },
     "first_seen": 1767796659.7490432,
-    "last_seen": 1767797737.2189827,
-    "reconnections": 43,
+    "last_seen": 1767908696.8239589,
+    "reconnections": 81,
     "configuration": {
       "channels": [
-        1
+        0
       ],
       "gains": {
-        "1": 1.0
+        "0": 3.9810717055349722,
+        "1": 3.9810717055349722,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
       },
       "pans": {
-        "1": 0.0
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
       },
       "mutes": {
-        "1": false
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
       },
       "solos": [],
       "master_gain": 1.0,
-      "timestamp": 1767797737218
+      "timestamp": 1767908696823
     },
     "configuration_session_id": null,
     "tags": [],
