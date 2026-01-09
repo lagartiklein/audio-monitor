@@ -67,6 +67,7 @@ class AudioDeviceChangeListener(
 
                 if (state == 1) {
                     Log.d(TAG, "🎧 Auriculares conectados")
+                    onAudioDeviceChanged() // <--- Agregado para reiniciar stream al conectar audífonos
                 } else if (state == 0) {
                     Log.d(TAG, "🔊 Auriculares desconectados - cambiando a parlante")
                     onAudioDeviceChanged()
@@ -79,5 +80,3 @@ class AudioDeviceChangeListener(
         }
     }
 }
-
-

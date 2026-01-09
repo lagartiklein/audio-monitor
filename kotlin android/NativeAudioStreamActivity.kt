@@ -2,6 +2,7 @@ package com.cepalabsfree.fichatech.audiostream
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.Build
@@ -12,17 +13,22 @@ import android.os.Process
 import android.util.Log
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.WindowManager
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.cepalabsfree.fichatech.R
 import com.cepalabsfree.fichatech.audiostream.AudioDeviceChangeListener
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
 import kotlin.math.*
 
 /**
@@ -88,7 +94,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private var lockWakeLock: android.os.PowerManager.WakeLock? = null
 
     // Variable para el tamaño del buffer
-    private var bufferSizeFrames: Int = 1024 // Valor por defecto normal
+    private var bufferSizeFrames: Int = 128 // Valor por defecto normal
 
     // Variables de reconexión automática y cambio de audio
     private var autoReconnectJob: Job? = null
@@ -97,6 +103,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private var connectionAttempts: Int = 0
     private val MAX_CONNECTION_ATTEMPTS = 5
     private val CONNECTION_RETRY_DELAY_MS = 500L
+
+    // Buffer reutilizable para interleaving estéreo
+    private var reusableInterleavedBuffer: FloatArray? = null
+
+    // Job para renovar el WakeLock parcialmente
+    private var wakeLockRenewJob: Job? = null
+
+    // AdMob
+    private lateinit var adViewAudioStream: AdView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -107,12 +122,19 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
         enableEdgeToEdge()
+        hideSystemUI()
         setContentView(R.layout.activity_native_receiver)
         setupEdgeToEdgeInsets()
         configureAudioSystemForLowLatency()
         initializeViews()
         initializeAudioComponents()
         loadSessionPreferences()
+
+        // AdMob
+        adViewAudioStream = findViewById(R.id.adViewAudioStream)
+        MobileAds.initialize(this) {}
+        val adRequest = AdRequest.Builder().build()
+        adViewAudioStream.loadAd(adRequest)
     }
 
     private fun configureAudioSystemForLowLatency() {
@@ -144,7 +166,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         infoText = findViewById(R.id.infoText)
         ultraLowLatencySwitch = findViewById(R.id.ultraLowLatencySwitch)
 
-        // ✅ Inicializar elementos de bloqueo
+        // ✅ Inicializar elementos de bloqueo ANTES de setupLockSlider
         lockSlider = findViewById(R.id.lockSlider)
         lockIcon = findViewById(R.id.lockIcon)
         lockTrack = findViewById(R.id.lockTrack)
@@ -153,6 +175,11 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         lockBarContainer = findViewById(R.id.lockBarContainer)
         nativeAudioContainer = findViewById(R.id.native_audio_container)
 
+        // Al abrir la actividad, el candado debe estar desbloqueado
+        lockSlider.setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
+        lockIcon.text = "\uD83D\uDD13"  // 🔓 Unicode correcto
+
+        // ✅ Configurar slider DESPUÉS de que todas las vistas estén inicializadas
         setupLockSlider()
 
         connectButton.setOnClickListener {
@@ -170,7 +197,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     masterVolumeDb = (progress - 60).toFloat()
                     masterVolumeText.text = String.format("%.0f dB", masterVolumeDb)
-                    audioClient.setMasterGain(if (isMuted) -60f else masterVolumeDb)
+                    audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {
@@ -192,14 +219,9 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         connectButton.text = "Conectar"
         muteButton.text = "Audio ON"
 
-        // Al abrir la actividad, el candado debe tener fondo #FF4081 y el icono normal (desbloqueado)
-        lockSlider.setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
-        lockIcon.text = "🔓"
-
-        ultraLowLatencySwitch.isChecked = true
+        ultraLowLatencySwitch.isChecked = false
         ultraLowLatencySwitch.setOnCheckedChangeListener { _, isChecked ->
-            bufferSizeFrames = if (isChecked) 32 else 512
-            // Si ya está conectado, aplicar el cambio en caliente si es posible
+            bufferSizeFrames = if (isChecked) 32 else 128
             if (isConnected) {
                 audioRenderer.setBufferSize(bufferSizeFrames)
             }
@@ -253,7 +275,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         audioDeviceChangeListener = AudioDeviceChangeListener {
             Log.d(TAG, "🔊 Cambio de dispositivo de audio detectado")
             if (isConnected) {
-                // Reiniciar el motor de audio sin desconectar
                 restartAudioEngine()
             }
         }
@@ -291,12 +312,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun toggleMute() {
         isMuted = !isMuted
         if (isMuted) {
-            audioClient.setMasterGain(-60f)
+            audioRenderer.setMasterGain(-60f)
             muteButton.text = "Audio OFF"
             muteButton.setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
             muteButton.setTextColor(android.graphics.Color.WHITE)
         } else {
-            audioClient.setMasterGain(masterVolumeDb)
+            audioRenderer.setMasterGain(masterVolumeDb)
             muteButton.text = "Audio ON"
             muteButton.setBackgroundColor(android.graphics.Color.BLACK)
             muteButton.setTextColor(android.graphics.Color.WHITE)
@@ -323,11 +344,8 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // Adquirir recursos de audio
                 audioFocusManager.requestAudioFocus()
                 audioRenderer.acquirePartialWakeLock(applicationContext)
-
-                // Antes de conectar, aplicar el buffer size seleccionado
                 audioRenderer.setBufferSize(bufferSizeFrames)
 
                 val success = audioClient.connect(serverIp, serverPort)
@@ -342,7 +360,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 Log.e(TAG, "❌ Error conectando: ${e.message}", e)
                 withContext(Dispatchers.Main) {
                     showError("Error de conexión:\n${e.message}")
-                    // Liberar recursos en caso de error
                     audioRenderer.releaseWakeLock()
                     audioFocusManager.abandonAudioFocus()
                 }
@@ -369,10 +386,14 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     private fun handleAudioData(audioData: NativeAudioClient.FloatAudioData) {
         if (audioData.audioData.size >= 2) {
             val samplesPerChannel = audioData.samplesPerChannel
-            val interleaved = FloatArray(samplesPerChannel * 2)
+            val requiredSize = samplesPerChannel * 2
+            if (reusableInterleavedBuffer == null || reusableInterleavedBuffer!!.size < requiredSize) {
+                reusableInterleavedBuffer = FloatArray(requiredSize)
+            }
+            val interleaved = reusableInterleavedBuffer!!
             for (s in 0 until samplesPerChannel) {
-                interleaved[s * 2] = audioData.audioData[0][s]  // L
-                interleaved[s * 2 + 1] = audioData.audioData[1][s]  // R
+                interleaved[s * 2] = audioData.audioData[0][s]
+                interleaved[s * 2 + 1] = audioData.audioData[1][s]
             }
             audioRenderer.renderStereo(interleaved, audioData.samplePosition)
         }
@@ -391,8 +412,31 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 connectButton.setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
                 connectButton.setTextColor(android.graphics.Color.WHITE)
                 connectionAttempts = 0
-                // ✅ Detener cualquier intento de reconexión cuando se conecta exitosamente
                 autoReconnectJob?.cancel()
+
+                try {
+                    audioRenderer.acquirePartialWakeLock(applicationContext)
+                } catch (e: Exception) {
+                    Log.w(TAG, "⚠️ No se pudo adquirir PartialWakeLock: ${e.message}")
+                }
+
+                try {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } catch (_: Exception) {}
+
+                wakeLockRenewJob?.cancel()
+                wakeLockRenewJob = lifecycleScope.launch {
+                    try {
+                        while (isActive && isConnected) {
+                            delay(5 * 60 * 1000L)
+                            audioRenderer.renewPartialWakeLock()
+                            Log.d(TAG, "🔋 PartialWakeLock renovado")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "⚠️ Error renovando wakeLock: ${e.message}")
+                    }
+                }
+
             } else {
                 statusText.text = message
                 statusText.setTextColor(android.graphics.Color.WHITE)
@@ -400,12 +444,16 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 connectButton.setBackgroundColor(android.graphics.Color.BLACK)
                 connectButton.setTextColor(android.graphics.Color.WHITE)
 
-                // ✅ Iniciar reconexión automática SOLO si hay desconexión del servidor
-                // y no está ya en progreso
                 if ((message.contains("BUSCANDO") || message.contains("perdida")) &&
                     autoReconnectJob?.isActive != true) {
                     startAutoReconnect()
                 }
+
+                wakeLockRenewJob?.cancel()
+                wakeLockRenewJob = null
+                try {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } catch (_: Exception) {}
             }
         }
     }
@@ -495,12 +543,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     /**
      * Sincroniza el estado visual del slider y overlay según isScreenLocked
-     * Siempre debe llamarse usando lockTrack.post { ... }
      */
     private fun syncLockSliderState() {
+        if (!::lockSlider.isInitialized || !::lockTrack.isInitialized || !::lockIcon.isInitialized) return
+
         recalculateLockDimensions()
         updateLockSliderVisuals()
-        // Overlay
+
         if (isScreenLocked) {
             screenLockOverlay.visibility = View.VISIBLE
             screenLockOverlay.alpha = 1f
@@ -509,13 +558,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             lockBarContainer.bringToFront()
             screenLockOverlay.isClickable = true
             screenLockOverlay.isFocusable = true
-            lockInstructionText.text = "◄ Desliza para desbloquear"
+            lockInstructionText.text = "◀ Desliza para desbloquear"
+            adViewAudioStream.visibility = View.GONE
         } else {
             screenLockOverlay.visibility = View.GONE
             screenLockOverlay.alpha = 1f
             screenLockOverlay.isClickable = false
             screenLockOverlay.isFocusable = false
-            lockInstructionText.text = "Desliza para bloquear ►"
+            lockInstructionText.text = "Desliza para bloquear ▶"
+            adViewAudioStream.visibility = View.VISIBLE
         }
     }
 
@@ -531,13 +582,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
             if (isScreenLocked) {
                 lockSlider.x = maxValidX
-                (lockSlider as FrameLayout).setBackgroundColor(android.graphics.Color.BLACK)
-                lockIcon.text = "🔒"
+                lockSlider.setBackgroundColor(android.graphics.Color.BLACK)
+                lockIcon.text = "\uD83D\uDD12"  // 🔒 Unicode correcto
                 Log.d(TAG, "🔒 Slider sincronizado - posición locked")
             } else {
                 lockSlider.x = lockTrack.x
-                (lockSlider as FrameLayout).setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
-                lockIcon.text = "🔓"
+                lockSlider.setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
+                lockIcon.text = "\uD83D\uDD13"  // 🔓 Unicode correcto
                 Log.d(TAG, "🔓 Slider sincronizado - posición unlocked")
             }
         } catch (e: Exception) {
@@ -547,12 +598,15 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
     private fun acquireLockWakeLock() {
         if (lockWakeLock == null) {
-            val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
-            lockWakeLock = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP, "fichatech:LockSliderWakeLock")
+            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            lockWakeLock = pm.newWakeLock(
+                android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "fichatech:LockSliderWakeLock"
+            )
         }
         if (lockWakeLock?.isHeld != true) {
-            lockWakeLock?.acquire()
-            Log.d(TAG, "🔆 WakeLock de slider adquirido")
+            lockWakeLock?.acquire(60_000L)
+            Log.d(TAG, "🔓 WakeLock de slider adquirido (timeout 60s)")
         }
     }
 
@@ -566,31 +620,41 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         startMetricsUpdates()
+
         if (globalLayoutListener != null && lockTrack.viewTreeObserver.isAlive) {
-            lockTrack.viewTreeObserver.removeOnGlobalLayoutListener(globalLayoutListener)
-        }
-        globalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
-            if (lockTrack.viewTreeObserver.isAlive) {
+            try {
                 lockTrack.viewTreeObserver.removeOnGlobalLayoutListener(globalLayoutListener)
+            } catch (e: Exception) {
+                Log.w(TAG, "Advertencia al remover listener previo: ${e.message}")
+            }
+        }
+
+        globalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
+            try {
+                if (lockTrack.viewTreeObserver.isAlive) {
+                    lockTrack.viewTreeObserver.removeOnGlobalLayoutListener(globalLayoutListener)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Advertencia al remover listener: ${e.message}")
             }
 
-            // sincronizar visuales cuando el layout esté listo
             lockTrack.post {
                 syncLockSliderState()
             }
-            Log.d(TAG, "👁️ Listener - Layout listo, slider sincronizado (post)")
+            Log.d(TAG, "👁️ Listener - Layout listo, slider sincronizado")
         }
 
-        // Añadir el listener
         lockTrack.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
         Log.d(TAG, "👁️ Activity visible - monitoreo activo")
+
+        adViewAudioStream.resume()
+        adViewAudioStream.visibility = View.VISIBLE
     }
 
     override fun onPause() {
         super.onPause()
         stopMetricsUpdates()
 
-        // ✅ Remover listener para evitar memory leaks
         globalLayoutListener?.let { existing ->
             if (lockTrack.viewTreeObserver.isAlive) {
                 try {
@@ -605,28 +669,32 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (isConnected) {
             disconnect()
         }
-        Log.d(TAG, "💤 Activity pausada - monitoreo detenido y stream detenido")
+        Log.d(TAG, "🤤 Activity pausada - monitoreo detenido, stream detenido")
+
+        adViewAudioStream.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         stopMetricsUpdates()
 
-        // Cancelar reconexión automática
         autoReconnectJob?.cancel()
-
-        // Desregistrar listener de dispositivo de audio
         audioDeviceChangeListener?.unregister(this)
 
-        // Detener todo antes de destruir
         if (isConnected) {
             disconnect()
         }
+
+        wakeLockRenewJob?.cancel()
+        wakeLockRenewJob = null
 
         audioRenderer.release()
         audioFocusManager.abandonAudioFocus()
         saveSessionPreferences()
         releaseLockWakeLock()
+
+        adViewAudioStream.destroy()
+
         Log.d(TAG, "💀 Activity destruida - recursos liberados")
     }
 
@@ -642,15 +710,17 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (newOrientation != isCurrentOrientation) {
             isCurrentOrientation = newOrientation
             val orientationName = if (newOrientation == Configuration.ORIENTATION_LANDSCAPE) "LANDSCAPE" else "PORTRAIT"
-            Log.d(TAG, "🔄 Rotación detectada: $orientationName")
+            Log.d(TAG, "📄 Rotación detectada: $orientationName")
 
-            // Usar post para asegurar que el layout esté listo y forzar recálculo/posición final
             lockTrack.post {
                 syncLockSliderState()
-                // Asegurarse de posicionar visualmente con una pequeña animación para evitar efectos intermedios
                 try {
                     val leftX = lockTrack.x
                     val rightX = (lockTrack.x + sliderMaxX).coerceAtMost(lockTrack.x + lockTrack.width - lockSlider.width)
+
+                    // Cancelar animación previa
+                    lockSlider.animate().cancel()
+
                     if (isScreenLocked) {
                         lockSlider.animate().x(rightX).setDuration(120).start()
                     } else {
@@ -659,7 +729,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     Log.w(TAG, "Error forzando posición tras rotación: ${e.message}")
                 }
-                Log.d(TAG, "✅ Slider sincronizado tras rotación (post)")
+                Log.d(TAG, "✅ Slider sincronizado tras rotación")
             }
         }
     }
@@ -679,7 +749,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         if (linear > 0) 20.0f * Math.log10(linear.toDouble()).toFloat() else -60f
 
     private fun setupEdgeToEdgeInsets() {
-        val mainContainer = findViewById<android.view.View>(R.id.native_audio_root)
+        val mainContainer = findViewById<View>(R.id.native_audio_root)
         if (mainContainer != null) {
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainContainer) { view, windowInsets ->
                 view.setPadding(view.paddingLeft, 0, view.paddingRight, 0)
@@ -689,7 +759,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     }
 
     /**
-     * ✅ Recalcular dimensiones del slider (se llama en setupLockSlider y en rotación)
+     * ✅ Recalcular dimensiones del slider
      */
     private fun recalculateLockDimensions() {
         if (!::lockTrack.isInitialized || !::lockSlider.isInitialized) return
@@ -698,11 +768,11 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             sliderStartX = lockTrack.x
             val trackWidth = lockTrack.width.toFloat()
             val sliderWidth = lockSlider.width.toFloat()
-            sliderMaxX = (trackWidth - sliderWidth).coerceAtLeast(0f) // Evitar valores negativos
+            sliderMaxX = (trackWidth - sliderWidth).coerceAtLeast(0f)
 
             Log.d(
                 TAG,
-                "📏 Lock Dimensions - Track: ${trackWidth.toInt()}px, Slider: ${sliderWidth.toInt()}px, MaxX: ${sliderMaxX.toInt()}px"
+                "🔒 Lock Dimensions - Track: ${trackWidth.toInt()}px, Slider: ${sliderWidth.toInt()}px, MaxX: ${sliderMaxX.toInt()}px"
             )
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error calculando dimensiones: ${e.message}")
@@ -714,7 +784,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
      */
     @SuppressLint("ClickableViewAccessibility")
     private fun setupLockSlider() {
-        // Calcular dimensiones cuando el layout esté listo
         lockSlider.post {
             recalculateLockDimensions()
         }
@@ -722,30 +791,20 @@ class NativeAudioStreamActivity : AppCompatActivity() {
         lockSlider.setOnTouchListener { view, event ->
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
-                    // recalcular dimensiones inmediatamente en down (ayuda después de rotaciones)
                     recalculateLockDimensions()
                     sliderStartX = view.x
                     true
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
-                    // Convertir coordenadas rawX a coordenadas del track para evitar diferencias al rotar
                     val trackLocation = IntArray(2)
                     lockTrack.getLocationOnScreen(trackLocation)
                     val trackLeftOnScreen = trackLocation[0].toFloat()
-
-                    // pointerX relativo al inicio del track (en px)
                     val pointerRelToTrack = event.rawX - trackLeftOnScreen
-
-                    // Calculamos la nueva X en coordenadas del padre: lockTrack.x + pointerRelToTrack - mitad del slider
                     val desiredX = lockTrack.x + pointerRelToTrack - view.width / 2f
-
-                    // Limitar la X a los límites del track (en coordenadas de la vista padre)
                     val minX = lockTrack.x
                     val maxX = (lockTrack.x + sliderMaxX).coerceAtMost(lockTrack.x + lockTrack.width - view.width)
-
                     val newX = desiredX.coerceIn(minX, maxX)
                     view.x = newX
-                    // Tonos neutros durante el deslizamiento
                     lockInstructionText.alpha = 0.8f
                     true
                 }
@@ -761,13 +820,13 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                         if (progress < 0.15f) {
                             unlockScreen()
                         } else {
-                            // Retornar a posición final (derecha)
                             val targetX = (lockTrack.x + sliderMaxX).coerceAtMost(lockTrack.x + lockTrack.width - view.width)
+                            view.animate().cancel()
                             view.animate()
                                 .x(targetX)
                                 .setDuration(200)
                                 .start()
-                            (view as FrameLayout).setBackgroundColor(android.graphics.Color.BLACK)
+                            lockSlider.setBackgroundColor(android.graphics.Color.BLACK)
                             lockInstructionText.alpha = 1f
                         }
                     } else {
@@ -777,12 +836,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
                                 lockSlider.isEnabled = true
                             }, 300)
                         } else {
-                            // Retornar a posición inicial (izquierda)
+                            view.animate().cancel()
                             view.animate()
                                 .x(lockTrack.x)
                                 .setDuration(200)
                                 .start()
-                            (view as FrameLayout).setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
+                            lockSlider.setBackgroundColor(android.graphics.Color.parseColor("#FF4081"))
                             lockInstructionText.alpha = 1f
                         }
                     }
@@ -799,8 +858,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             syncLockSliderState()
         }
         acquireLockWakeLock()
-        showToast("🔒 Pantalla bloqueada")
-        Log.d(TAG, "🔒 Pantalla BLOQUEADA")
+        Log.d(TAG, "🔐 Pantalla BLOQUEADA")
     }
 
     /**
@@ -812,12 +870,11 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             syncLockSliderState()
         }
         releaseLockWakeLock()
-        showToast("🔓 Pantalla desbloqueada")
         Log.d(TAG, "🔓 Pantalla DESBLOQUEADA")
     }
 
     /**
-     * ✅ Reconexión automática cuando hay desconexión externa
+     * ✅ Reconexión automática
      */
     private fun startAutoReconnect() {
         if (autoReconnectJob?.isActive == true) {
@@ -825,7 +882,6 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             return
         }
 
-        // No intentar reconectar si ya está conectado
         if (isConnected) {
             Log.d(TAG, "✅ Ya está conectado, cancelando reconexión automática")
             return
@@ -838,14 +894,12 @@ class NativeAudioStreamActivity : AppCompatActivity() {
             while (connectionAttempts < MAX_CONNECTION_ATTEMPTS && !isConnected && !isFinishing && !isDestroyed) {
                 delay(CONNECTION_RETRY_DELAY_MS)
 
-                // ✅ Verificar nuevamente si se conectó mientras esperaba
                 if (isConnected) {
                     Log.d(TAG, "✅ Conexión establecida durante espera, cancelando intentos")
                     return@launch
                 }
 
                 connectionAttempts++
-
                 Log.d(TAG, "🔄 Intento de reconexión #$connectionAttempts de $MAX_CONNECTION_ATTEMPTS")
 
                 try {
@@ -873,28 +927,34 @@ class NativeAudioStreamActivity : AppCompatActivity() {
     }
 
     /**
-     * ✅ Reiniciar el motor de audio sin destruir la Activity (para cambio de dispositivo)
+     * ✅ Reiniciar motor de audio sin destruir la Activity
      */
     private fun restartAudioEngine() {
         Log.d(TAG, "🔄 Reiniciando motor de audio...")
-
         lifecycleScope.launch(Dispatchers.Main) {
             try {
-                // Detener streams sin desconectar
+                audioRenderer.prepareNewEngine(bufferSizeFrames, if (isMuted) -60f else masterVolumeDb)
                 audioRenderer.stop()
-                delay(200)
-
-                // Recrear engine y streams
-                audioRenderer.init()
-                audioRenderer.setMasterGain(if (isMuted) -60f else masterVolumeDb)
-                audioRenderer.setBufferSize(bufferSizeFrames)
-
-                Log.d(TAG, "✅ Motor de audio reiniciado sin interrupción")
+                audioRenderer.swapToPreparedEngine()
+                Log.d(TAG, "✅ Motor de audio reiniciado sin interrupción perceptible")
                 showToast("🔊 Audio reiniciado (dispositivo cambiado)")
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error reiniciando motor: ${e.message}")
+                Log.e(TAG, "❌ Error reiniciando motor: ", e)
                 showError("Error al reiniciar audio: ${e.message}")
             }
         }
     }
+
+    // --- BroadcastReceiver para pantalla apagada ---
+    private val screenOffReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == android.content.Intent.ACTION_SCREEN_OFF) {
+                Log.d(TAG, "🔐 Pantalla bloqueada - deteniendo transmisión")
+                if (isConnected) {
+                    disconnect()
+                }
+            }
+        }
+    }
 }
+

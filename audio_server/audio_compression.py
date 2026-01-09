@@ -1,13 +1,12 @@
 """
-audio_compression.py - Compresión para ultra baja latencia
-✅ Usa Zlib (puro Python, sin dependencias externas)
-✅ Reduce ancho de banda 4-8x sin pérdida de calidad
+audio_compression.py - Empaquetado de audio sin compresión
+✅ Puro Python, sin dependencias externas
+✅ Mantiene compatibilidad de formato
 """
 
 
 import numpy as np
 import logging
-import zlib
 import struct
 
 
@@ -17,27 +16,27 @@ logger = logging.getLogger(__name__)
 
 
 class AudioCompressor:
-    """Compresor de audio usando zlib o Opus (opcional)"""
+    """Empaquetador de audio sin compresión"""
 
     def __init__(self, sample_rate=48000, channels=1, bitrate=32000):
         self.sample_rate = sample_rate
         self.channels = channels
         self.bitrate = bitrate
-        # Solo zlib, sin lógica de pyogg
+        # Sin compresión
         self._max_compressed_size = 2_000_000  # Máximo 2MB para prevenir OOM
-        self.compression_method = "zlib"
-        logger.info(f"[AudioCompressor] ✅ Zlib: {channels}ch, {sample_rate}Hz")
+        self.compression_method = "none"
+        logger.info(f"[AudioCompressor] ✅ Sin compresión: {channels}ch, {sample_rate}Hz")
 
 
     def compress(self, audio_data: np.ndarray) -> bytes:
-        return self._compress_zlib(audio_data)
+        return self._compress_none(audio_data)
 
 
     def decompress(self, compressed_data: bytes) -> np.ndarray:
-        return self._decompress_zlib(compressed_data)
+        return self._decompress_none(compressed_data)
 
-    def _compress_zlib(self, audio_data: np.ndarray) -> bytes:
-        """Comprime datos de audio con zlib usando nivel 4 para baja latencia"""
+    def _compress_none(self, audio_data: np.ndarray) -> bytes:
+        """Empaqueta datos de audio sin compresión usando el mismo formato que zlib"""
         try:
             # ✅ ZERO-COPY: Minimizar copias - conversión directa optimizada
             # Usar 32768 (2^15) en lugar de 32767 para correcta conversión
@@ -47,22 +46,22 @@ class AudioCompressor:
                 pcm_int16 = np.clip(audio_data.astype(np.float32) * 32768, -32768, 32767).astype(np.int16)
             
             pcm_data = pcm_int16.tobytes()
-            # Usar nivel 4 en lugar de 6 para baja latencia (mejor trade-off)
-            compressed = zlib.compress(pcm_data, 4)
+            # Sin compresión, solo empaquetar
+            compressed = pcm_data
             
             # Validar tamaño máximo
             if len(compressed) > self._max_compressed_size:
-                logger.warning(f"[Zlib] Datos comprimidos exceden límite: {len(compressed)}")
+                logger.warning(f"[Sin compresión] Datos exceden límite: {len(compressed)}")
                 return b''
             
             header = struct.pack('>I', len(pcm_data))
             return header + compressed
         except Exception as e:
-            logger.error(f"[ZlibCompress] Error: {e}")
+            logger.error(f"[CompressNone] Error: {e}")
             return b''
 
-    def _decompress_zlib(self, compressed_data: bytes) -> np.ndarray:
-        """Descomprime datos de audio con zlib"""
+    def _decompress_none(self, compressed_data: bytes) -> np.ndarray:
+        """Desempaqueta datos de audio sin descompresión"""
         try:
             if len(compressed_data) < 4:
                 raise ValueError("Datos inválidos - header incompleto")
@@ -73,15 +72,15 @@ class AudioCompressor:
             if original_size > self._max_compressed_size or original_size <= 0:
                 raise ValueError(f"Tamaño original inválido: {original_size}")
             
-            pcm_data = zlib.decompress(compressed_data[4:])
+            pcm_data = compressed_data[4:]
             
             if len(pcm_data) != original_size:
-                logger.warning(f"[ZlibDecompress] Tamaño descomprimido mismatch: esperado {original_size}, obtenido {len(pcm_data)}")
+                logger.warning(f"[DecompressNone] Tamaño mismatch: esperado {original_size}, obtenido {len(pcm_data)}")
             
             audio_int16 = np.frombuffer(pcm_data, dtype=np.int16).copy()
             return audio_int16.astype(np.float32) / 32768.0
         except Exception as e:
-            logger.error(f"[ZlibDecompress] Error: {e}")
+            logger.error(f"[DecompressNone] Error: {e}")
             return np.zeros(512, dtype=np.float32)
 
 
@@ -89,13 +88,13 @@ class AudioCompressor:
 def compress_audio_channels(audio_data: np.ndarray, channels_to_compress: list, 
                             compressor: AudioCompressor) -> dict:
     """
-    Comprimir canales individuales usando zlib
+    Empaquetar canales individuales sin compresión
     Args:
         audio_data: ndarray (samples, total_channels)
         channels_to_compress: lista de índices de canales
         compressor: AudioCompressor instance
     Returns:
-        dict con canales comprimidos: {channel_id: compressed_bytes}
+        dict con canales empaquetados: {channel_id: bytes}
     """
     compressed = {}
     for ch in channels_to_compress:
@@ -106,12 +105,12 @@ def compress_audio_channels(audio_data: np.ndarray, channels_to_compress: list,
 
 def decompress_audio_channels(compressed_dict: dict, compressor: AudioCompressor) -> dict:
     """
-    Descomprimir canales individuales usando zlib
+    Desempaquetar canales individuales sin compresión
     Args:
-        compressed_dict: {channel_id: compressed_bytes}
+        compressed_dict: {channel_id: bytes}
         compressor: AudioCompressor instance
     Returns:
-        dict con canales descomprimidos: {channel_id: audio_float32}
+        dict con canales desempaquetados: {channel_id: audio_float32}
     """
     decompressed = {}
     for ch, compressed_data in compressed_dict.items():
@@ -125,7 +124,7 @@ _audio_compressor_params = {}
 
 def get_audio_compressor(sample_rate=48000, channels=1, bitrate=32000) -> AudioCompressor:
     """
-    Obtener instancia global de compressor zlib
+    Obtener instancia global de compressor sin compresión
     ⚠️ Recrea el compressor si los parámetros cambian
     """
     global _audio_compressor, _audio_compressor_params

@@ -182,9 +182,12 @@ class OboeAudioRenderer(private val context: Context? = null) {
         val streamHandle = getOrCreateStream(RENDER_STEREO_CHANNEL)
         if (streamHandle == 0L) return
 
-        // No gain application, already applied on server
+        // Aplica la ganancia master al buffer
+        val gainLinear = dbToLinear(masterGainDb)
         val stereoBuffer = acquireBuffer(audioData.size)
-        System.arraycopy(audioData, 0, stereoBuffer, 0, audioData.size)
+        for (i in audioData.indices) {
+            stereoBuffer[i] = audioData[i] * gainLinear
+        }
 
         try {
             val written = nativeWriteAudio(streamHandle, stereoBuffer)
@@ -199,17 +202,13 @@ class OboeAudioRenderer(private val context: Context? = null) {
                             nativeStopStream(streamHandle)
                             nativeStartStream(streamHandle)
                         }
-                        in 5..Int.MAX_VALUE -> destroyStream(RENDER_STEREO_CHANNEL)
                     }
                 }
             } else {
-                if (streamState != null) {
-                    streamState.consecutiveFailures = 0
-                    streamState.lastWriteTime = System.currentTimeMillis()
-                }
+                streamState?.consecutiveFailures = 0
             }
-        } finally {
-            releaseBuffer(audioData.size, stereoBuffer)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error escribiendo audio estéreo: ", e)
         }
     }
 
@@ -397,6 +396,56 @@ class OboeAudioRenderer(private val context: Context? = null) {
             } catch (e: Exception) {
                 Log.e(TAG, "Error al cambiar buffer size: ${e.message}")
             }
+        }
+    }
+
+    // --- Hot swap engine support ---
+    private var preparedEngineHandle: Long = 0
+    private var preparedIsInitialized: Boolean = false
+    private var preparedOPTIMAL_BUFFER_SIZE: Int = OPTIMAL_BUFFER_SIZE
+    private var preparedMasterGainDb: Float = masterGainDb
+
+    fun prepareNewEngine(bufferSize: Int, masterGain: Float) {
+        try {
+            if (context != null) {
+                detectDeviceCapabilities()
+            }
+            preparedEngineHandle = nativeCreateEngine(OPTIMAL_SAMPLE_RATE, CHANNELS)
+            preparedIsInitialized = preparedEngineHandle != 0L
+            preparedOPTIMAL_BUFFER_SIZE = bufferSize
+            preparedMasterGainDb = masterGain
+            if (preparedIsInitialized) {
+                Log.d(TAG, "✅ Nuevo engine preparado para hot swap")
+            } else {
+                Log.e(TAG, "❌ Error preparando nuevo engine para hot swap")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error preparando engine: ${e.message}", e)
+            preparedIsInitialized = false
+        }
+    }
+
+    fun swapToPreparedEngine() {
+        try {
+            if (!preparedIsInitialized || preparedEngineHandle == 0L) {
+                Log.e(TAG, "❌ No hay engine preparado para swap")
+                return
+            }
+            // Liberar engine actual
+            stop()
+            if (engineHandle != 0L) {
+                nativeDestroyEngine(engineHandle)
+            }
+            // Hacer swap
+            engineHandle = preparedEngineHandle
+            isInitialized = true
+            OPTIMAL_BUFFER_SIZE = preparedOPTIMAL_BUFFER_SIZE
+            masterGainDb = preparedMasterGainDb
+            preparedEngineHandle = 0
+            preparedIsInitialized = false
+            Log.d(TAG, "✅ Hot swap de engine realizado")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error en hot swap: ${e.message}", e)
         }
     }
 

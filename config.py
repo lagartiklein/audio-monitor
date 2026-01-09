@@ -12,9 +12,8 @@ SAMPLE_RATE = DEFAULT_SAMPLE_RATE
 # 512 samples @ 48kHz ≈ 10.67ms latencia; mejor balance entre latencia y CPU
 BLOCKSIZE = 32
 
-# ✅ COMPRESIÓN DE AUDIO: Solo zlib habilitado
-ENABLE_OPUS_COMPRESSION = False  # Opus deshabilitado, solo zlib
-OPUS_BITRATE = 32  # (Ignorado, solo para compatibilidad)
+# ✅ COMPRESIÓN DE AUDIO: Sin compresión
+# Opus completamente removido
 
 # ✅ CANALES POR DEFECTO
 DEFAULT_NUM_CHANNELS = 2  # Solo fallback; se usa el conteo real del dispositivo

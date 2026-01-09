@@ -158,7 +158,7 @@ native.start()
 |----------|----------|
 | **No hay audio** | Verificar dispositivo: `sd.query_devices()` |
 | **Alta latencia** | Reducir `BLOCKSIZE = 16`, aumentar `AUDIO_SEND_POOL_SIZE` |
-| **CPU alto** | Reducir compresión: `ENABLE_OPUS = False`, deshabilitar logs |
+| **CPU alto** | Deshabilitar logs, reducir procesamiento |
 | **Clientes no conectan** | Verificar firewall puerto 5100-5101 |
 | **Audio cortado** | Aumentar buffer: `WEB_QUEUE_SIZE = 4` |
 | **Memoria crece** | Limpiar cache: `RF_MAX_PERSISTENT_STATES = 20` |
@@ -350,7 +350,7 @@ NATIVE_HEARTBEAT_TIMEOUT = 300   # Más tolerancia
 
 ### Para Bajo CPU
 ```python
-ENABLE_OPUS_COMPRESSION = False
+# Sin compresión (Opus removido)
 AUDIO_SEND_POOL_SIZE = 2
 WEBSOCKET_LATENCY_LOG = False
 logger.setLevel(logging.WARNING)

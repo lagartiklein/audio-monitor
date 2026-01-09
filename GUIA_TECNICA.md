@@ -949,8 +949,7 @@ cProfile.run('main()', sort='cumtime')
 
 **Soluciones**:
 ```python
-# Reducir compresión
-ENABLE_OPUS_COMPRESSION = False
+# Sin compresión (Opus removido)
 # Disminuir frecuencia de logging
 logger.setLevel(logging.WARNING)
 # Limitar número de canales activos
