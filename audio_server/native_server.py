@@ -210,26 +210,12 @@ class NativeClient:
                 logger.warning(f"⚠️ {self.id[:15]} - Error envío sync: {e}")
             return False
     
-    def send_audio_android(self, audio_data, sample_position: int) -> bool:
-        if not self.subscribed_channels or self.status == 0:
-            return True
-
-        if isinstance(audio_data, memoryview):
-            num_channels = len(self.subscribed_channels)
-            if num_channels <= 0:
-                return True
-            try:
-                audio_data = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, num_channels)
-            except (ValueError, RuntimeError) as e:
-                if config.DEBUG:
-                    logger.error(f"❌ Error reshape audio: num_channels={num_channels}, error={e}")
-                return False
-
-        channels = sorted(list(self.subscribed_channels))
-        max_channel = audio_data.shape[1] - 1
-        valid_channels = [ch for ch in channels if ch <= max_channel]
-
-        if not valid_channels:
+    def send_audio_android(self, stereo_audio, sample_position: int) -> bool:
+        """
+        Envía mezcla estéreo (L y R) ya procesada por el servidor al cliente Android.
+        stereo_audio: np.ndarray de shape (samples, 2)
+        """
+        if self.status == 0:
             return True
 
         # Elegir formato según preferencia del cliente
@@ -237,17 +223,17 @@ class NativeClient:
         if audio_format not in ('int16', 'float32'):
             audio_format = 'float32'
 
-        # Loguear preferencia al enviar
-        logger.debug(f"[NativeServer] Enviando audio a {self.id[:15]} en formato: {audio_format}")
+        logger.debug(f"[NativeServer] Enviando mezcla estéreo a {self.id[:15]} en formato: {audio_format}")
 
         try:
+            # Solo enviar canales 0 (L) y 1 (R)
             packet_bytes = NativeAndroidProtocol.create_audio_packet(
-                audio_data, valid_channels, sample_position, 0, self.rf_mode
+                stereo_audio, [0, 1], sample_position, 0, self.rf_mode
             )
         except Exception as e:
             logger.warning(f"[AudioSend] Error: {e}, usando float32 por defecto")
             packet_bytes = NativeAndroidProtocol.create_audio_packet(
-                audio_data, valid_channels, sample_position, 0, self.rf_mode
+                stereo_audio, [0, 1], sample_position, 0, self.rf_mode
             )
 
         if packet_bytes:
@@ -1281,91 +1267,64 @@ class NativeAudioServer:
             return 0
     
     def on_audio_data(self, audio_data):
-        """✅ FASE 2: Envío optimizado con cache de paquetes y menos contención"""
+        """
+        Mezcla el audio según la suscripción de cada cliente y envía solo la mezcla estéreo (L y R) lista para reproducir.
+        El cliente Android siempre recibe solo dos canales (L y R).
+        """
         if not self.running:
             return
-        
+
         if isinstance(audio_data, memoryview):
             audio_data = np.frombuffer(audio_data, dtype=np.float32).reshape(-1, self.channel_manager.num_channels)
-        
+
         samples = audio_data.shape[0]
         current_position = self.increment_sample_position(samples)
-        
-        # ✅ FASE 2: Tomar snapshot de clientes con lock mínimo
+
+        # Tomar snapshot de clientes con lock mínimo
         with self.client_lock:
             active_clients = [
                 (client_id, client, self.channel_manager.get_client_subscription(client_id))
                 for client_id, client in self.clients.items()
                 if client.status == 1
             ]
-        
+
         if not active_clients:
             return
-        
-        # ✅ FASE 2: Limpiar cache del frame anterior
-        self._packet_cache.clear()
-        
+
         clients_to_remove = []
         sent = 0
-        
-        # ✅ FASE 2: Procesar sin lock global
+
+        # Procesar sin lock global
         for client_id, client, subscription in active_clients:
             if not client.is_alive(buffer_grace=30.0):
                 clients_to_remove.append(client_id)
                 continue
-            
+
             if not subscription:
                 continue
-            
+
             channels = subscription.get('channels', [])
             if not channels:
-                # ✅ ARREGLO: Asegurar que subscribed_channels es vacío cuando no hay canales
                 client.subscribed_channels = set()
                 continue
-            
-            # ✅ FASE 2: Usar cache de paquetes por grupo de canales
-            channel_key = frozenset(channels)
-            
-            cached = self._packet_cache.get(channel_key)
-            if cached:
-                packet_bytes = cached
-                self.update_stats(cache_hits=1)
-            else:
-                # Crear paquete y cachear
-                valid_channels = sorted([ch for ch in channels if ch < audio_data.shape[1]])
-                if not valid_channels:
-                    # ✅ ARREGLO: Limpiar subscribed_channels si no hay canales válidos
-                    client.subscribed_channels = set()
-                    continue
-                    
-                packet_bytes = NativeAndroidProtocol.create_audio_packet(
-                    audio_data, valid_channels, current_position, 0, client.rf_mode
-                )
-                
-                if packet_bytes:
-                    self._packet_cache[channel_key] = packet_bytes
-                    self.update_stats(cache_misses=1)
-                else:
-                    continue
-            
-            # ✅ ARREGLO: Actualizar subscribed_channels con validación
-            # Solo guardar canales que existen en el audio_data
-            valid_subscribed = [ch for ch in channels if ch < audio_data.shape[1]]
-            client.subscribed_channels = set(valid_subscribed)
-            
+
+            # Mezclar a estéreo según la suscripción del cliente
+            stereo_audio = self._mix_to_stereo(audio_data, subscription)
+            if stereo_audio is None:
+                continue
+
+            # Enviar mezcla estéreo lista (L y R) al cliente Android
             try:
-                # ✅ OPTIMIZACIÓN: Envío asíncrono (no bloquea hilo de captura)
-                if client.send_bytes_direct(packet_bytes):
+                if client.send_audio_android(stereo_audio, current_position):
                     sent += 1
                 else:
-                    # No desconectar aquí, dejar que is_alive() lo haga por tiempo
                     self.update_stats(packets_dropped=1)
             except Exception as e:
                 if config.DEBUG:
                     logger.error(f"❌ Envío {client_id[:15]}: {e}")
                 clients_to_remove.append(client_id)
-        
-        # ✅ FASE 2: Limpiar clientes muertos con lock
+
+        # Limpiar clientes muertos
         if clients_to_remove:
             for client_id in clients_to_remove:
                 with self.client_lock:
@@ -1373,7 +1332,7 @@ class NativeAudioServer:
                 if client:
                     preserve = client.auto_reconnect
                     self._disconnect_client(client_id, preserve_state=preserve)
-        
+
         if sent > 0:
             self.update_stats(packets_sent=sent)
     
@@ -1476,3 +1435,55 @@ class NativeAudioServer:
     def get_active_client_count(self):
         with self.client_lock:
             return sum(1 for c in self.clients.values() if c.subscribed_channels)
+    
+    def _mix_to_stereo(self, audio_data, subscription):
+        """✅ NUEVO: Mezclar canales en estéreo según gains y pans del cliente"""
+        try:
+            channels = subscription.get('channels', [])
+            gains = subscription.get('gains', {})
+            pans = subscription.get('pans', {})
+            mutes = subscription.get('mutes', {})
+            master_gain = subscription.get('master_gain', 1.0)
+            
+            if not channels:
+                return None
+            
+            samples = audio_data.shape[0]
+            left = np.zeros(samples, dtype=np.float32)
+            right = np.zeros(samples, dtype=np.float32)
+            
+            for ch in channels:
+                if ch >= audio_data.shape[1]:
+                    continue
+                
+                # Verificar mute
+                if mutes.get(ch, False):
+                    continue
+                
+                channel_data = audio_data[:, ch]
+                gain = gains.get(ch, 1.0) * master_gain
+                pan = pans.get(ch, 0.0)  # -1 = left, 0 = center, 1 = right
+                
+                # Aplicar pan: left_gain = gain * (1 - pan), right_gain = gain * (1 + pan)
+                # Normalizar para que en center (pan=0) sea gain total
+                if pan >= 0:
+                    left_gain = gain * (1 - pan)
+                    right_gain = gain
+                else:
+                    left_gain = gain
+                    right_gain = gain * (1 + pan)
+                
+                np.add(left, channel_data * left_gain, out=left)
+                np.add(right, channel_data * right_gain, out=right)
+            
+            # Clip para evitar distorsión
+            np.clip(left, -1.0, 1.0, out=left)
+            np.clip(right, -1.0, 1.0, out=right)
+            
+            # Crear array estéreo: shape (samples, 2)
+            stereo = np.column_stack((left, right))
+            return stereo
+            
+        except Exception as e:
+            logger.error(f"❌ Error mezclando audio: {e}")
+            return None
