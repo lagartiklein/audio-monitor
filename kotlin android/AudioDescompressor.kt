@@ -4,10 +4,11 @@ import android.util.Log
 import java.util.zip.Inflater
 
 /**
- * ✅ AudioDecompressor - Descompresión Zlib para ultra baja latencia
+ * ✅ AudioDecompressor - Descompresión Opus/Zlib para ultra baja latencia
  * Compatible con compresión server-side (audio_compression.py)
  *
- * Reduce ancho de banda ~50% (Zlib) sin pérdida perceptible de calidad
+ * Opus: Reduce ancho de banda ~95% con calidad profesional
+ * Zlib: Reduce ancho de banda ~50% (fallback)
  */
 object AudioDecompressor {
     private const val TAG = "AudioDecompressor"
@@ -17,6 +18,16 @@ object AudioDecompressor {
     const val FLAG_UNCOMPRESSED = 0
 
     private val inflater = Inflater()
+
+    init {
+        // ✅ Cargar librería Opus nativa
+        try {
+            System.loadLibrary("opus")
+            Log.i(TAG, "✅ Opus library loaded successfully")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w(TAG, "⚠️ Opus library not available, using Zlib fallback")
+        }
+    }
 
     /**
      * Descomprimir audio Zlib del servidor
@@ -98,14 +109,37 @@ object AudioDecompressor {
     }
 
     /**
-     * Procesar audio packet - descomprimir si es necesario
+     * Procesar audio packet - descomprimir según método
      */
-    fun processAudioPacket(audioData: ByteArray, isCompressed: Boolean): FloatArray {
-        return if (isCompressed) {
-            decompressZlib(audioData)
-        } else {
-            // Audio sin comprimir - convertir directamente de bytes a float
-            pcm16ToFloat32(audioData)
+    fun processAudioPacket(audioData: ByteArray, compressionMethod: String = "none"): FloatArray {
+        return when (compressionMethod.lowercase()) {
+            "opus" -> decompressOpus(audioData, 48000, 1)
+            "zlib" -> decompressZlib(audioData)
+            "none" -> pcm16ToFloat32(audioData)
+            else -> {
+                Log.w(TAG, "Unknown compression method: $compressionMethod, using none")
+                pcm16ToFloat32(audioData)
+            }
+        }
+    }
+
+    /**
+     * ✅ Descomprimir audio Opus usando JNI
+     */
+    private external fun decompressOpusNative(compressedData: ByteArray, sampleRate: Int, channels: Int): FloatArray
+
+    /**
+     * Descomprimir audio Opus con fallback a Zlib
+     */
+    private fun decompressOpus(compressedData: ByteArray, sampleRate: Int, channels: Int): FloatArray {
+        return try {
+            decompressOpusNative(compressedData, sampleRate, channels)
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w(TAG, "Opus JNI not available, falling back to Zlib: ${e.message}")
+            decompressZlib(compressedData)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error decompressing Opus: ${e.message}")
+            FloatArray(0)
         }
     }
 

@@ -17,6 +17,7 @@ wheel>=0.38.0
 sounddevice>=0.4.6          # Captura de audio multiplataforma (PortAudio)
 numpy>=1.26.0               # ✅ Python 3.13 requiere numpy >= 1.26
 scipy>=1.11.4               # Funciones científicas (requerido por sounddevice)
+opuslib>=3.0.0              # Biblioteca Python para códec Opus
 
 # ============================================================================
 # WEB SERVER & WEBSOCKETS

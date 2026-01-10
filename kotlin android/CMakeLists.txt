@@ -44,12 +44,47 @@ else()
     message(FATAL_ERROR "❌ Oboe no encontrado. Verifica que 'prefab = true' esté en build.gradle.kts")
 endif()
 
+# ✅ Configurar Opus
+set(OPUS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../opus-android")
+set(OPUS_INCLUDE_DIR "${OPUS_DIR}/include")
+set(OPUS_LIBRARY "${OPUS_DIR}/lib/${ANDROID_ABI}/libopus.so")
+
+# Verificar que Opus existe
+if(EXISTS "${OPUS_LIBRARY}")
+    message(STATUS "✅ Opus encontrado: ${OPUS_LIBRARY}")
+    add_library(opus SHARED IMPORTED)
+    set_target_properties(opus PROPERTIES
+        IMPORTED_LOCATION "${OPUS_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${OPUS_INCLUDE_DIR}"
+    )
+else()
+    message(WARNING "⚠️ Opus no encontrado en ${OPUS_LIBRARY}. Usando implementación sin compresión.")
+endif()
+
+# ✅ Configurar Opus
+set(OPUS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../opus-android")
+set(OPUS_INCLUDE_DIR "${OPUS_DIR}/include")
+set(OPUS_LIBRARY "${OPUS_DIR}/lib/arm64-v8a/libopus.so")
+
+# Verificar que Opus existe
+if(EXISTS "${OPUS_LIBRARY}")
+    message(STATUS "✅ Opus encontrado: ${OPUS_LIBRARY}")
+    add_library(opus SHARED IMPORTED)
+    set_target_properties(opus PROPERTIES
+        IMPORTED_LOCATION "${OPUS_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${OPUS_INCLUDE_DIR}"
+    )
+else()
+    message(WARNING "⚠️ Opus no encontrado en ${OPUS_LIBRARY}. Usando implementación sin compresión.")
+endif()
+
 # Crear biblioteca compartida
 add_library(
         fichatech_audio
         SHARED
         native_audio_engine.cpp
         audio_callback.mm
+        AudioDecompressorJNI.cpp
 )
 
 # Incluir headers
@@ -57,6 +92,7 @@ target_include_directories(
         fichatech_audio
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${OPUS_INCLUDE_DIR}
 )
 
 # Flags de compilación específicos para el target
@@ -77,6 +113,13 @@ target_link_libraries(
         -Wl,-z,max-page-size=16384
         -Wl,-z,common-page-size=16384
 )
+
+# ✅ Linkear con Opus si está disponible
+if(TARGET opus)
+    target_link_libraries(fichatech_audio opus)
+    target_compile_definitions(fichatech_audio PRIVATE OPUS_ENABLED=1)
+    message(STATUS "✅ Opus linked to fichatech_audio")
+endif()
 
 # Optimizaciones por arquitectura (SOLO flags de compilación)
 if(${ANDROID_ABI} STREQUAL "arm64-v8a")

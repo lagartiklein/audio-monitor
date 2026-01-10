@@ -289,50 +289,46 @@
     "client_type": "native"
   },
   "ccf60cb2-4bd4-40d5-9fd5-001388cc5cb0": {
-    "channels": [
-      1
-    ],
+    "channels": [],
     "gains": {
-      "1": 3.9810717055349722,
-      "0": 0.7943282347242815,
-      "2": 1.0,
+      "1": 0.8912509381337456,
+      "2": 0.8912509381337456,
       "3": 1.0,
       "4": 1.0,
       "5": 1.0,
       "6": 1.0,
+      "0": 1.0,
       "7": 1.0
     },
     "pans": {
       "1": 0.0,
-      "0": -0.01,
       "2": 0.0,
       "3": 0.0,
       "4": 0.0,
       "5": 0.0,
       "6": 0.0,
+      "0": 0.0,
       "7": 0.0
     },
     "mutes": {
       "1": false,
-      "0": false,
       "2": false,
       "3": false,
       "4": false,
       "5": false,
       "6": false,
+      "0": false,
       "7": false
     },
     "master_gain": 1.0,
-    "last_seen": 1767985015.2851863,
+    "last_seen": 1768012885.9700081,
     "reconnection_count": 0,
     "client_type": "native"
   },
   "09ddacad-ae0b-4d9b-8ce8-bd46fb30e569": {
-    "channels": [
-      1
-    ],
+    "channels": [],
     "gains": {
-      "1": 2.8183829312644537,
+      "1": 2.51188643150958,
       "0": 1.2589254117941673,
       "2": 1.0,
       "3": 1.0,
@@ -362,8 +358,25 @@
       "7": false
     },
     "master_gain": 1.0,
-    "last_seen": 1767983423.2816267,
-    "reconnection_count": 2,
+    "last_seen": 1768012846.0151885,
+    "reconnection_count": 0,
     "client_type": "native"
+  },
+  "test_android_client": {
+    "channels": [],
+    "gains": {
+      "0": 1.0,
+      "1": 1.0
+    },
+    "pans": {
+      "0": 0.0,
+      "1": 0.0
+    },
+    "mutes": {
+      "0": false,
+      "1": false
+    },
+    "master_gain": 2.0,
+    "timestamp": 1768009941182
   }
 }
