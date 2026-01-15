@@ -119,5 +119,376 @@
     "configuration_session_id": null,
     "tags": [],
     "active": true
+  },
+  "af0c3832-c3d3-486b-aa15-10c19087c06c": {
+    "uuid": "af0c3832-c3d3-486b-aa15-10c19087c06c",
+    "type": "android",
+    "name": "android-af0c3832",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-af0c3832",
+      "primary_ip": null,
+      "client_id": "af0c3832-c3d3-486b-aa15-10c19087c06c",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768183203.4551983,
+    "last_seen": 1768183712.4525898,
+    "reconnections": 31,
+    "configuration": {
+      "channels": [],
+      "gains": {
+        "7": 1.0,
+        "1": 1.0,
+        "0": 1.0
+      },
+      "pans": {
+        "7": 0.0,
+        "1": 0.0,
+        "0": 0.0
+      },
+      "mutes": {
+        "7": false,
+        "1": false,
+        "0": false
+      },
+      "master_gain": 1.0,
+      "timestamp": 1768183712452
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "053f3ab7-1523-4b50-a6fe-b332b86cc1ae": {
+    "uuid": "053f3ab7-1523-4b50-a6fe-b332b86cc1ae",
+    "type": "android",
+    "name": "android-053f3ab7",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-053f3ab7",
+      "primary_ip": null,
+      "client_id": "053f3ab7-1523-4b50-a6fe-b332b86cc1ae",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768261854.730051,
+    "last_seen": 1768262779.0331388,
+    "reconnections": 21,
+    "configuration": {
+      "channels": [],
+      "gains": {
+        "0": 3.9810717055349722,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "master_gain": 1.0,
+      "timestamp": 1768262779033
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "36f2d666-21fd-4490-8ec8-160fb7f70b95": {
+    "uuid": "36f2d666-21fd-4490-8ec8-160fb7f70b95",
+    "type": "android",
+    "name": "android-36f2d666",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-36f2d666",
+      "primary_ip": null,
+      "client_id": "36f2d666-21fd-4490-8ec8-160fb7f70b95",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768261854.8941295,
+    "last_seen": 1768262758.3821402,
+    "reconnections": 71,
+    "configuration": {
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 3.9810717055349722,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 3.9810717055349722
+      },
+      "pans": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1768262758382
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "b8230a92-6155-45e7-a3c5-871a0d53dae2": {
+    "uuid": "b8230a92-6155-45e7-a3c5-871a0d53dae2",
+    "type": "android",
+    "name": "android-b8230a92",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-b8230a92",
+      "primary_ip": null,
+      "client_id": "b8230a92-6155-45e7-a3c5-871a0d53dae2",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768261855.1552255,
+    "last_seen": 1768262078.9783797,
+    "reconnections": 429,
+    "configuration": {
+      "channels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "gains": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1768262078978
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": false
+  },
+  "2d2e13bc-ae93-452d-bf03-a9f53925d4f0": {
+    "uuid": "2d2e13bc-ae93-452d-bf03-a9f53925d4f0",
+    "type": "android",
+    "name": "android-2d2e13bc",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-2d2e13bc",
+      "primary_ip": null,
+      "client_id": "2d2e13bc-ae93-452d-bf03-a9f53925d4f0",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768262399.0528038,
+    "last_seen": 1768262756.3061948,
+    "reconnections": 15,
+    "configuration": {
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 3.9810717055349722,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0
+      },
+      "pans": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
+      },
+      "mutes": {
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1768262756306
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae": {
+    "uuid": "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae",
+    "type": "android",
+    "name": "android-3ccfcd8f",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-3ccfcd8f",
+      "primary_ip": null,
+      "client_id": "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768490367.2891197,
+    "last_seen": 1768491901.29217,
+    "reconnections": 55,
+    "configuration": {
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 1.0
+      },
+      "pans": {
+        "0": 0.0
+      },
+      "mutes": {
+        "0": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1768491901292
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "617176a1-c5bf-4745-9cac-7f81e8c145a8": {
+    "uuid": "617176a1-c5bf-4745-9cac-7f81e8c145a8",
+    "type": "android",
+    "name": "android-617176a1",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "native",
+      "name": "native-617176a1",
+      "primary_ip": null,
+      "client_id": "617176a1-c5bf-4745-9cac-7f81e8c145a8",
+      "protocol_version": 2,
+      "rf_mode": true,
+      "user_agent": null
+    },
+    "first_seen": 1768492697.3439052,
+    "last_seen": 1768492741.5426612,
+    "reconnections": 45,
+    "configuration": {
+      "channels": [
+        0
+      ],
+      "gains": {
+        "0": 1.0
+      },
+      "pans": {
+        "0": 0.0
+      },
+      "mutes": {
+        "0": false
+      },
+      "solos": [],
+      "master_gain": 1.0,
+      "timestamp": 1768492741542
+    },
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
   }
 }

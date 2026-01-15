@@ -27,8 +27,7 @@ class NativeAndroidProtocol:
     
     # ✅ OPTIMIZACIÓN: Struct pre-compilado para headers
     _header_struct = struct.Struct('!IHHII')
-    _payload_struct = struct.Struct('!QI')
-    
+    _payload_struct = struct.Struct('!QQ')  # Was: !QI    
     # ✅ OPTIMIZACIÓN LATENCIA: Timestamp cacheado para evitar syscalls
     _cached_timestamp = 0
     _timestamp_cache_valid_ms = 5  # Actualizar cada 5ms máximo
@@ -83,7 +82,7 @@ class NativeAndroidProtocol:
             # ✅ Crear channel mask eficientemente
             channel_mask = 0
             for ch in valid_channels:
-                if 0 <= ch < 48:  # Máximo 48 canales soportados
+                if 0 <= ch < 64:  # Máximo 64 canales soportados
                     channel_mask |= (1 << ch)
             
             # ✅ Seleccionar y entrelazar datos (operación única)
