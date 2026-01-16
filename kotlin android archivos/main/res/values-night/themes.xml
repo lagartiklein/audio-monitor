@@ -1,0 +1,42 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="AppTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <!-- Dejamos que enableEdgeToEdge() controle las barras del sistema también en modo noche -->
+        <!-- <item name="android:windowLightStatusBar">false</item> -->
+        <!-- <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item> -->
+        <!-- <item name="android:statusBarColor">@android:color/transparent</item> -->
+        <!-- <item name="android:navigationBarColor">@android:color/transparent</item> -->
+        <!-- <item name="android:windowDrawsSystemBarBackgrounds">true</item> -->
+        <!-- <item name="android:windowTranslucentNavigation">false</item> -->
+        <!-- <item name="android:windowTranslucentStatus">false</item> -->
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+    </style>
+    <style name="Theme.Fichatech.Splash" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+        <!-- Edge to edge: no padding en barras de sistema -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+    <style name="Theme.Fichatech.Light" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+    </style>
+    <style name="Theme.Fichatech.Dark" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+    </style>
+    <style name="FacebookToolbarTitle" parent="TextAppearance.AppCompat.Widget.ActionBar.Title">
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar" />
+</resources>

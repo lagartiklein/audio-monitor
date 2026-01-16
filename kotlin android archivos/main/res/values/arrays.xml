@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Array de idiomas disponibles -->
+    <string-array name="languages_array">
+        <item>Español</item>
+        <item>English</item>
+        <item>Deutsch</item>
+    </string-array>
+
+    <!-- Códigos de idioma correspondientes -->
+    <string-array name="language_codes" translatable="false">
+        <item>es</item>
+        <item>en</item>
+        <item>de</item>
+    </string-array>
+
+
+    <!-- Protocol options -->
+    <string-array name="protocol_options">
+        <item>TCP Nativo (8-15ms)</item>
+        <item>WebSocket (20-40ms)</item>
+        <item>UDP (3-10ms) - Experimental</item>
+    </string-array>
+
+    <!-- Quality options -->
+    <string-array name="quality_options">
+        <item>Ultra Baja (3ms)</item>
+        <item>Baja (8ms)</item>
+        <item>Media (15ms)</item>
+        <item>Alta (30ms)</item>
+    </string-array>
+
+    <!-- Buffer size options -->
+    <string-array name="buffer_size_options">
+        <item>128 samples (2.7ms)</item>
+        <item>256 samples (5.3ms)</item>
+        <item>512 samples (10.7ms)</item>
+        <item>1024 samples (21.3ms)</item>
+    </string-array>
+</resources>
+

@@ -218,31 +218,91 @@ class AudioMonitorGUI:
     
     def setup_server_status(self, parent):
         """Estado del servidor con animación - Responsivo"""
-        status_frame = ctk.CTkFrame(parent, fg_color=self.bg_card_hover, corner_radius=15, height=120)
+        status_frame = ctk.CTkFrame(parent, fg_color=self.bg_card_hover, corner_radius=15, height=160)
         status_frame.pack(fill="x", padx=20, pady=(0, 15))
         status_frame.pack_propagate(False)
-        
+
         # Contenedor centrado
         content = ctk.CTkFrame(status_frame, fg_color="transparent")
-        content.place(relx=0.5, rely=0.5, anchor="center")
-        
+        content.place(relx=0.5, rely=0.3, anchor="center")
+
         # Indicador circular (tamaño responsivo)
         self.status_indicator = ctk.CTkLabel(
             content,
             text="●",
-            font=ctk.CTkFont(size=48),  # Reducido de 60 para mejor escala
+            font=ctk.CTkFont(size=48),
             text_color=self.text_muted
         )
         self.status_indicator.pack()
-        
+
         # Texto de estado
         self.status_text = ctk.CTkLabel(
             content,
             text="SERVIDOR INACTIVO",
-            font=ctk.CTkFont(size=14, weight="bold"),  # Responsivo
+            font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.text_muted
         )
         self.status_text.pack(pady=(8, 0))
+
+        # Menú de escena (guardar/cargar)
+        menu_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
+        menu_frame.place(relx=0.5, rely=0.85, anchor="center")
+
+        save_btn = ctk.CTkButton(
+            menu_frame,
+            text="Guardar escena",
+            fg_color=self.accent_primary,
+            hover_color="#0099cc",
+            text_color="#000000",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.save_scene_dialog,
+            corner_radius=10,
+            width=140,
+            height=32
+        )
+        save_btn.grid(row=0, column=0, padx=8)
+
+        load_btn = ctk.CTkButton(
+            menu_frame,
+            text="Cargar escena",
+            fg_color=self.accent_secondary,
+            hover_color="#cc0077",
+            text_color="#ffffff",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.load_scene_dialog,
+            corner_radius=10,
+            width=140,
+            height=32
+        )
+        load_btn.grid(row=0, column=1, padx=8)
+
+    def save_scene_dialog(self):
+        import tkinter.filedialog
+        filename = tkinter.filedialog.asksaveasfilename(
+            title="Guardar escena como...",
+            defaultextension=".json",
+            filetypes=[("Escena JSON", "*.json"), ("Todos los archivos", "*.*")]
+        )
+        if filename:
+            if hasattr(self.main_app, "export_scene"):
+                self.main_app.export_scene(filename)
+                self.log_message(f"✅ Escena guardada en: {filename}", "SUCCESS")
+            else:
+                self.log_message("❌ No se puede guardar la escena (función no implementada)", "ERROR")
+
+    def load_scene_dialog(self):
+        import tkinter.filedialog
+        filename = tkinter.filedialog.askopenfilename(
+            title="Cargar escena...",
+            defaultextension=".json",
+            filetypes=[("Escena JSON", "*.json"), ("Todos los archivos", "*.*")]
+        )
+        if filename:
+            if hasattr(self.main_app, "import_scene"):
+                self.main_app.import_scene(filename)
+                self.log_message(f"✅ Escena cargada desde: {filename}", "SUCCESS")
+            else:
+                self.log_message("❌ No se puede cargar la escena (función no implementada)", "ERROR")
     
     def setup_device_info(self, parent):
         """Información del dispositivo de audio - Responsivo"""
@@ -393,6 +453,7 @@ class AudioMonitorGUI:
             self.accent_success
         )
         self.latency_card.grid(row=0, column=2, sticky="nsew", padx=(7, 0))
+
     
     def create_stat_card(self, parent, title, value, color):
         """Crear tarjeta de estadística - Responsiva"""

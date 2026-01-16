@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Dirección IP del Servidor"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <EditText
+        android:id="@+id/ipEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="192.168.1.100"
+        android:inputType="text"
+        android:textColor="@android:color/white"
+        android:backgroundTint="@color/colorPrimary"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Puerto"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <EditText
+        android:id="@+id/portEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="5101"
+        android:inputType="number"
+        android:textColor="@android:color/white"
+        android:backgroundTint="@color/colorPrimary"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Protocolo"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <Spinner
+        android:id="@+id/protocolSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/colorPrimary"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Puertos: 5101 (Nativo) | 5100 (WebSocket)"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:layout_marginTop="8dp"/>
+
+</LinearLayout>

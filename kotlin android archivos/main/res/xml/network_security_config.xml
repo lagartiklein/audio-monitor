@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 🔒 Configuración de seguridad de red para Fichatech -->
+
+    <!-- Bloquear tráfico HTTP en producción (solo HTTPS) -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Certificados del sistema (CA raíz de Android) -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+    ✅ Dominios de confianza para HTTPS:
+    - Firebase (firestore, auth, analytics, crashlytics, performance)
+    - Google APIs (ads, play services)
+    - Sites.google.com (política de privacidad)
+    - AdMob
+    -->
+
+    <!-- Permitir cleartext solo para localhost en desarrollo (comentado para producción) -->
+    <!--
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+    -->
+
+</network-security-config>
+

@@ -1,0 +1,134 @@
+<resources>
+    <style name="AppTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+        <!-- Edge-to-edge se maneja con enableEdgeToEdge() en MainActivity -->
+        <!-- No se usan las APIs obsoletas de Android 15: statusBarColor, navigationBarColor -->
+    </style>
+
+    <style name="Theme.Fichatech.Splash" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+        <!-- Edge to edge: no padding en barras de sistema -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <style name="CustomProgressBarVertical">
+        <item name="android:indeterminateOnly">false</item>
+        <item name="android:progressDrawable">@drawable/custom_progress_drawable_vertical</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:maxHeight">40dp</item>
+        <item name="android:indeterminateDrawable">@drawable/custom_progress_drawable_vertical</item>
+    </style>
+    <style name="FacebookToolbarStyle" parent="ThemeOverlay.AppCompat.Dark.ActionBar">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">?attr/actionBarSize</item>
+        <item name="titleTextAppearance">@style/FacebookToolbarTitle</item>
+        <item name="popupTheme">@style/ThemeOverlay.AppCompat.Light</item>
+        <item name="contentInsetStart">0dp</item>
+    </style>
+
+    <style name="Theme.Fichatech.Light" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+    </style>
+
+    <style name="Theme.Fichatech.Dark" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/botonesnegrosyblancos</item>
+        <item name="android:colorBackground">@color/botonesnegrosyblancos</item>
+    </style>
+
+    <style name="FacebookToolbarTitle" parent="TextAppearance.AppCompat.Widget.ActionBar.Title">
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar" />
+    <!-- Añade estos estilos en tu archivo themes.xml -->
+
+    <!-- 🔴 DIALOGO OPACO (sin transparencia) -->
+    <style name="ModernDialogOpaque" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowBackground">@color/material_dialog_background</item>
+        <item name="android:backgroundDimAmount">0.6</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="android:textColorPrimary">@color/primary_text</item>
+        <item name="android:textColorSecondary">@color/secondary_text</item>
+    </style>
+
+
+    <!-- Base application theme -->
+    <style name="Theme.AudioMonitor" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:statusBarColor">@color/colorPrimaryDark</item>
+        <item name="android:navigationBarColor">@color/black</item>
+    </style>
+
+    <!-- Dialog theme -->
+    <style name="DialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog">
+        <item name="android:windowBackground">@color/background_medium</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="buttonBarButtonStyle">@style/Widget.Material3.Button.TextButton</item>
+    </style>
+
+    <!-- AlertDialog custom theme -->
+    <style name="AlertDialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <item name="android:windowBackground">@color/background_medium</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="colorBackgroundFloating">@color/background_medium</item>
+    </style>
+    <!-- Color de fondo para diálogos -->
+    <color name="material_dialog_background">#FFFFFFFF</color>
+    <color name="primary_text">#212121</color>
+    <color name="secondary_text">#757575</color>
+    <!-- Material Design 3 Theme -->
+    <style name="Theme.YourApp" parent="Theme.Material3.DayNight">
+        <!-- Your theme customization -->
+    </style>
+
+    <!-- Circle shape for mute indicator -->
+    <style name="ShapeAppearanceOverlay.Circle" parent="">
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- Colors for dynamic theming -->
+    <color name="material_dynamic_primary">#6750A4</color>
+    <color name="material_dynamic_primary_container">#EADDFF</color>
+    <color name="material_dynamic_on_primary">#FFFFFF</color>
+    <color name="material_dynamic_secondary">#625B71</color>
+    <color name="material_dynamic_secondary_container">#E8DEF8</color>
+    <color name="material_dynamic_tertiary">#7D5260</color>
+    <color name="material_dynamic_tertiary_container">#FFD8E4</color>
+    <color name="material_dynamic_surface">#FFFBFE</color>
+    <color name="material_dynamic_surface_variant">#E7E0EC</color>
+    <color name="material_dynamic_surface_container">#F3EDF7</color>
+    <color name="material_dynamic_surface_container_high">#ECE6F0</color>
+    <color name="material_dynamic_surface_container_highest">#E6E0E9</color>
+    <color name="material_dynamic_on_surface">#1C1B1F</color>
+    <color name="material_dynamic_on_surface_variant">#49454F</color>
+    <color name="material_dynamic_outline">#79747E</color>
+    <color name="material_dynamic_outline_variant">#C4C7C5</color>
+    <color name="material_dynamic_error">#B3261E</color>
+    <color name="material_dynamic_error_container">#F9DEDC</color>
+    <color name="material_dynamic_neutral">#938F99</color>
+    <color name="material_dynamic_neutral_variant">#938F99</color>
+    <color name="material_dynamic_neutral70">#CAC4D0</color>
+    <color name="material_dynamic_neutral90">#F5EFF7</color>
+    <color name="material_dynamic_neutral95">#FEF7FF</color>
+    <color name="material_dynamic_neutral99">#FFFBFE</color>
+</resources>

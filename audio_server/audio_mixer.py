@@ -73,7 +73,7 @@ class AudioMixer:
                 if ch >= audio_data.shape[1]:
                     continue
                 channel_data = audio_data[:, ch]
-                gain = gains.get(ch, 1.0) * master_gain
+                gain = gains.get(ch, 10**(-24/20)) * master_gain  # Default -24 dB
                 np.add(output_mono, channel_data * gain, out=output_mono)
             np.clip(output_mono, -1.0, 1.0, out=output_mono)
             import config

@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@android:color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="22dp"
+        android:paddingBottom="24dp">
+
+
+
+        <!-- Contenedor de logos -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="28dp">
+
+        </LinearLayout>
+
+        <!-- Título de la aplicación modernizado -->
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/fichatech_pro"
+            android:textSize="42sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"
+            android:fontFamily="@font/futura_heavy"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:paddingHorizontal="8dp"
+            android:textColor="#000000"
+            android:letterSpacing="0.02"/>
+
+        <!-- Subtítulo -->
+
+        <!-- Contenedor de formulario modernizado -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:layout_marginBottom="32dp"
+            android:elevation="0dp"
+            android:background="@drawable/bg_btn_modern"
+            android:backgroundTint="#F8F9FA">
+
+            <!-- Campo de email modernizado -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusTopStart="16dp"
+                app:boxCornerRadiusTopEnd="16dp"
+                app:boxCornerRadiusBottomStart="16dp"
+                app:boxCornerRadiusBottomEnd="16dp"
+                app:boxStrokeColor="#D0D5DD"
+                app:boxStrokeWidth="1.5dp"
+                app:boxStrokeWidthFocused="2dp"
+                android:hint="@string/hint_email"
+                app:hintTextColor="#000000"
+                app:helperTextTextColor="#999999">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etEmail"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:inputType="textEmailAddress"
+                    android:textSize="16sp"
+                    android:textColor="#000000"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:fontFamily="@font/futura_heavy"/>
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Campo de contraseña modernizado -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusTopStart="16dp"
+                app:boxCornerRadiusTopEnd="16dp"
+                app:boxCornerRadiusBottomStart="16dp"
+                app:boxCornerRadiusBottomEnd="16dp"
+                app:boxStrokeColor="#D0D5DD"
+                app:boxStrokeWidth="1.5dp"
+                app:boxStrokeWidthFocused="2dp"
+                android:hint="@string/hint_password"
+                app:hintTextColor="#000000"
+                app:endIconMode="password_toggle"
+                app:endIconTint="#000000">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etPassword"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:inputType="textPassword"
+                    android:textSize="16sp"
+                    android:textColor="#000000"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:fontFamily="@font/futura_heavy"/>
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- Botón de inicio de sesión modernizado -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEmailLogin"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/sign_in"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:fontFamily="@font/futura_heavy"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="14dp"
+            android:backgroundTint="#FF4081"
+            android:elevation="2dp"
+            android:textColor="@android:color/white"
+            android:letterSpacing="0.01"/>
+
+        <!-- Botón de registro modernizado -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRegister"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/sign_up"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:fontFamily="@font/futura_heavy"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="32dp"
+            android:textColor="#000000"
+            android:elevation="0dp"
+            android:strokeColor="#000000"
+            android:strokeWidth="@integer/material_motion_duration_long_2"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:letterSpacing="0.01"/>
+
+        <!-- Separador mejorado -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="24dp">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#E0E0E0"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/or_continue_with"
+                android:textSize="13sp"
+                android:textColor="#999999"
+                android:fontFamily="@font/futura_heavy"
+                android:paddingHorizontal="16dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#E0E0E0"/>
+
+        </LinearLayout>
+
+        <!-- Botón de Google Sign In modernizado -->
+        <LinearLayout
+            android:id="@+id/btnGoogleLogin"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/bg_btn_delete"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginBottom="14dp"
+            android:elevation="1dp"
+            >
+
+            <ImageView
+                android:id="@+id/imgGoogleLogo"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_google_logo"
+                android:layout_marginEnd="12dp"
+                android:contentDescription="@string/cd_google_logo"
+                />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/continue_google"
+                android:textSize="15sp"
+                android:textColor="#333333"
+                android:fontFamily="@font/futura_heavy"
+                android:letterSpacing="0.01"/>
+
+        </LinearLayout>
+
+        <!-- Botón de invitado modernizado -->
+        <LinearLayout
+            android:id="@+id/btnGuest"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/bg_fader_level"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginBottom="32dp"
+            android:elevation="1dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/continue_guest"
+                android:textSize="15sp"
+                android:textColor="#ffffff"
+                android:fontFamily="@font/futura_heavy"
+                android:letterSpacing="0.01"/>
+
+        </LinearLayout>
+
+        <!-- Política de privacidad modernizada -->
+        <TextView
+            android:id="@+id/tvPrivacyPolicy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/privacy_policy"
+            android:textSize="12sp"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginTop="12dp"
+            android:textColor="#000000"
+            android:fontFamily="@font/futura_heavy"
+            android:alpha="0.9"
+            android:letterSpacing="0.02"/>
+
+    </LinearLayout>
+
+</ScrollView>

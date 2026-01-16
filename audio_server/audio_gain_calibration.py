@@ -12,7 +12,8 @@ DEFAULT_GAIN_CONFIG = {
     "normalize_by_channel_count": True,
     "soft_clip_threshold": 0.85,
     "soft_clip_enabled": True,
-    "max_channel_gain": 0.8,
+    "max_channel_gain": 0.8,  # Se mantiene igual (máximo permitido)
+    "min_channel_gain": 10**(-60/20),  # ✅ NUEVO: Mínimo por defecto
     "max_master_gain": 0.8,
     "channel_gains": {},
     "rms_target_db": -12.0,

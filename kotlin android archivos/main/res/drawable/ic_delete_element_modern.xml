@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+
+    <!-- Fondo elegante - Blanco -->
+    <path
+        android:pathData="M28,6 C17.51,6 9,14.51 9,25 C9,35.49 17.51,44 28,44 C38.49,44 47,35.49 47,25 C47,14.51 38.49,6 28,6 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Papelera elegante - Forma refinada -->
+    <path
+        android:pathData="M18,12 L19,10 L37,10 L38,12 L38,13 L18,13 Z"
+        android:fillColor="#1A1A1A"
+        android:fillAlpha="0.95" />
+
+    <!-- Cuerpo de papelera -->
+    <path
+        android:pathData="M17,13 L19,40 C19,41.1 19.9,42 21,42 L35,42 C36.1,42 37,41.1 37,40 L39,13 Z"
+        android:fillColor="#1A1A1A"
+        android:fillAlpha="0.95" />
+
+    <!-- Línea vertical central -->
+    <path
+        android:pathData="M25,16 L25,38"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Línea vertical derecha -->
+    <path
+        android:pathData="M31,16 L31,38"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:fillColor="@android:color/transparent" />
+</vector>
+

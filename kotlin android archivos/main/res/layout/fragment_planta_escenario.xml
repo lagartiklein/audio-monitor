@@ -1,0 +1,67 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    tools:context=".planta.PlantaEscenarioFragment">
+
+    <ImageView
+        android:id="@+id/escenarioImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/escenarioplanta"
+        android:scaleType="fitCenter"
+        tools:ignore="ContentDescription" />
+
+    <FrameLayout
+        android:id="@+id/elementContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/bottomButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:padding="8dp"
+        android:background="@android:color/transparent">
+
+        <ImageButton
+            android:id="@+id/btnAddElement"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:layout_margin="4dp"
+            android:src="@drawable/ic_mastres"
+            android:background="@color/botonesnegrosyblancos"
+            app:tint="@color/botonesnegrosyblancostexto"
+            android:scaleType="centerInside"
+            android:padding="12dp"
+            tools:ignore="ContentDescription" />
+
+        <ImageButton
+            android:id="@+id/btnEscena"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:layout_margin="4dp"
+            android:src="@drawable/ic_savenegro"
+            android:background="@color/botonesnegrosyblancos"
+            app:tint="@color/botonesnegrosyblancostexto"
+            android:scaleType="centerInside"
+            android:padding="12dp"
+            tools:ignore="ContentDescription" />
+
+        <ImageButton
+            android:id="@+id/btnToggleSound"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:layout_margin="4dp"
+            android:src="@drawable/ic_toggle_sound_modern"
+            android:background="@color/botonesnegrosyblancos"
+            app:tint="@color/botonesnegrosyblancostexto"
+            android:scaleType="centerInside"
+            android:padding="12dp"
+            tools:ignore="ContentDescription" />
+    </LinearLayout>
+</FrameLayout>

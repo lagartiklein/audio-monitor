@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:divider="?android:attr/listDivider"
+        android:showDividers="middle"
+        android:dividerPadding="12dp">
+
+        <!-- Switch para modo oscuro -->
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_theme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dark_mode"
+            android:textSize="16sp"
+            android:checked="false"
+            android:layout_marginBottom="16dp"
+            />
+
+        <!-- Botón para cerrar sesión -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_logout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/logout"
+            android:textAllCaps="false"
+            android:icon="@drawable/exitico"
+            app:cornerRadius="8dp"
+            android:fontFamily="@font/futura_heavy"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp"
+            />
+
+        <!-- Botón para borrar datos -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear_data"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/clear_data"
+            android:textAllCaps="false"
+            android:icon="@drawable/ic_delete"
+            app:cornerRadius="8dp"
+            android:fontFamily="@font/futura_heavy"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp"
+            />
+
+        <!-- Separador visual -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/darker_gray"
+            android:layout_marginVertical="12dp" />
+
+    </LinearLayout>
+</ScrollView>

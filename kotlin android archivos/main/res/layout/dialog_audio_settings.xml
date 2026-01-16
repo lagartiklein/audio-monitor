@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <!-- Título -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Configuración de Audio"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Tamaño del Buffer -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Tamaño del Buffer"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/bufferSizeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+             />
+
+        </LinearLayout>
+
+        <!-- Sample Rate -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sample Rate"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/sampleRateSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+ />
+
+        </LinearLayout>
+
+        <!-- Protocolo -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Protocolo"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/protocolSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                />
+
+        </LinearLayout>
+
+        <!-- Baja Latencia -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp"
+            android:paddingVertical="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Modo Baja Latencia"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/lowLatencySwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+
+        </LinearLayout>
+
+        <!-- Advertencia -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚠️ Reiniciar aplicación para aplicar cambios"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:padding="8dp"
+            android:background="@color/background_medium" />
+
+    </LinearLayout>
+
+</ScrollView>

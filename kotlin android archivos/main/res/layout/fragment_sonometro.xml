@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ====== FRAGMENT SONOMETRO ====== -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/negro"
+    tools:context=".sonometro.SonometroFragment">
+
+
+
+    <!-- BOTÓN INICIO -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnStart"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginTop="16dp"
+        android:text="Iniciar Medición"
+        android:textAllCaps="false"
+        android:textSize="13sp"
+        app:cornerRadius="10dp"
+        app:backgroundTint="#FF4081"
+        android:textColor="#FFFFFF"
+        app:elevation="6dp" />
+
+    <!-- CONTENIDO DESPLAZABLE -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:paddingBottom="32dp">
+
+            <!-- CARD MEDICIÓN EN TIEMPO REAL -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="8dp"
+                app:cardBackgroundColor="#1F1F2E">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="MEDICIÓN EN TIEMPO REAL"
+                        android:textSize="11sp"
+                        android:textColor="#ffffff"
+                        android:letterSpacing="0.05"
+                        android:layout_marginBottom="16dp" />
+
+                    <!-- VALORES dB -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="16dp"
+                        android:gravity="center"
+                        android:baselineAligned="false">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/value_box_left"
+                            android:padding="12dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="CANAL IZQ"
+                                android:textSize="9sp"
+                                android:textColor="#ffffff"
+                                android:letterSpacing="0.05"
+                                android:layout_marginBottom="4dp" />
+
+                            <TextView
+                                android:id="@+id/tvDecibelMic1"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 dB"
+                                android:textColor="#ffffff"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="60dp"
+                            android:background="#37474F"
+                            android:layout_marginHorizontal="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/value_box_right"
+                            android:padding="12dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="CANAL DER"
+                                android:textSize="9sp"
+                                android:textColor="#ffffff"
+                                android:letterSpacing="0.05"
+                                android:layout_marginBottom="4dp" />
+
+                            <TextView
+                                android:id="@+id/tvDecibelMic2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 dB"
+                                android:textColor="#ffffff"
+                                android:textSize="20dp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <com.cepalabsfree.fichatech.sonometro.SonometroWaveView
+                        android:id="@+id/stereoWaveView"
+                        android:layout_width="match_parent"
+                        android:layout_height="240dp"
+                        android:layout_marginBottom="16dp" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- CARD ESTADÍSTICAS -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="8dp"
+                app:cardBackgroundColor="#1F1F2E">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ESTADÍSTICAS"
+                        android:textSize="11sp"
+                        android:textColor="#ffffff"
+                        android:letterSpacing="0.05"
+                        android:layout_marginBottom="16dp" />
+
+                    <GridLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:columnCount="2"
+                        android:rowCount="2"
+                        android:columnOrderPreserved="false"
+                        android:layout_marginBottom="12dp">
+
+                        <FrameLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_row="0"
+                            android:layout_column="0"
+                            android:layout_columnWeight="1"
+                            android:layout_marginEnd="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:background="@drawable/stat_card_average"
+                            android:padding="12dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="PROMEDIO"
+                                    android:textSize="9sp"
+                                    android:textColor="#ffffff"
+                                    android:letterSpacing="0.05"
+                                    android:layout_marginBottom="4dp" />
+
+                                <TextView
+                                    android:id="@+id/tvAverage"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0 dB"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#ffffff" />
+                            </LinearLayout>
+                        </FrameLayout>
+
+                        <FrameLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_row="0"
+                            android:layout_column="1"
+                            android:layout_columnWeight="1"
+                            android:layout_marginStart="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:background="@drawable/stat_card_average"
+                            android:padding="12dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="PICO"
+                                    android:textSize="9sp"
+                                    android:textColor="#ffffff"
+                                    android:letterSpacing="0.05"
+                                    android:layout_marginBottom="4dp" />
+
+                                <TextView
+                                    android:id="@+id/tvPeak"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0 dB"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#ffffff" />
+                            </LinearLayout>
+                        </FrameLayout>
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_row="1"
+                            android:layout_column="0"
+                            android:layout_columnSpan="2"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/stat_card_average"
+                            android:padding="12dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="RANGO"
+                                    android:textSize="9sp"
+                                    android:textColor="#ffffff"
+                                    android:letterSpacing="0.05"
+                                    android:layout_marginBottom="4dp" />
+
+                                <TextView
+                                    android:id="@+id/tvRange"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0 - 0 dB"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#ffffff" />
+                            </LinearLayout>
+                        </FrameLayout>
+
+                    </GridLayout>
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- CARD HISTORIAL -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="8dp"
+                app:cardBackgroundColor="#1F1F2E">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="HISTORIAL"
+                        android:textSize="11sp"
+                        android:textColor="#ffffff"
+                        android:letterSpacing="0.05"
+                        android:layout_marginBottom="12dp" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvReports"
+                        android:layout_width="match_parent"
+                        android:layout_height="200dp"
+                        android:nestedScrollingEnabled="false"
+                        android:overScrollMode="never" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

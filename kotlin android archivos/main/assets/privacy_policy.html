@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Política de Privacidad - Fichatech</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body {
+            max-width: 100vw;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        img, table, pre, code, iframe, video {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8e4c3 100%);
+            color: #1a1a1a;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #000 !important;
+                color: #fff !important;
+            }
+            .content {
+                background: #111 !important;
+                color: #fff !important;
+            }
+            .section {
+                border-bottom: 2px solid #222 !important;
+            }
+            header {
+                background: #181818 !important;
+                color: #fff !important;
+            }
+            .highlight {
+                background: #222 !important;
+                color: #fff !important;
+                border-left: 5px solid #FFD700 !important;
+            }
+            .contact-box {
+                background: #181818 !important;
+                color: #fff !important;
+            }
+            a, a:visited {
+                color: #FFD700 !important;
+            }
+            footer {
+                background: #111 !important;
+                color: #fff !important;
+            }
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #FFD700 0%, #FFC700 100%);
+            color: #333;
+            padding: 60px 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(255, 215, 0, 0.3);
+        }
+
+        header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #333;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-weight: 300;
+            color: #444;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 900px;
+            margin: -40px auto 40px;
+            padding: 0 20px;
+            position: relative;
+        }
+
+        /* Content Section */
+        .content {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 50px;
+            margin-bottom: 40px;
+        }
+
+        /* Section Styles */
+        .section {
+            margin-bottom: 50px;
+            padding-bottom: 40px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        h2 {
+            color: #FFB700;
+            font-size: 1.8em;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #FFF9E6;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2 .icon {
+            font-size: 1.3em;
+        }
+
+        h3 {
+            color: #FFB700;
+            font-size: 1.2em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        p {
+            color: #444;
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        /* List Styles */
+        ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 15px;
+            padding-left: 35px;
+            position: relative;
+            color: #444;
+            line-height: 1.7;
+        }
+
+        li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #FFB700;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        li.negative:before {
+            content: "✕";
+            color: #e74c3c;
+        }
+
+        strong {
+            color: #FF9500;
+            font-weight: 600;
+        }
+
+        /* Highlight Box */
+        .highlight {
+            background: linear-gradient(135deg, #FFF9E6 0%, #FFFBF0 100%);
+            border-left: 5px solid #FFD700;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.15);
+        }
+
+        .highlight strong {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #FF9500;
+        }
+
+        .highlight p {
+            margin-top: 10px;
+        }
+
+        /* Feature Cards */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #FFFBF0 0%, #FFF9E6 100%);
+            border: 2px solid #FFE5B4;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: #FFD700;
+            box-shadow: 0 10px 25px rgba(255, 215, 0, 0.2);
+        }
+
+        .feature-card .icon {
+            font-size: 2.5em;
+            margin-bottom: 12px;
+        }
+
+        .feature-card h4 {
+            color: #FF9500;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+
+        .feature-card p {
+            color: #666;
+            font-size: 0.9em;
+            margin: 0;
+        }
+
+        /* Link Style */
+        a {
+            color: #FFD700;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        a:hover {
+            border-bottom-color: #FFD700;
+            opacity: 0.8;
+        }
+
+        /* Footer */
+        footer {
+            background: #2d3436;
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 50px;
+        }
+
+        .contact-box {
+            background: linear-gradient(135deg, #FFD700 0%, #FFC700 100%);
+            color: #333;
+            border-radius: 16px;
+            padding: 35px;
+            margin: 40px 0;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+        }
+
+        .contact-box h3 {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+
+        .contact-box p {
+            margin: 10px 0;
+            opacity: 0.95;
+            color: #333;
+        }
+
+        .contact-box a {
+            color: #333;
+            border-bottom-color: rgba(51, 51, 51, 0.3);
+        }
+
+        .contact-box a:hover {
+            border-bottom-color: #333;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+
+            .content {
+                padding: 25px;
+            }
+
+            h2 {
+                font-size: 1.4em;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .contact-box {
+                padding: 25px;
+            }
+        }
+
+        .timestamp {
+            text-align: center;
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+
+        .intro-box {
+            background: linear-gradient(135deg, #FFF9E6 0%, #FFFBF0 100%);
+            border: 2px solid #FFE5B4;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .intro-box p {
+            font-size: 1.1em;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>🔒 Política de Privacidad</h1>
+    <p>Fichatech Pro - Aplicación de Audio e Instrumentos Musicales</p>
+</header>
+
+<div class="container">
+    <div class="content">
+        <!-- Introducción -->
+        <div class="intro-box">
+            <p>En <strong>CepaLabs</strong>, respetamos tu privacidad y nos comprometemos a proteger tus datos personales. Lee detenidamente esta política para comprender nuestras prácticas de privacidad.</p>
+        </div>
+
+        <!-- Recopilación -->
+        <section class="section">
+            <h2><span class="icon">📊</span>Información que Recopilamos</h2>
+
+            <h3>Datos Personales</h3>
+            <ul>
+                <li><strong>Correo electrónico:</strong> Para crear y verificar tu cuenta</li>
+                <li><strong>Contraseña:</strong> Almacenada de forma segura mediante cifrado y hash criptográfico</li>
+                <li><strong>Datos de Google Sign-In:</strong> Si optas por iniciar sesión con Google (nombre, email, foto de perfil)</li>
+            </ul>
+
+            <h3>Datos de la Aplicación</h3>
+            <ul>
+                <li><strong>Fichas Técnicas:</strong> Información de bandas, canales, micrófonos y efectos que creas</li>
+                <li><strong>Plantas de Escenario:</strong> Diseños y diagramas que generas</li>
+                <li><strong>Grabaciones de Audio:</strong> Archivos almacenados localmente en tu dispositivo</li>
+                <li><strong>Preferencias de la App:</strong> Tema (oscuro/claro), idioma (Español, Inglés, Alemán)</li>
+            </ul>
+
+            <h3>Datos Técnicos</h3>
+            <ul>
+                <li><strong>Información del Dispositivo:</strong> Modelo, sistema operativo, versión de la app</li>
+                <li><strong>Datos de Uso:</strong> Características utilizadas, frecuencia de uso, errores encontrados</li>
+                <li><strong>ID de Publicidad:</strong> Identificador único para personalizar anuncios (Google AdMob)</li>
+                <li><strong>Datos de Streaming:</strong> Configuraciones para streaming de audio en tiempo real</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>⚠️ Grabaciones de Audio</strong>
+                <p>Las grabaciones se almacenan <strong>localmente en tu dispositivo</strong> y NO se envían a nuestros servidores a menos que tú lo hagas explícitamente.</p>
+            </div>
+        </section>
+
+        <!-- Uso -->
+        <section class="section">
+            <h2><span class="icon">⚙️</span>Cómo Usamos tu Información</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">🎛️</div>
+                    <h4>Funcionalidades</h4>
+                    <p>Ficha técnica, planta de escenario, afinador cromático, sonómetro</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔐</div>
+                    <h4>Autenticación</h4>
+                    <p>Gestionar tu cuenta y sesión de forma segura</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">☁️</div>
+                    <h4>Sincronización</h4>
+                    <p>Guardar y recuperar tus fichas en la nube</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🎨</div>
+                    <h4>Personalización</h4>
+                    <p>Recordar tu idioma y tema preferido</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📄</div>
+                    <h4>Exportación</h4>
+                    <p>Generar PDFs de fichas y plantas</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h4>Análisis</h4>
+                    <p>Mejorar la experiencia de usuario</p>
+                </div>
+            </div>
+
+            <h3>Otros Usos</h3>
+            <ul>
+                <li><strong>Mostrar Anuncios:</strong> A través de Google AdMob para sostener la aplicación</li>
+                <li><strong>Análisis Anónimo:</strong> Entender patrones de uso para mejorar la experiencia</li>
+                <li><strong>Comunicación:</strong> Notificar sobre actualizaciones y nuevas características</li>
+                <li><strong>Soporte Técnico:</strong> Responder consultas y resolver problemas</li>
+                <li><strong>Estabilidad:</strong> Detectar y corregir errores mediante Crashlytics</li>
+                <li><strong>Streaming de Audio:</strong> Transmitir audio en tiempo real a dispositivos externos</li>
+            </ul>
+        </section>
+
+        <!-- Servicios Terceros -->
+        <section class="section">
+            <h2><span class="icon">🔗</span>Servicios de Terceros</h2>
+
+            <p>La Aplicación utiliza servicios confiables que cumplen con estándares internacionales de seguridad y privacidad:</p>
+
+            <ul>
+                <li><strong>Google Firebase:</strong> Autenticación y almacenamiento seguro de datos de usuario</li>
+                <li><strong>Google Sign-In:</strong> Inicio de sesión rápido con tu cuenta de Google</li>
+                <li><strong>Google AdMob:</strong> Anuncios personalizados y no personalizados. Puede recopilar ID de publicidad, dirección IP, datos de ubicación aproximada e interacciones</li>
+                <li><strong>Firebase Crashlytics:</strong> Reportar errores y crashes para mejorar estabilidad</li>
+                <li><strong>Google Play Services:</strong> Para funcionalidades del sistema y servicios de Google</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>🎯 Publicidad (AdMob)</strong>
+                <p>Los anuncios mostrados pueden ser personalizados según tus intereses. Puedes gestionar tus preferencias en: <a href="https://adssettings.google.com" target="_blank">Configuración de Anuncios Google</a></p>
+            </div>
+
+            <h3>Permisos de la Aplicación</h3>
+            <p>Solicitamos estos permisos para funcionar correctamente:</p>
+            <ul>
+                <li><strong>🎤 Micrófono (RECORD_AUDIO):</strong> Para grabador de audio, afinador cromático, sonómetro y transmisión de audio en tiempo real (streaming)</li>
+                <li><strong>🔊 Ajustes de Audio (MODIFY_AUDIO_SETTINGS):</strong> Para optimizar la calidad de audio y gestionar el audio durante el streaming</li>
+                <li><strong>🎚️ Servicio en Segundo Plano (FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK):</strong> Permite que el streaming de audio continúe funcionando aunque la app no esté en primer plano</li>
+                <li><strong>🔋 Mantener Despierto (WAKE_LOCK):</strong> Evita que el dispositivo entre en suspensión durante la transmisión de audio</li>
+                <li><strong>🎵 Acceso a Archivos de Audio (READ_MEDIA_AUDIO):</strong> (Android 13+) Permite acceder a archivos de audio para reproducir o transmitir</li>
+                <li><strong>📶 Cambios en WiFi (CHANGE_WIFI_STATE):</strong> Para optimizar la calidad de la transmisión de audio según la red disponible</li>
+                <li><strong>🌐 Internet:</strong> Para autenticación, sincronización, streaming y carga de anuncios</li>
+                <li><strong>💾 Almacenamiento (READ/WRITE_EXTERNAL_STORAGE):</strong> Para guardar y exportar fichas en PDF</li>
+                <li><strong>📡 Estado de Red (ACCESS_NETWORK_STATE):</strong> Para verificar conectividad antes de sincronizar o transmitir audio</li>
+                <li><strong>🔔 Notificaciones (POST_NOTIFICATIONS):</strong> Para alertas y actualizaciones importantes</li>
+                <li><strong>🎯 ID de Publicidad (AD_ID):</strong> Para mostrar anuncios relevantes (Google AdMob)</li>
+            </ul>
+
+            <h3>Servicios de Audio Streaming</h3>
+            <p>La aplicación incluye funcionalidades avanzadas de <strong>streaming de audio en tiempo real</strong>, permitiendo transmitir y recibir audio a través de redes WiFi o Internet. Para ello, se utilizan servicios y actividades dedicadas que requieren permisos especiales para funcionar en segundo plano y optimizar la experiencia de audio.</p>
+            <ul>
+                <li><strong>Servicio de Audio en Segundo Plano:</strong> Permite transmitir audio incluso cuando la app no está activa en pantalla, garantizando continuidad y estabilidad.</li>
+                <li><strong>Gestión de Calidad y Latencia:</strong> Se ajustan parámetros de audio y red para ofrecer la mejor calidad posible según tu conexión.</li>
+                <li><strong>Protección de Privacidad:</strong> El audio transmitido no se almacena en servidores de CepaLabs, salvo que el usuario lo decida explícitamente. Toda transmisión se realiza de forma segura y privada.</li>
+            </ul>
+            <div class="highlight">
+                <strong>🔊 Audio Streaming Seguro</strong>
+                <p>El streaming de audio se realiza en tiempo real y solo mientras el usuario lo solicita. No se graba ni almacena el audio transmitido, y puedes detener la transmisión en cualquier momento desde la app.</p>
+            </div>
+        </section>
+
+        <!-- Seguridad -->
+        <section class="section">
+            <h2><span class="icon">🛡️</span>Seguridad de Datos</h2>
+
+            <h3>Medidas de Protección</h3>
+            <ul>
+                <li>✅ Cifrado HTTPS en todas las comunicaciones</li>
+                <li>✅ Contraseñas protegidas con algoritmos criptográficos</li>
+                <li>✅ Infraestructura de seguridad de Google Firebase</li>
+                <li>✅ Auditorías de seguridad periódicas</li>
+            </ul>
+
+            <h3>Lo que NO Hacemos</h3>
+            <ul>
+                <li class="negative">No vendemos tu información a terceros</li>
+                <li class="negative">No compartimos tu correo electrónico sin consentimiento</li>
+                <li class="negative">No usamos tus grabaciones de audio para entrenar IA</li>
+                <li class="negative">No compartimos tus fichas o plantas de escenario sin permiso</li>
+                <li class="negative">No vendemos perfiles de usuario</li>
+                <li class="negative">No rastreamos tu ubicación física</li>
+                <li class="negative">No accedemos a tus contactos o galería sin permiso</li>
+                <li class="negative">No revelamos información sin orden legal válida</li>
+            </ul>
+
+            <h3>Retención de Datos</h3>
+            <ul>
+                <li><strong>Datos de Autenticación:</strong> Mientras tu cuenta esté activa</li>
+                <li><strong>Fichas Técnicas y Plantas:</strong> Indefinidamente en tu dispositivo; en la nube hasta que las elimines o borres tu cuenta</li>
+                <li><strong>Grabaciones de Audio:</strong> Almacenadas localmente en tu dispositivo hasta que las elimines manualmente</li>
+                <li><strong>Datos de Uso y Analytics:</strong> 12 meses para análisis de mejoras</li>
+                <li><strong>Registros de Errores (Crashlytics):</strong> 90 días</li>
+                <li><strong>Datos de Publicidad (AdMob):</strong> Según políticas de Google</li>
+                <li><strong>Cuenta Eliminada:</strong> Eliminación completa de datos en 30 días después de solicitud</li>
+            </ul>
+        </section>
+
+        <!-- Derechos -->
+        <section class="section">
+            <h2><span class="icon">⚖️</span>Tus Derechos</h2>
+
+            <p>Tienes los siguientes derechos respecto a tus datos personales:</p>
+
+            <ul>
+                <li><strong>📋 Derecho de Acceso:</strong> Solicitar una copia de tus datos personales</li>
+                <li><strong>✏️ Derecho de Rectificación:</strong> Corregir datos inexactos o incompletos</li>
+                <li><strong>🗑️ Derecho de Eliminación:</strong> Solicitar borrado de tu cuenta y datos (opción en Ajustes > "Borrar todos los datos")</li>
+                <li><strong>📥 Derecho de Portabilidad:</strong> Exportar tus fichas técnicas y plantas como PDFs</li>
+                <li><strong>🚫 Derecho de Oposición:</strong> Desactivar publicidad personalizada en configuración de Google</li>
+                <li><strong>⚙️ Derecho de Restricción:</strong> Limitar cómo procesamos tus datos</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>¿Cómo Ejercer tus Derechos?</strong>
+                <p>Para ejercer estos derechos, contacta: <strong>contacto.cepalabs@gmail.com</strong></p>
+                <p>Te responderemos dentro de 30 días.</p>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section class="section">
+            <h2><span class="icon">❓</span>Preguntas Frecuentes</h2>
+
+            <h3>¿Dónde se guardan mis grabaciones de audio?</h3>
+            <p>Tus grabaciones se almacenan <strong>localmente en tu dispositivo</strong>. No se envían a nuestros servidores a menos que tú decidas exportarlas explícitamente.</p>
+
+            <h3>¿Venden mis datos a terceros?</h3>
+            <p>No. Nunca vendemos, cedemos ni compartimos tus datos con terceros sin tu consentimiento explícito.</p>
+
+            <h3>¿Cómo elimino mi cuenta completamente?</h3>
+            <p>Ve a <strong>Ajustes > "Borrar todos los datos"</strong>. Tus datos se eliminarán completamente en 30 días. También puedes contactarnos en <strong>contacto.cepalabs@gmail.com</strong>.</p>
+
+            <h3>¿Usan mis grabaciones para entrenar IA?</h3>
+            <p>No. Tus grabaciones de audio jamás se utilizan para entrenar modelos de inteligencia artificial o ningún otro fin sin tu consentimiento explícito.</p>
+
+            <h3>¿Qué datos recopila Google AdMob?</h3>
+            <p>AdMob recopila ID de publicidad, dirección IP, datos aproximados de ubicación e interacciones con anuncios. Esto se usa para mostrar anuncios relevantes. Consulta la <a href="https://policies.google.com/privacy" target="_blank">Política de Privacidad de Google</a> para más detalles.</p>
+
+            <h3>¿Cómo contacto al equipo de privacidad?</h3>
+            <p><strong>Email:</strong> <a href="mailto:contacto.cepalabs@gmail.com">contacto.cepalabs@gmail.com</a><br>
+                <strong>Sitio Web:</strong> <a href="https://cepalabs.cl" target="_blank">cepalabs.cl</a></p>
+
+            <h3>¿Se actualizará esta política?</h3>
+            <p>Podemos actualizar esta Política de Privacidad regularmente. Te notificaremos de cambios importantes. Te animamos a revisar esta política periódicamente.</p>
+        </section>
+
+        <!-- Contact Box -->
+        <div class="contact-box">
+            <h3>📧 ¿Preguntas sobre tu Privacidad?</h3>
+            <p>Estamos aquí para ayudarte</p>
+            <p style="margin-top: 20px;">
+                <strong>CepaLabs</strong><br>
+                <a href="mailto:contacto.cepalabs@gmail.com">contacto.cepalabs@gmail.com</a><br>
+                <a href="https://cepalabs.cl" target="_blank">cepalabs.cl</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>&copy; 2026 CepaLabs - Fichatech Pro. Todos los derechos reservados.</p>
+    <p class="timestamp">Última actualización: 13 de enero de 2026</p>
+</footer>
+</body>
+</html>

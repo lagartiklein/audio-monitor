@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ====== FRAGMENT TUNER ====== -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/negro"
+    tools:context=".tuner.TunerFragment">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="24dp"
+        android:paddingTop="12dp">
+
+
+        <!-- CARD PRINCIPAL -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginVertical="8dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="8dp"
+            app:cardBackgroundColor="#1F1F2E">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- VISUALIZADOR CIRCULAR -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:layout_marginBottom="20dp"
+                    android:gravity="center">
+
+                    <View
+                        android:layout_width="180dp"
+                        android:layout_height="180dp"
+                        android:background="@drawable/circle_background"
+                        android:layout_gravity="center" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:layout_gravity="center">
+
+                        <TextView
+                            android:id="@+id/note_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/tuner_default_note"
+                            android:textSize="50sp"
+                            android:textStyle="bold"
+                            android:textColor="#ffffff"
+                            android:gravity="center"
+                            android:lineSpacingMultiplier="0.8" />
+
+
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- CENTS VIEW -->
+                <com.cepalabsfree.fichatech.CentsView
+                    android:id="@+id/cents_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="80dp"
+                    android:layout_marginBottom="20dp" />
+
+                <!-- INFO FRECUENCIA Y NIVEL -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="24dp"
+                    android:background="@drawable/bg_info_card"
+                    android:padding="16dp"
+                    android:baselineAligned="false">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:layout_marginEnd="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="FRECUENCIA"
+                            android:textSize="9sp"
+                            android:textColor="#B0BEC5"
+                            android:letterSpacing="0.05" />
+
+                        <TextView
+                            android:id="@+id/frequency_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/tuner_default_frequency"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="#ffffff"
+                            android:gravity="center"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="40dp"
+                        android:background="#37474F"
+                        android:layout_marginHorizontal="8dp" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:layout_marginStart="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="NIVEL"
+                            android:textSize="9sp"
+                            android:textColor="#B0BEC5"
+                            android:letterSpacing="0.05" />
+
+                        <ProgressBar
+                            android:id="@+id/audio_level_bar"
+                            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                            android:layout_width="80dp"
+                            android:layout_height="4dp"
+                            android:max="100"
+                            android:progress="0"
+                            android:progressTint="#00D4FF"
+                            android:layout_marginTop="6dp"
+                            android:backgroundTint="#37474F" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- BOTÓN INICIO/PARADA -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/start_stop_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="@string/start_tuner"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:cornerRadius="10dp"
+                    app:backgroundTint="#000000"
+                    android:textColor="#FFFFFF"
+                    app:elevation="6dp" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- CARD INFORMACIÓN -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="8dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="#252836">
+
+
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+</ScrollView>

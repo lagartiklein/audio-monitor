@@ -35,7 +35,7 @@ class NativeClient:
         self.connection_time = time.time()
         self.reconnection_count = 0
         self.consecutive_send_failures = 0
-        self.max_consecutive_failures = 10  # ✅ AUMENTADO: 5 → 10 (más tolerante con buffers llenos)
+        self.max_consecutive_failures = config.MAX_SEND_FAILURES  # ✅ AUMENTADO: Muy tolerante para suscripciones grandes
         self.first_buffer_full_time = None  # Inicializar para evitar AttributeError
         
         # ✅ ZERO-LATENCY: Sin cola - envío directo (tipo RF)
@@ -827,23 +827,28 @@ class NativeAudioServer:
             except Exception as e:
                 logger.debug(f"Device channel mapping failed: {e}")
 
-            # ✅ FIXED: Cerrar cliente viejo ANTES de sobrescribir
+            # ✅ FIXED: Verificar si es el MISMO socket antes de cerrar
             old_temp_id = client.id
 
             with self.client_lock:
-                # ✅ Si ya existe, CERRAR el socket viejo
+                # ✅ Si ya existe, verificar si es reconexión real o mensaje duplicado
                 if persistent_id in self.clients:
                     old_client = self.clients[persistent_id]
                     
-                    logger.info(f"🔄 Reconexión detectada: {persistent_id[:15]}")
-                    logger.info(f"   Cerrando conexión anterior...")
-                    
-                    # ✅ CERRAR socket viejo
-                    try:
-                        old_client.status = 0
-                        old_client.close()
-                    except Exception as e:
-                        logger.warning(f"⚠️ Error cerrando cliente viejo: {e}")
+                    # ✅ NUEVO: Solo cerrar si es un socket DIFERENTE
+                    if old_client.socket != client.socket:
+                        logger.info(f"🔄 Reconexión real detectada: {persistent_id[:15]}")
+                        logger.info(f"   Cerrando conexión ANTIGUA...")
+                        
+                        try:
+                            old_client.status = 0
+                            old_client.close()
+                        except Exception as e:
+                            logger.warning(f"⚠️ Error cerrando cliente viejo: {e}")
+                    else:
+                        logger.warning(f"⚠️ Mensaje duplicado detectado (mismo socket): {persistent_id[:15]}")
+                        # No cerrar, es el mismo cliente
+                        return
 
             # Cambiar ID del cliente
             client.id = persistent_id
@@ -1337,6 +1342,9 @@ class NativeAudioServer:
             self.update_stats(packets_sent=sent)
     
     def _disconnect_client(self, client_id: str, preserve_state: bool = False):
+        # ✅ Logging simple (sin stack trace costoso)
+        logger.info(f"[Disconnect] {client_id[:15]}: preserve_state={preserve_state}")
+        
         # ✅ OPTIMIZACIÓN: Sacar client_lock LO ANTES POSIBLE para no bloquear audio
         # Paso 1: Obtener cliente y actualizar stats (DENTRO del lock, rápido)
         with self.client_lock:

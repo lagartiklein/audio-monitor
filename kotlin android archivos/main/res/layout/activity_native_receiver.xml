@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:ads="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="#0A0A0A">
+
+    <!-- Contenido principal con padding inferior para dejar espacio al banner -->
+    <ScrollView
+        android:id="@+id/native_audio_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:paddingBottom="100dp">
+
+        <LinearLayout
+            android:id="@+id/native_audio_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:enabled="true">
+
+            <!-- Título principal con estilo moderno -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_marginBottom="32dp"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/futura_heavy"
+                    android:gravity="center"
+                    android:textSize="28sp"
+                    android:text="@string/app_title_native"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:textSize="13sp"
+                    android:text="@string/subtitle_native"
+                    android:textColor="#B0B0B0"
+                    android:layout_marginTop="8dp"
+                    android:alpha="0.8"/>
+            </LinearLayout>
+
+            <!-- Connection Settings Card -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#1A1A1A"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                android:layout_marginBottom="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+
+
+                    <!-- Switch para ultra baja latencia -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="16dp"
+                        android:background="#0F0F0F"
+                        android:padding="12dp"
+                        android:elevation="1dp"
+                        android:clipToOutline="true">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ultra_low_latency"
+                                android:textColor="#FFFFFF"
+                                android:textSize="15sp"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ultra_low_latency_desc"
+                                android:textColor="#888888"
+                                android:textSize="12sp"
+                                android:layout_marginTop="2dp"/>
+                        </LinearLayout>
+
+                        <Switch
+                            android:id="@+id/ultraLowLatencySwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="false"
+                            android:layout_marginStart="12dp"
+                            android:contentDescription="Activar ultra baja latencia"/>
+                    </LinearLayout>
+
+                    <!-- IP y Puerto en grid -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="16dp">
+
+                        <!-- IP Input -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginEnd="8dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ip_address"
+                                android:textColor="#B0B0B0"
+                                android:textSize="12sp"
+                                android:layout_marginBottom="6dp"
+                                android:textStyle="bold"/>
+
+                            <EditText
+                                android:id="@+id/ipEditText"
+                                android:layout_width="match_parent"
+                                android:layout_height="44dp"
+                                android:hint="192.168.1.100"
+                                android:textColor="#FFFFFF"
+                                android:textColorHint="#606060"
+                                android:inputType="textNoSuggestions|text"
+                                android:background="#0F0F0F"
+                                android:padding="12dp"
+                                android:maxLines="1"
+                                android:singleLine="true"
+                                android:imeOptions="actionNext"
+                                android:textSize="14sp"
+                                android:elevation="1dp"
+                                android:clipToOutline="true"/>
+                        </LinearLayout>
+
+                        <!-- Puerto Input -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="0.6"
+                            android:orientation="vertical"
+                            android:layout_marginStart="8dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/port"
+                                android:textColor="#B0B0B0"
+                                android:textSize="12sp"
+                                android:layout_marginBottom="6dp"
+                                android:textStyle="bold"/>
+
+                            <EditText
+                                android:id="@+id/portEditText"
+                                android:layout_width="match_parent"
+                                android:layout_height="44dp"
+                                android:text="5101"
+                                android:textColor="#FFFFFF"
+                                android:inputType="number"
+                                android:background="#0F0F0F"
+                                android:padding="12dp"
+                                android:maxLines="1"
+                                android:singleLine="true"
+                                android:imeOptions="actionDone"
+                                android:textSize="14sp"
+                                android:elevation="1dp"
+                                android:clipToOutline="true"/>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Connect Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/connectButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="@string/connect_button"
+                        android:textSize="16sp"
+                        android:textColor="#FFFFFF"
+                        app:cornerRadius="12dp"
+                        app:backgroundTint="#000000"
+                        android:layout_marginTop="4dp"
+                        style="@style/Widget.Material3.Button.TonalButton"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Master Controls Card -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#1A1A1A"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                android:layout_marginBottom="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+
+                    <!-- Volume Control -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginBottom="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/volume"
+                                android:textColor="#FFFFFF"
+                                android:textSize="15sp"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:id="@+id/masterVolumeText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 dB"
+                                android:textColor="#FF4081"
+                                android:textSize="15sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <SeekBar
+                            android:id="@+id/masterVolumeSeekBar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="72"
+                            android:progress="60"
+                            android:progressTint="#FF4081"
+                            android:thumbTint="#FF4081"
+                            android:layout_marginTop="4dp"/>
+                    </LinearLayout>
+
+                    <!-- Mute Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/muteButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="@string/audio_on"
+                        android:textSize="15sp"
+                        android:textColor="#FFFFFF"
+                        app:cornerRadius="12dp"
+                        app:backgroundTint="#000000"
+                        style="@style/Widget.Material3.Button.TonalButton"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Info Display Card -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#1A1A1A"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                android:layout_marginBottom="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+
+
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardBackgroundColor="#0F0F0F"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="1dp"
+                        >
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="20dp">
+
+                            <ImageButton
+                                android:id="@+id/openMixerButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:src="@android:drawable/ic_popup_disk_full"
+                                android:background="?android:attr/selectableItemBackground"
+                                android:contentDescription="Abrir mixer"/>
+
+                            <TextView
+                                android:id="@+id/latencyText"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:text="@string/latency_default"
+                                android:textColor="#FF4081"
+                                android:textSize="28sp"
+                                android:textStyle="bold"/>
+
+
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Banner de anuncios AdMob (anclado al fondo) -->
+    <com.google.android.gms.ads.AdView
+        android:id="@+id/adViewAudioStream"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#0A0A0A"
+        ads:adSize="BANNER"
+        app:adUnitId="ca-app-pub-5677027647580832/7349398326"
+        android:visibility="visible"
+        android:elevation="8dp"/>
+</FrameLayout>

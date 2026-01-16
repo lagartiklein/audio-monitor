@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@android:color/white">
+
+    <TextView
+        android:id="@+id/titleElementOptions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Opciones"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:layout_gravity="center_horizontal"
+        android:paddingBottom="6dp" />
+
+    <!-- Escala -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="2dp">
+
+        <TextView
+            android:id="@+id/scaleLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Escala"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/scaleValueText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="100%"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:minWidth="50dp"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/scaleSlider"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:valueFrom="0.5"
+        android:valueTo="2.0"
+        android:stepSize="0.01"
+        android:value="1.0"
+        style="@style/Widget.Material3.Slider" />
+
+    <!-- Rotación -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="2dp">
+
+        <TextView
+            android:id="@+id/rotationLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Rotación"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/rotationValueText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0°"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:minWidth="50dp"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/rotationSlider"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:valueFrom="0"
+        android:valueTo="360"
+        android:stepSize="1"
+        android:value="0"
+        style="@style/Widget.Material3.Slider" />
+
+    <!-- Botones -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/btnDelete"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="Eliminar"
+            android:textSize="11sp"
+            android:textColor="@android:color/holo_red_dark"
+            android:layout_marginEnd="4dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <Button
+            android:id="@+id/btnClose"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="Cerrar"
+            android:textSize="11sp"
+            android:layout_marginStart="4dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

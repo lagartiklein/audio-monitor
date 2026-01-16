@@ -1,0 +1,92 @@
+{
+  "scene_name": "Escena Demo - Test",
+  "channels": [
+    {
+      "id": 0,
+      "name": "Voz Principal",
+      "enabled": true
+    },
+    {
+      "id": 1,
+      "name": "Guitarra",
+      "enabled": true
+    },
+    {
+      "id": 2,
+      "name": "Bajo",
+      "enabled": true
+    },
+    {
+      "id": 3,
+      "name": "Bateria",
+      "enabled": true
+    }
+  ],
+  "clients": [
+    {
+      "device_uuid": "demo-client-1",
+      "client_id": "demo1",
+      "client_type": "native",
+      "name": "Cliente Movil 1",
+      "subscribed_channels": [
+        0,
+        1,
+        2
+      ],
+      "custom_mix": {
+        "gains": {
+          "0": 1.2,
+          "1": 0.8,
+          "2": 1.0
+        },
+        "pans": {
+          "0": 0.0,
+          "1": -0.3,
+          "2": 0.3
+        },
+        "mutes": {
+          "0": false,
+          "1": false,
+          "2": false
+        }
+      },
+      "master_gain": 1.1
+    },
+    {
+      "device_uuid": "demo-client-2",
+      "client_id": "demo2",
+      "client_type": "web",
+      "name": "Cliente Web",
+      "subscribed_channels": [
+        1,
+        2,
+        3
+      ],
+      "custom_mix": {
+        "gains": {
+          "1": 1.5,
+          "2": 0.7,
+          "3": 1.8
+        },
+        "pans": {
+          "1": 0.2,
+          "2": -0.2,
+          "3": 0.0
+        },
+        "mutes": {
+          "1": false,
+          "2": true,
+          "3": false
+        }
+      },
+      "master_gain": 0.9
+    }
+  ],
+  "global_settings": {
+    "sample_rate": 44100,
+    "blocksize": 1024,
+    "max_channels": 8
+  },
+  "exported_at": "2026-01-16T09:14:36",
+  "schema_version": 1
+}

@@ -568,6 +568,30 @@
             font-weight: 800;
         }
 
+        .channel-name-input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-weight: inherit;
+            font-size: inherit;
+            text-align: center;
+            width: 100%;
+            outline: none;
+            border-radius: 4px;
+            padding: 2px 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .channel-name-input:focus {
+            background: rgba(79, 147, 255, 0.2);
+            border: 1px solid var(--blue);
+        }
+
+        .channel-name-input:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
         /* Channel Buttons */
         .channel-buttons {
             display: flex;
@@ -626,9 +650,8 @@
         }
 
         .fader {
-            -webkit-appearance: slider-vertical;
-            appearance: slider-vertical;
-            writing-mode: bt-lr;
+            writing-mode: vertical-lr;
+            direction: rtl;
             width: clamp(20px, 5vw, 28px);
             height: 100%;
             min-height: 120px;
@@ -1291,6 +1314,7 @@
             constructor() {
                 this.socket = null;
                 this.clients = {};
+                this.channelNames = {}; // ✅ Nombres de canales globales
                 this.selectedClientId = null;
                 this.deviceInfo = null;
                 this.webDeviceUuid = this.getOrCreateWebDeviceUuid();
@@ -1807,10 +1831,43 @@
                         this.clients[clientId].master_gain = data.master_gain || 1.0;
                         this.clients[clientId].active_channels = (data.channels || []).length;
 
+                        // ✅ Actualizar nombres de canales globales
+                        this.channelNames = data.channel_names || {};
+
                         // Refrescar UI
                         this.updateClientsList(Object.values(this.clients));
                         if (this.selectedClientId === clientId) {
                             this.renderMixer(clientId);
+                        }
+                    }
+                });
+
+                // ✅ NUEVO: Listener para suscripción inicial con nombres de canales
+                this.socket.on('subscribed', (data) => {
+                    console.log('[Subscribed]', data);
+                    
+                    // ✅ Procesar nombres de canales globales
+                    if (data.channel_names) {
+                        this.channelNames = data.channel_names;
+                        console.log('[Channel Names Loaded]', this.channelNames);
+                    }
+                    
+                    // Si hay un cliente seleccionado, refrescar la interfaz
+                    if (this.selectedClientId) {
+                        this.renderMixer(this.selectedClientId);
+                    }
+                });
+
+                // ✅ NUEVO: Listener para inicialización de nombres de canales al conectar
+                this.socket.on('channel_names_init', (data) => {
+                    console.log('[Channel Names Init]', data);
+                    if (data.channel_names) {
+                        this.channelNames = data.channel_names;
+                        console.log('[Channel Names Initialized]', this.channelNames);
+                        
+                        // Si hay un cliente seleccionado, refrescar la interfaz
+                        if (this.selectedClientId) {
+                            this.renderMixer(this.selectedClientId);
                         }
                     }
                 });
@@ -2024,7 +2081,12 @@
                         } else if (type === 'channel_toggle') {
                             const channels = this.clients[client_id].channels || [];
                             const idx = channels.indexOf(channel);
-                            if (value && idx < 0) channels.push(channel);
+                            if (value && idx < 0) {
+                                channels.push(channel);
+                                // Siempre inicializar en -24 dB al activar un canal nuevo
+                                if (!this.clients[client_id].gains) this.clients[client_id].gains = {};
+                                this.clients[client_id].gains[channel] = 10**(-24/20);
+                            }
                             if (!value && idx >= 0) channels.splice(idx, 1);
                             this.clients[client_id].channels = channels;
                             this.clients[client_id].active_channels = channels.length;
@@ -2045,6 +2107,21 @@
                                 this.updateClientItemUI(listItem, this.clients[client_id]);
                             }
                         }
+                    }
+                });
+
+                // ✅ NUEVO: Listener para actualizaciones de nombres de canales globales
+                this.socket.on('channel_name_updated', (data) => {
+                    console.log('[Channel Name Updated]', data);
+                    const { channel, name } = data;
+                    
+                    // Actualizar estado local de nombres de canales
+                    if (!this.channelNames) this.channelNames = {};
+                    this.channelNames[channel] = name;
+                    
+                    // Re-renderizar mixer si hay un cliente seleccionado
+                    if (this.selectedClientId) {
+                        this.renderMixer(this.selectedClientId);
                     }
                 });
 
@@ -2430,7 +2507,7 @@
                 for (let i = 0; i < numChannels; i++) {
                     const isActive = activeChannels.includes(i);
                     
-                    const gainLinear = gains[i] !== undefined ? gains[i] : 1.0;
+                    const gainLinear = gains[i] !== undefined ? gains[i] : 10**(-24/20);
                     const gainDBRaw = this.linearToDb(gainLinear);
                     const gainDB = Math.max(FADER_MIN_DB, Math.min(FADER_MAX_DB, gainDBRaw));
                     const panValue = pans[i] !== undefined ? pans[i] : 0;
@@ -2449,8 +2526,13 @@
                         strip.classList.remove('disconnected-controls'); // ✅ Remover si estaba desconectado
                     }
 
+                    const channelName = this.channelNames[i] || `CH ${i + 1}`;
+
                     strip.innerHTML = `
-                        <div class="channel-number">CH ${i + 1}</div>
+                        <div class="channel-number">
+                            <input type="text" class="channel-name-input" data-channel="${i}" 
+                                   value="${channelName}" maxlength="12" ${interactive ? '' : 'disabled'}>
+                        </div>
                         
                         <div class="channel-buttons">
                             <button class="channel-btn on-btn ${isActive ? 'active' : ''}" data-channel="${i}">ON</button>
@@ -2478,6 +2560,27 @@
                         onBtn.addEventListener('click', () => this.toggleChannel(clientId, i));
                     } else {
                         onBtn.title = 'Cliente desconectado';
+                    }
+
+                    // ✅ Channel name input
+                    const nameInput = strip.querySelector('.channel-name-input');
+                    if (interactive) {
+                        let nameDebounce;
+                        nameInput.addEventListener('input', (e) => {
+                            clearTimeout(nameDebounce);
+                            nameDebounce = setTimeout(() => {
+                                const newName = e.target.value.trim();
+                                this.updateChannelName(i, newName);
+                            }, 500); // Debounce 500ms
+                        });
+                        
+                        nameInput.addEventListener('blur', (e) => {
+                            // Reset to default if empty
+                            if (!e.target.value.trim()) {
+                                e.target.value = `CH ${i + 1}`;
+                                this.updateChannelName(i, '');
+                            }
+                        });
                     }
 
                     // Fader
@@ -2569,6 +2672,17 @@
                     channel: channel,
                     gain: gain,
                     target_client_id: clientId
+                });
+            }
+
+            updateChannelName(channel, name) {
+                // ✅ Actualizar local inmediatamente
+                this.channelNames[channel] = name;
+                
+                // ✅ Enviar al servidor para persistencia global
+                this.socket.emit('update_channel_name', {
+                    channel: channel,
+                    name: name
                 });
             }
 

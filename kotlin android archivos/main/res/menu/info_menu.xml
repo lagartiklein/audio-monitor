@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ✅ Menú de información con acceso rápido a privacidad -->
+    <item
+        android:id="@+id/menu_privacy_policy"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:title="@string/menu_privacy_policy" />
+
+    <item
+        android:id="@+id/menu_terms_conditions"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="@string/menu_terms_conditions" />
+
+    <item
+        android:id="@+id/menu_about"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:title="@string/menu_about" />
+
+</menu>
+

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="120dp"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:layout_margin="4dp"
+    android:background="@color/channel_inactive_background">
+
+    <TextView
+        android:id="@+id/channelLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CH 1"
+        android:textColor="@color/channel_inactive_text"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <Button
+        android:id="@+id/powerButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:text="OFF"
+        android:textColor="#000000"
+        app:layout_constraintTop_toBottomOf="@id/channelLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <ProgressBar
+        android:id="@+id/vuMeter"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="30dp"
+        android:layout_height="100dp"
+        android:rotation="270"
+        android:max="100"
+        android:progress="0"
+        android:progressTint="@color/vu_green"
+        app:layout_constraintTop_toBottomOf="@id/powerButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"/>
+
+    <View
+        android:id="@+id/peakIndicator"
+        android:layout_width="30dp"
+        android:layout_height="2dp"
+        android:background="#ffffff"
+        app:layout_constraintTop_toTopOf="@id/vuMeter"
+        app:layout_constraintStart_toStartOf="@id/vuMeter"
+        android:alpha="0"/>
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/volumeSlider"
+        android:layout_width="8dp"
+        android:layout_height="80dp"
+        android:valueFrom="-60"
+        android:valueTo="12"
+        android:value="0"
+        app:layout_constraintTop_toBottomOf="@id/vuMeter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:id="@+id/volumeValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0dB"
+        android:textColor="@color/channel_inactive_text"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/volumeSlider"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="4dp"/>
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/panSlider"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:valueFrom="-100"
+        android:valueTo="100"
+        android:value="0"
+        app:layout_constraintTop_toBottomOf="@id/volumeValue"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:id="@+id/panValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="C"
+        android:textColor="@color/channel_inactive_text"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/panSlider"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="4dp"/>
+
+    <ImageView
+        android:id="@+id/muteIndicator"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@android:drawable/ic_lock_silent_mode"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="4dp"
+        app:tint="#ff0000" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

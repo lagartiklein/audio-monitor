@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Layout optimizado para pantallas extra grandes (sw840dp+) - Tablets grandes, escritorio según Android 16 -->
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawer_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Contenedor principal -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/coordinator_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- AppBarLayout -->
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appbar_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            android:elevation="4dp">
+
+            <!-- Toolbar para pantallas extra grandes -->
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:background="@android:color/black"
+                android:theme="@style/FacebookToolbarStyle"
+                app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+                app:navigationIconTint="@android:color/white"
+                app:iconTint="@android:color/white"
+                app:titleTextColor="@android:color/white"
+                app:subtitleTextColor="@android:color/white">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- Título grande -->
+                    <TextView
+                        android:id="@+id/toolbar_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/futura_heavy"
+                        android:textColor="@android:color/white"
+                        android:textSize="24sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="24dp"
+                        android:layout_marginEnd="16dp"/>
+
+                </LinearLayout>
+            </androidx.appcompat.widget.Toolbar>
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Contenedor con máximo ancho para mejor legibilidad -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <!-- LinearLayout interno con máximo ancho -->
+            <LinearLayout
+                android:id="@+id/content_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_horizontal"
+                android:maxWidth="1400dp"
+                android:orientation="vertical">
+
+                <!-- Container del fragmento -->
+                <FrameLayout
+                    android:id="@+id/fragment_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"/>
+
+                <!-- Banner de anuncios -->
+                <com.google.android.gms.ads.AdView
+                    android:id="@+id/adView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:adSize="BANNER"
+                    app:adUnitId="ca-app-pub-5677027647580832/7349398326"
+                    android:visibility="gone"
+                    android:elevation="4dp"/>
+
+            </LinearLayout>
+
+        </FrameLayout>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Navigation Drawer muy ancho para pantallas grandes -->
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/nav_view"
+        android:layout_width="420dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@color/colorBackground2"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/activity_main_drawer"/>
+
+</androidx.drawerlayout.widget.DrawerLayout>

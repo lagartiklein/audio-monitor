@@ -60,7 +60,15 @@ class ChannelManager:
         if getattr(config, 'MASTER_CLIENT_ENABLED', True):
             self._init_master_client()
 
-        print(f"[ChannelManager] ✅ Inicializado: {num_channels} canales")
+        # ✅ NUEVO: Integración con UnifiedPersistence
+        from audio_server.unified_persistence import get_unified_persistence
+        self.unified_persistence = get_unified_persistence()
+        
+        # ✅ NUEVO: Nombres de canales globales
+        self.channel_names = {}  # channel -> name
+
+        # ✅ NUEVO: Cargar nombres de canales al inicializar
+        self.load_channel_names()
     
     def _init_master_client(self):
         """✅ NUEVO: Inicializar cliente maestro para monitor del sonidista"""
@@ -73,7 +81,7 @@ class ChannelManager:
         # Crear suscripción del cliente maestro
         self.subscriptions[master_uuid] = {
             'channels': list(default_channels),
-            'gains': {ch: 1.0 for ch in default_channels},
+            'gains': {ch: 10**(-60/20) for ch in default_channels},  # -60 dB
             'pans': {ch: 0.0 for ch in default_channels},
             'mutes': {ch: False for ch in default_channels},
             'master_gain': 1.0,
@@ -281,117 +289,96 @@ class ChannelManager:
     
 
     def subscribe_client(self, client_id, channels, gains=None, pans=None, client_type="web", device_uuid=None):
-
         """
-
         Suscribir cliente con configuración de mezcla
-
-        
-
-        Args:
-
-            client_id: ID del cliente (temporal o socket ID)
-            
-            channels: Lista de canales (puede estar vacía para Android)
-
-            gains: Dict {channel: gain_linear}
-
-            pans: Dict {channel: pan}
-
-            client_type: "native" (Android) o "web"
-            
-            device_uuid: ✅ NUEVO - UUID único del dispositivo
-
+        ✅ NUEVO: Guarda automáticamente en UnifiedPersistence
         """
-
-        # ✅ NUEVO: Convertir canales a int si vienen como strings
+        # ✅ NUEVO: Logging detallado para debugging (solo en modo DEBUG)
+        import config as config_module
+        if config_module.DEBUG:
+            operational = self.get_operational_channels()
+            logger.info(f"[Subscribe START] {client_id[:12]}: channels={channels}")
+            logger.info(f"[Subscribe] Operacionales: {list(operational)}")
+        
+        # Convertir canales a int
         try:
             channels = [int(ch) for ch in channels]
         except (ValueError, TypeError):
             channels = []
         
-        # ✅ VALIDAR canales dentro del rango permitido
-
+        # Validar canales dentro del rango
         valid_channels = [ch for ch in channels if 0 <= ch < self.num_channels]
-
         
-
+        # ✅ NUEVO: Logging si hay canales inválidos (solo en modo DEBUG)
+        if config_module.DEBUG and len(valid_channels) < len(channels):
+            invalid = set(channels) - set(valid_channels)
+            logger.error(f"[Subscribe] ❌ Canales INVÁLIDOS rechazados: {invalid}")
+            logger.error(f"[Subscribe] Rango válido: 0-{self.num_channels-1}")
         if gains is None:
-
-            gains = {ch: 1.0 for ch in valid_channels}
-
-        
-
+            gains = {ch: 10**(-60/20) for ch in valid_channels}
         if pans is None:
-
             pans = {ch: 0.0 for ch in valid_channels}
-
-        
-
-        # ✅ Inicializar mutes para los canales válidos
-
+        # Inicializar mutes
         mutes = {}
-
         for ch in valid_channels:
-
             mutes[ch] = False
-
-        
-
         self.subscriptions[client_id] = {
-
             'channels': valid_channels,
-
             'gains': gains,
-
             'pans': pans,
-
             'mutes': mutes,
-
             'master_gain': 1.0,
-
             'client_type': client_type,
-            'device_uuid': device_uuid,  # ✅ NUEVO
-
+            'device_uuid': device_uuid,
             'last_update': time.time()
-
         }
-
-        
-
+        # Asegurar que canales nuevos inicien en -60 dB
+        for ch in valid_channels:
+            if ch not in gains:
+                gains[ch] = 10**(-60/20)
         self.client_types[client_id] = client_type
-        
-        # ✅ NUEVO: Mapear device_uuid -> client_id si está disponible
+        # ✅ NUEVO: Guardar en UnifiedPersistence
         if device_uuid:
-            self.device_client_map[device_uuid] = client_id
-
-            # ✅ Registrar/actualizar dispositivo en el registry
-            if self.device_registry:
-                try:
-                    self.device_registry.register_device(device_uuid, {
-                        'type': client_type,
-                        'name': f"{client_type}-{device_uuid[:8]}",
-                        'primary_ip': None
-                    })
-                except Exception as e:
-                    logger.debug(f"[ChannelManager] Device registry register failed: {e}")
-
-        
-
-        logger.info(f"[ChannelManager] 📡 Cliente {client_id[:8]} ({client_type}) suscrito:")
-
-        logger.info(f"   Canales: {len(valid_channels)}")
-        
-        if device_uuid:
-            logger.info(f"   Device UUID: {device_uuid[:12]}")
-        
+            try:
+                from audio_server.unified_persistence import ClientConfiguration, ClientType
+                client_type_enum = {
+                    'native': ClientType.NATIVE,
+                    'web': ClientType.WEB,
+                    'master': ClientType.MASTER
+                }.get(client_type, ClientType.UNKNOWN)
+                prev_config = self.unified_persistence.get_config(device_uuid, validate=False)
+                config = ClientConfiguration(
+                    device_uuid=device_uuid,
+                    client_type=client_type_enum,
+                    custom_name=prev_config.custom_name if prev_config else None,
+                    channels=valid_channels,
+                    gains=gains,
+                    pans=pans,
+                    mutes=mutes,
+                    master_gain=1.0,
+                    created_at=prev_config.created_at if prev_config else time.time(),
+                    last_modified=time.time(),
+                    last_session_duration=0.0,
+                    reconnection_count=prev_config.reconnection_count if prev_config else 0
+                )
+                self.unified_persistence.save_or_update_config(device_uuid, config)
+                logger.info(f"[ChannelManager] 💾 Config persistida: {device_uuid[:12]}")
+            except Exception as e:
+                logger.error(f"[ChannelManager] Error persistiendo config: {e}")
+        logger.info(f"[ChannelManager] 💡 Cliente {client_id[:8]} ({client_type}) suscrito: {len(valid_channels)} canales")
         return True
 
     
 
     def unsubscribe_client(self, client_id):
 
-        """Desuscribir cliente y marcarlo como inactivo en DeviceRegistry"""
+        """
+
+        Desuscribir cliente (NO eliminar su configuración)
+
+        La configuración persiste para que se pueda restaurar después
+
+        """
 
         if client_id in self.subscriptions:
 
@@ -415,7 +402,8 @@ class ChannelManager:
 
             self.client_types.pop(client_id, None)
 
-            logger.info(f"[ChannelManager] 📡 Cliente {client_id[:8]} ({client_type}) desuscrito ({channels_count} canales)")
+            logger.info(f"[ChannelManager] 👋 Cliente {client_id[:8]} ({client_type}) desuscrito "
+                       f"({channels_count} canales, config persistida para {device_uuid[:12] if device_uuid else 'sin uuid'})")
     
     def get_client_by_device_uuid(self, device_uuid):
         """✅ NUEVO: Buscar client_id por device_uuid"""
@@ -488,7 +476,7 @@ class ChannelManager:
 
                 if ch not in sub['gains']:
 
-                    sub['gains'][ch] = 1.0
+                    sub['gains'][ch] = 10**(-60/20)  # ✅ -60 dB = mínimo
 
                 if ch not in sub['pans']:
 
@@ -561,28 +549,21 @@ class ChannelManager:
 
         sub['last_update'] = time.time()
 
-        # ✅ Persistencia: guardar configuración para sobrevivir reinicios del servidor
+        # ✅ NUEVO: Persistir cambios en UnifiedPersistence
         device_uuid = sub.get('device_uuid')
-        is_master = sub.get('is_master', False)
-        if device_uuid and self.device_registry and not is_master:
+        if device_uuid:
             try:
-                self.device_registry.update_configuration(
+                self.unified_persistence.update_channels(
                     device_uuid,
-                    {
-                        'channels': sub.get('channels', []),
-                        'gains': sub.get('gains', {}),
-                        'pans': sub.get('pans', {}),
-                        'mutes': sub.get('mutes', {}),
-                        'master_gain': sub.get('master_gain', 1.0),
-                        'timestamp': int(time.time() * 1000)
-                    }
+                    channels=sub['channels'],
+                    gains=sub['gains'],
+                    pans=sub['pans'],
+                    mutes=sub['mutes'],
+                    master_gain=sub['master_gain']
                 )
-                logger.debug(f"[ChannelManager] 💾 Config persistida para {device_uuid[:12]}")
+                logger.debug(f"[ChannelManager] 💾 Cambios persistidos: {device_uuid[:12]}")
             except Exception as e:
-                logger.debug(f"[ChannelManager] Persist config failed: {e}")
-
-        
-
+                logger.error(f"[ChannelManager] Error persistiendo cambios: {e}")
         if config.DEBUG:
 
             logger.debug(f"[ChannelManager] Mezcla actualizada para {client_id[:8]}")
@@ -813,3 +794,73 @@ class ChannelManager:
             'available_channels': self.num_channels
 
         }
+
+    def restore_client_config(self, device_uuid: str, client_id: str) -> bool:
+        """
+        ✅ NUEVO: Restaurar configuración guardada de un cliente
+        Args:
+            device_uuid: UUID único del dispositivo
+            client_id: ID actual de la conexión (puede ser diferente cada vez)
+        Returns:
+            True si se restauró exitosamente, False si no hay config guardada
+        """
+        config = self.unified_persistence.get_config(device_uuid)
+        if not config:
+            logger.debug(f"[ChannelManager] Sin config guardada para {device_uuid[:12]}")
+            return False
+        try:
+            # Validar canales contra los operacionales
+            operational = self.get_operational_channels()
+            valid_channels = [ch for ch in config.channels if ch in operational]
+            # Suscribir con la configuración restaurada
+            self.subscribe_client(
+                client_id,
+                channels=valid_channels,
+                gains=config.gains,
+                pans=config.pans,
+                client_type=config.client_type.value,
+                device_uuid=device_uuid
+            )
+            # Aplicar mutes y master_gain
+            self.update_client_mix(
+                client_id,
+                mutes=config.mutes,
+                master_gain=config.master_gain
+            )
+            logger.info(f"[ChannelManager] 🛠️ Config restaurada: {device_uuid[:12]} "
+                       f"({len(valid_channels)} canales, custom_name: {config.custom_name})")
+            return True
+        except Exception as e:
+            logger.error(f"[ChannelManager] Error restaurando config: {e}")
+            return False
+
+    # ✅ NUEVO: Métodos para nombres de canales globales
+    def set_channel_name(self, channel: int, name: str):
+        """Establecer nombre de canal global"""
+        self.channel_names[channel] = name.strip()
+        # Emitir evento para sincronización
+        if self.socketio:
+            self.socketio.emit('channel_name_updated', {
+                'channel': channel,
+                'name': name.strip()
+            })
+        # Persistir
+        self.unified_persistence.update_channel_name(channel, name.strip())
+
+    def get_channel_name(self, channel: int) -> str:
+        """Obtener nombre de canal"""
+        return self.channel_names.get(channel, f"CH {channel + 1}")
+
+    def get_all_channel_names(self) -> dict:
+        """Obtener todos los nombres de canales"""
+        return self.channel_names.copy()
+
+    def load_channel_names(self):
+        """Cargar nombres de canales desde persistencia"""
+        try:
+            if self.unified_persistence:
+                names = self.unified_persistence.get_channel_names()
+                self.channel_names.update(names)
+                logger.info(f"[ChannelManager] 📝 Cargados {len(names)} nombres de canales")
+        except Exception as e:
+            logger.error(f"[ChannelManager] Error cargando nombres de canales: {e}")

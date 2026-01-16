@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout
+    android:id="@+id/drawer_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Contenedor principal con CoordinatorLayout para diseño moderno -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/coordinator_layout"
+        android:layout_width="match_parent"
+
+        android:layout_height="match_parent">
+
+        <!-- AppBarLayout con Toolbar arriba (diseño moderno) -->
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appbar_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            android:elevation="4dp">
+
+            <!-- Toolbar con TextView FICHATECH integrado (FIJO - sin scroll) -->
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/black"
+                android:theme="@style/FacebookToolbarStyle"
+                app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+                app:navigationIconTint="@android:color/white"
+                app:iconTint="@android:color/white"
+                app:titleTextColor="@android:color/white"
+                app:subtitleTextColor="@android:color/white">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- Título del Toolbar (navegación) -->
+                    <TextView
+                        android:id="@+id/toolbar_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/futura_heavy"
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"/>
+
+                </LinearLayout>
+            </androidx.appcompat.widget.Toolbar>
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Contenedor principal del contenido -->
+        <LinearLayout
+            android:id="@+id/content_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <!-- Contenedor del fragmento (se expande) -->
+            <FrameLayout
+                android:id="@+id/fragment_container"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <!-- Banner de anuncios en la parte inferior -->
+            <com.google.android.gms.ads.AdView
+                android:id="@+id/adView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:adSize="BANNER"
+                app:adUnitId="ca-app-pub-5677027647580832/7349398326"
+                android:visibility="gone"
+                android:elevation="4dp"/>
+
+        </LinearLayout>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Navigation Drawer -->
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/nav_view"
+        android:layout_width="300dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/activity_main_drawer">
+
+        <!-- Footer FICHATECH al final de la barra de navegación -->
+
+    </com.google.android.material.navigation.NavigationView>
+
+</androidx.drawerlayout.widget.DrawerLayout>

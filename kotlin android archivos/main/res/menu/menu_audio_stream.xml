@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Configuración -->
+    <item
+        android:id="@+id/action_settings"
+        android:title="Configuración"
+        android:icon="@drawable/ic_settings"
+        android:orderInCategory="100"
+        app:showAsAction="ifRoom|withText" />
+
+    <!-- Reconectar -->
+    <item
+        android:id="@+id/action_reconnect"
+        android:title="Reconectar"
+        android:icon="@drawable/ic_refresh"
+        android:orderInCategory="200"
+        app:showAsAction="ifRoom" />
+
+    <!-- Calidad de Audio -->
+    <item
+        android:id="@+id/action_quality"
+        android:title="Calidad"
+        android:icon="@drawable/ic_quality"
+        android:orderInCategory="300"
+        app:showAsAction="never">
+        <menu>
+            <group android:id="@+id/quality_group"
+                android:checkableBehavior="single">
+                <item
+                    android:id="@+id/quality_ultra_low"
+                    android:title="Ultra Baja (3ms)"
+                    android:checked="true" />
+                <item
+                    android:id="@+id/quality_low"
+                    android:title="Baja (8ms)" />
+                <item
+                    android:id="@+id/quality_medium"
+                    android:title="Media (15ms)" />
+                <item
+                    android:id="@+id/quality_high"
+                    android:title="Alta (30ms)" />
+            </group>
+        </menu>
+    </item>
+
+    <!-- Protocolo -->
+    <item
+        android:id="@+id/action_protocol"
+        android:title="Protocolo"
+        android:icon="@drawable/maracas"
+        android:orderInCategory="400"
+        app:showAsAction="never">
+        <menu>
+            <group android:id="@+id/protocol_group"
+                android:checkableBehavior="single">
+                <item
+                    android:id="@+id/protocol_native"
+                    android:title="TCP Nativo (8ms)"
+                    android:checked="true" />
+                <item
+                    android:id="@+id/protocol_websocket"
+                    android:title="WebSocket (20ms)" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/action_separator"
+        android:title=""
+        android:orderInCategory="450"
+        app:showAsAction="never">
+        <menu>
+            <item android:title="──────────" />
+        </menu>
+    </item>
+
+    <!-- Desconectar -->
+    <item
+        android:id="@+id/action_disconnect"
+        android:title="Desconectar"
+        android:icon="@drawable/ic_disconnect"
+        android:orderInCategory="500"
+        app:showAsAction="ifRoom" />
+
+    <!-- Ayuda -->
+    <item
+        android:id="@+id/action_help"
+        android:title="Ayuda"
+        android:icon="@drawable/ic_help"
+        android:orderInCategory="600"
+        app:showAsAction="ifRoom" />
+
+    <!-- Acerca de -->
+    <item
+        android:id="@+id/action_about"
+        android:title="Acerca de"
+        android:icon="@drawable/ic_info"
+        android:orderInCategory="700"
+        app:showAsAction="never" />
+
+</menu>

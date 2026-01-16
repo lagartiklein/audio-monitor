@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Términos y Condiciones - Fichatech</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8e4c3 100%);
+            color: #1a1a1a;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #000 !important;
+                color: #fff !important;
+            }
+            .content {
+                background: #111 !important;
+                color: #fff !important;
+            }
+            .section {
+                border-bottom: 2px solid #222 !important;
+            }
+            header {
+                background: #181818 !important;
+                color: #fff !important;
+            }
+            .highlight {
+                background: #222 !important;
+                color: #fff !important;
+                border-left: 5px solid #FFD700 !important;
+            }
+            .contact-box {
+                background: #181818 !important;
+                color: #fff !important;
+            }
+            a, a:visited {
+                color: #FFD700 !important;
+            }
+            footer {
+                background: #111 !important;
+                color: #fff !important;
+            }
+        }
+        header {
+            background: linear-gradient(135deg, #FFD700 0%, #FFC700 100%);
+            color: #333;
+            padding: 60px 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(255, 215, 0, 0.3);
+        }
+        header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #333;
+        }
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-weight: 300;
+            color: #444;
+        }
+        .container {
+            max-width: 900px;
+            margin: -40px auto 40px;
+            padding: 0 20px;
+            position: relative;
+        }
+        .content {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 50px;
+            margin-bottom: 40px;
+        }
+        .section {
+            margin-bottom: 50px;
+            padding-bottom: 40px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        h2 {
+            color: #FFB700;
+            font-size: 1.8em;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #FFF9E6;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        h2 .icon {
+            font-size: 1.3em;
+        }
+        h3 {
+            color: #FFB700;
+            font-size: 1.2em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        p {
+            color: #444;
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+        ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 20px;
+        }
+        li {
+            margin-bottom: 15px;
+            padding-left: 35px;
+            position: relative;
+            color: #444;
+            line-height: 1.7;
+        }
+        li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #FFB700;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        strong {
+            color: #FF9500;
+            font-weight: 600;
+        }
+        .highlight {
+            background: linear-gradient(135deg, #FFF9E6 0%, #FFFBF0 100%);
+            border-left: 5px solid #FFD700;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.15);
+        }
+        .highlight strong {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #FF9500;
+        }
+        .highlight p {
+            margin-top: 10px;
+        }
+        a {
+            color: #FFD700;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        a:hover {
+            border-bottom-color: #FFD700;
+            opacity: 0.8;
+        }
+        footer {
+            background: #2d3436;
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 50px;
+        }
+        .contact-box {
+            background: linear-gradient(135deg, #FFD700 0%, #FFC700 100%);
+            color: #333;
+            border-radius: 16px;
+            padding: 35px;
+            margin: 40px 0;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+        }
+        .contact-box h3 {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        .contact-box p {
+            margin: 10px 0;
+            opacity: 0.95;
+            color: #333;
+        }
+        .contact-box a {
+            color: #333;
+            border-bottom-color: rgba(51, 51, 51, 0.3);
+        }
+        .contact-box a:hover {
+            border-bottom-color: #333;
+        }
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+            .content {
+                padding: 25px;
+            }
+            h2 {
+                font-size: 1.4em;
+            }
+            .contact-box {
+                padding: 25px;
+            }
+        }
+        .timestamp {
+            text-align: center;
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>📜 Términos y Condiciones</h1>
+    <p>Fichatech Pro - Aplicación de Audio e Instrumentos Musicales</p>
+</header>
+<div class="container">
+    <div class="content">
+        <div class="intro-box">
+            <p>Bienvenido a <strong>Fichatech Pro</strong>. Al usar nuestra aplicación, aceptas estos términos y condiciones. Por favor, léelos con atención.</p>
+        </div>
+        <section class="section">
+            <h2><span class="icon">📝</span>1. Uso de la Aplicación</h2>
+            <ul>
+                <li><strong>Licencia:</strong> Te concedemos una licencia limitada, no exclusiva y revocable para usar Fichatech Pro para fines personales y profesionales relacionados con la gestión de audio.</li>
+                <li><strong>Conducta del Usuario:</strong> No debes usar la aplicación para actividades ilegales o que infrinjan los derechos de otros.</li>
+                <li><strong>Cuenta de Usuario:</strong> Eres responsable de mantener la confidencialidad de tu cuenta y contraseña.</li>
+            </ul>
+        </section>
+        <section class="section">
+            <h2><span class="icon">📄</span>2. Contenido del Usuario</h2>
+            <ul>
+                <li><strong>Propiedad:</strong> El contenido que creas (fichas técnicas, plantas de escenario, grabaciones) es de tu propiedad. No reclamamos derechos sobre tu contenido.</li>
+                <li><strong>Responsabilidad:</strong> Eres el único responsable del contenido que creas, guardas y compartes.</li>
+            </ul>
+        </section>
+        <section class="section">
+            <h2><span class="icon">🔗</span>3. Servicios de Terceros</h2>
+            <p>La aplicación utiliza servicios de terceros como Google Firebase, AdMob y otros para autenticación, almacenamiento, anuncios y análisis. El uso de estos servicios está sujeto a sus propios términos y condiciones.</p>
+        </section>
+        <section class="section">
+            <h2><span class="icon">⚠️</span>4. Limitación de Responsabilidad</h2>
+            <p>Fichatech Pro se proporciona "tal cual". No garantizamos que la aplicación esté libre de errores o interrupciones. En la máxima medida permitida por la ley, CepaLabs no será responsable de ningún daño directo o indirecto derivado del uso de la aplicación.</p>
+        </section>
+        <section class="section">
+            <h2><span class="icon">🔄</span>5. Modificaciones de los Términos</h2>
+            <p>Podemos modificar estos términos en cualquier momento. Te notificaremos de los cambios importantes. El uso continuado de la aplicación después de los cambios constituye tu aceptación de los nuevos términos.</p>
+        </section>
+        <section class="section">
+            <h2><span class="icon">🔊</span>6. Servicios de Audio y Permisos</h2>
+            <ul>
+                <li><strong>Permisos de Audio:</strong> El uso de funciones de grabación, transmisión y reproducción de audio requiere permisos explícitos del usuario. Estos permisos se solicitan solo cuando son necesarios para la funcionalidad.</li>
+                <li><strong>Streaming de Audio:</strong> La app puede transmitir audio en tiempo real a través de servicios dedicados, siempre bajo control del usuario y sin almacenar el audio transmitido salvo que el usuario lo decida.</li>
+                <li><strong>Segundo Plano:</strong> Algunas funciones de audio pueden ejecutarse en segundo plano para garantizar la continuidad del servicio, siempre respetando la privacidad y el control del usuario.</li>
+            </ul>
+            <div class="highlight">
+                <strong>Privacidad y Seguridad</strong>
+                <p>El uso de servicios de audio y permisos está alineado con la <a href="privacy_policy.html">Política de Privacidad</a> y las políticas de Google Play. El usuario puede revocar permisos en cualquier momento desde la configuración del dispositivo.</p>
+            </div>
+        </section>
+        <div class="contact-box">
+            <h3>📧 Contacto</h3>
+            <p>Si tienes preguntas sobre estos términos:</p>
+            <p style="margin-top: 20px;">
+                <strong>CepaLabs</strong><br>
+                <a href="mailto:contacto.cepalabs@gmail.com">contacto.cepalabs@gmail.com</a><br>
+                <a href="https://cepalabs.cl" target="_blank">cepalabs.cl</a>
+            </p>
+        </div>
+    </div>
+</div>
+<footer>
+    <p>&copy; 2026 CepaLabs - Fichatech Pro. Todos los derechos reservados.</p>
+    <p class="timestamp">Última actualización: 13 de enero de 2026</p>
+</footer>
+</body>
+</html>

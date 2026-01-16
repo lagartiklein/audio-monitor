@@ -1,0 +1,32 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@drawable/homeiconotoolbar"
+        android:title="@string/nav_home"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/nav_technical_data"
+        android:icon="@drawable/listaiconoficha"
+        android:title="@string/nav_technical_data"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/nav_stage_plan"
+        android:icon="@drawable/escenarioicoblanco"
+        android:title="@string/nav_stage_plan_escenario"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_documents"
+        android:icon="@drawable/documentosico"
+        android:title="@string/nav_documents"
+        app:showAsAction="always" />
+
+    <!-- ✅ Botón de información para acceso rápido a privacidad -->
+    <item
+        android:id="@+id/action_info"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:title="@string/action_info"
+        app:showAsAction="always" />
+
+</menu>

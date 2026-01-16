@@ -1,0 +1,78 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Sección principal -->
+    <group android:id="@+id/group_principal" android:checkableBehavior="single"
+        android:title="@string/nav_group_principal"
+        android:fontFamily="@font/futura_heavy"
+        >
+        <item
+            android:id="@+id/nav_home"
+            android:icon="@drawable/homeicoico"
+            android:title="@string/nav_home"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_technical_data"
+            android:icon="@drawable/fichatecico"
+            android:title="@string/nav_technical_data_list"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_stage_plan"
+            android:icon="@drawable/escenarioico"
+            android:title="@string/nav_stage_plan_escenario"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_documents"
+            android:icon="@drawable/documentosico"
+            android:title="@string/nav_documents"
+            android:checkable="true" />
+    </group>
+
+    <!-- Herramientas -->
+    <group android:id="@+id/group_tools" android:checkableBehavior="single"
+        android:title="@string/nav_group_tools">
+        <item
+            android:id="@+id/nav_tuner"
+            android:icon="@drawable/recico"
+            android:title="@string/nav_tuner"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_sonometro"
+            android:icon="@drawable/ic_sound_meter"
+            android:title="@string/nav_sonometro"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_record_playback"
+            android:icon="@android:drawable/ic_btn_speak_now"
+            android:title="@string/nav_record_playback"
+            android:checkable="true" />
+
+        <item
+            android:id="@+id/nav_monitor"
+            android:icon="@drawable/ic_monitor"
+            android:title="Monitor"
+            android:checkable="true" />
+    </group>
+
+    <!-- Opciones finales -->
+    <group android:id="@+id/group_more" android:checkableBehavior="single"
+        android:title="@string/nav_group_more">
+        <item
+            android:id="@+id/nav_settings"
+            android:icon="@drawable/setico"
+            android:title="@string/nav_settings"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_ayuda"
+            android:icon="@drawable/ayudaico"
+            android:title="@string/nav_ayuda"
+            android:checkable="true" />
+        <item
+            android:id="@+id/nav_exit"
+            android:icon="@drawable/exitico"
+            android:title="@string/nav_exit"
+            android:checkable="true" />
+    </group>
+
+
+
+</menu>

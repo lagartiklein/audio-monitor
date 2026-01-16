@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+
+    <!-- Fondo elegante - Azul profundo -->
+    <path
+        android:pathData="M28,6 C17.51,6 9,14.51 9,25 C9,35.49 17.51,44 28,44 C38.49,44 47,35.49 47,25 C47,14.51 38.49,6 28,6 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Signo Plus elegante - Línea vertical -->
+    <path
+        android:pathData="M28,12 L28,38"
+        android:strokeColor="#1A1A1A"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- Signo Plus elegante - Línea horizontal -->
+    <path
+        android:pathData="M16,25 L40,25"
+        android:strokeColor="#1A1A1A"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent" />
+</vector>
+

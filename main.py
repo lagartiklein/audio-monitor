@@ -5,6 +5,7 @@ from audio_server.device_registry import init_device_registry
 
 import sys, signal, threading, time, socket, os, webbrowser, uuid
 import logging
+from pathlib import Path  # ✅ NUEVO (si no lo tienes)
 # ✅ NUEVO: Configurar rutas antes de imports
 
 # Configurar logger global
@@ -64,6 +65,9 @@ from audio_server.device_registry import init_device_registry
 
 from audio_server.audio_mixer import init_audio_mixer
 
+from audio_server.scene_manager import SceneManager  # ✅ NUEVO
+import time  # ✅ Si no lo tienes ya
+
 import config
 
 from gui_monitor import AudioMonitorGUI
@@ -71,6 +75,252 @@ from gui_monitor import AudioMonitorGUI
 
 
 class AudioServerApp:
+    def export_scene(self, filename):
+        """✅ Guardar escena actual a archivo JSON"""
+        try:
+            if not self.channel_manager:
+                msg = "❌ Channel manager not available"
+                if self.gui:
+                    self.gui.queue_log_message(msg, "ERROR")
+                return False
+            
+            # ✅ CONSTRUIR DATOS DE ESCENA
+            scene = {
+                "scene_name": f"Scene {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                "created_at": time.strftime('%Y-%m-%dT%H:%M:%S'),
+                "channels": [],
+                "clients": [],
+                "master_gain": 1.0,
+                "global_settings": {
+                    "sample_rate": config.SAMPLE_RATE,
+                    "blocksize": config.BLOCKSIZE,
+                    "max_channels": self.channel_manager.num_channels
+                }
+            }
+            
+            # ✅ EXPORTAR CANALES
+            for ch_id in range(self.channel_manager.num_channels):
+                channel_name = self.channel_manager.get_channel_name(ch_id)
+                scene["channels"].append({
+                    "id": ch_id,
+                    "name": channel_name,
+                    "enabled": True
+                })
+            
+            # ✅ EXPORTAR CLIENTES
+            if hasattr(self.channel_manager, 'subscriptions'):
+                for client_id, subscription in self.channel_manager.subscriptions.items():
+                    # NO incluir cliente maestro
+                    if subscription.get('is_master'):
+                        continue
+                    
+                    device_uuid = subscription.get('device_uuid', client_id)
+                    
+                    scene["clients"].append({
+                        "device_uuid": device_uuid,
+                        "client_id": client_id,
+                        "client_type": subscription.get('client_type', 'unknown'),
+                        "name": subscription.get('custom_name', f"Client-{device_uuid[:8]}"),
+                        "subscribed_channels": list(subscription.get('channels', [])),
+                        "custom_mix": {
+                            "gains": {
+                                str(k): float(v) 
+                                for k, v in subscription.get('gains', {}).items()
+                            },
+                            "pans": {
+                                str(k): float(v) 
+                                for k, v in subscription.get('pans', {}).items()
+                            },
+                            "mutes": {
+                                str(k): bool(v) 
+                                for k, v in subscription.get('mutes', {}).items()
+                            }
+                        },
+                        "master_gain": subscription.get('master_gain', 1.0)
+                    })
+            
+            # ✅ GUARDAR ESCENA
+            success, message = self.scene_manager.export_scene(filename, scene)
+            
+            if self.gui:
+                tag = "SUCCESS" if success else "ERROR"
+                self.gui.queue_log_message(message, tag)
+            
+            return success
+        
+        except Exception as e:
+            msg = f"❌ Error exporting scene: {str(e)}"
+            if self.gui:
+                self.gui.queue_log_message(msg, "ERROR")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def import_scene(self, filename):
+        """✅ Cargar escena desde archivo JSON y restaurar estado"""
+        try:
+            if not self.channel_manager:
+                msg = "❌ Channel manager not available"
+                if self.gui:
+                    self.gui.queue_log_message(msg, "ERROR")
+                return False
+            
+            # ✅ CARGAR ESCENA
+            success, scene_data, load_msg = self.scene_manager.import_scene(filename)
+            
+            if not success:
+                if self.gui:
+                    self.gui.queue_log_message(load_msg, "ERROR")
+                return False
+            
+            if self.gui:
+                self.gui.queue_log_message(f"📂 {load_msg}", "INFO")
+            
+            # ✅ VERIFICAR SETTINGS GLOBALES
+            global_settings = scene_data.get('global_settings', {})
+            new_sample_rate = global_settings.get('sample_rate', config.SAMPLE_RATE)
+            new_blocksize = global_settings.get('blocksize', config.BLOCKSIZE)
+            
+            settings_changed = (
+                new_sample_rate != config.SAMPLE_RATE or 
+                new_blocksize != config.BLOCKSIZE
+            )
+            
+            if settings_changed:
+                if self.gui:
+                    self.gui.queue_log_message(
+                        f"⚠️  Global settings changed (SampleRate: {new_sample_rate}, BlockSize: {new_blocksize})",
+                        "WARNING"
+                    )
+                
+                # Actualizar config
+                config.SAMPLE_RATE = new_sample_rate
+                config.BLOCKSIZE = new_blocksize
+            
+            # ✅ RESTAURAR CLIENTES
+            self._restore_scene_clients(scene_data)
+            
+            # ✅ REINICIAR SERVIDOR PARA APLICAR CAMBIOS
+            if self.gui:
+                self.gui.queue_log_message(
+                    f"🔄 Restarting server to apply scene changes...",
+                    "INFO"
+                )
+            
+            # Detener servidor
+            self.stop_server()
+            time.sleep(1)
+            
+            # Reiniciar
+            if self.device_id is not None:
+                self.start_server_with_device(self.device_id)
+                time.sleep(1)
+            
+            if self.gui:
+                self.gui.queue_log_message(
+                    f"✅ Scene restored from {Path(filename).name}",
+                    "SUCCESS"
+                )
+            
+            return True
+        
+        except Exception as e:
+            msg = f"❌ Error importing scene: {str(e)}"
+            if self.gui:
+                self.gui.queue_log_message(msg, "ERROR")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _restore_scene_clients(self, scene_data):
+        """✅ Restaurar clientes desde escena"""
+        if not self.channel_manager:
+            return
+        
+        try:
+            clients = scene_data.get('clients', [])
+            
+            if self.gui:
+                self.gui.queue_log_message(
+                    f"🔄 Restoring {len(clients)} clients...",
+                    "INFO"
+                )
+            
+            # Desconectar clientes actuales (excepto maestro)
+            current_clients = list(self.channel_manager.subscriptions.keys())
+            for client_id in current_clients:
+                subscription = self.channel_manager.get_client_subscription(client_id)
+                if not subscription or not subscription.get('is_master'):
+                    self.channel_manager.unsubscribe_client(client_id)
+            
+            # Restaurar cada cliente
+            restored_count = 0
+            for client_data in clients:
+                try:
+                    device_uuid = client_data.get('device_uuid')
+                    client_id = client_data.get('client_id', device_uuid)
+                    client_type = client_data.get('client_type', 'web')
+                    channels = client_data.get('subscribed_channels', [])
+                    
+                    custom_mix = client_data.get('custom_mix', {})
+                    gains = {
+                        int(k): float(v) 
+                        for k, v in custom_mix.get('gains', {}).items()
+                    }
+                    pans = {
+                        int(k): float(v) 
+                        for k, v in custom_mix.get('pans', {}).items()
+                    }
+                    mutes = {
+                        int(k): bool(v) 
+                        for k, v in custom_mix.get('mutes', {}).items()
+                    }
+                    master_gain = client_data.get('master_gain', 1.0)
+                    
+                    # Suscribir cliente
+                    self.channel_manager.subscribe_client(
+                        client_id,
+                        channels=channels,
+                        gains=gains,
+                        pans=pans,
+                        client_type=client_type,
+                        device_uuid=device_uuid
+                    )
+                    
+                    # Aplicar mutes y master gain
+                    self.channel_manager.update_client_mix(
+                        client_id,
+                        mutes=mutes,
+                        master_gain=master_gain
+                    )
+                    
+                    restored_count += 1
+                    
+                    if self.gui:
+                        self.gui.queue_log_message(
+                            f"  ✅ {client_data.get('name', 'Unknown')} ({len(channels)} ch)",
+                            "INFO"
+                        )
+                
+                except Exception as e:
+                    if self.gui:
+                        self.gui.queue_log_message(
+                            f"  ⚠️ Failed: {str(e)[:50]}...",
+                            "WARNING"
+                        )
+            
+            if self.gui:
+                self.gui.queue_log_message(
+                    f"✅ Restored {restored_count}/{len(clients)} clients",
+                    "SUCCESS"
+                )
+        
+        except Exception as e:
+            if self.gui:
+                self.gui.queue_log_message(
+                    f"❌ Error restoring clients: {str(e)}",
+                    "ERROR"
+                )
 
     def __init__(self):
 
@@ -86,7 +336,10 @@ class AudioServerApp:
 
         self.server_running = False
         self.server_session_id = None
+        self.device_id = None
 
+        # ✅ ESCENAS
+        self.scene_manager = SceneManager()
         
 
         # Configurar manejo de señales
@@ -222,6 +475,10 @@ class AudioServerApp:
                 self.gui.queue_log_message("⚠️ El servidor ya está ejecutándose", 'WARNING')
 
             return
+
+        
+
+        self.device_id = device_id  # Guardar device_id para reinicio
 
         
 

@@ -1,0 +1,20 @@
+<resources>
+    <string-array name="color_options">
+        <item>Por defecto</item>  <!-- NUEVO -->
+        <item>Azul</item>
+        <item>Verde</item>
+        <item>Rojo</item>
+        <item>Amarillo</item>
+        <item>Gris</item>
+    </string-array>
+
+    <integer-array name="color_values">
+        <item>0</item>  <!-- NUEVO - 0 = Por defecto -->
+        <item>0xFF2196F3</item>
+        <item>0xFF4CAF50</item>
+        <item>0xFFF44336</item>
+        <item>0xFFFFEB3B</item>
+        <item>0xFFBDBDBD</item>
+    </integer-array>
+</resources>
+

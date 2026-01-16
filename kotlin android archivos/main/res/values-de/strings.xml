@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="Fichatech">Meine Anwendung</string>
+    <string name="nav_home">Startseite</string>
+    <string name="nav_technical_data">Technisches Datenblatt</string>
+    <string name="nav_technical_data_list">Kanalliste</string>
+    <string name="nav_stage_plan">Bühnenplan</string>
+    <string name="nav_stage_plan_escenario">Szenario</string>
+    <string name="nav_documents">Dokumente</string>
+    <string name="nav_saved_documents">Gespeicherte Dokumente</string>
+    <string name="nav_task_list">Aufgabenliste</string>
+    <string name="nav_settings">Einstellungen</string>
+    <string name="nav_exit">Beenden</string>
+    <string name="nav_tuner">Chromatisches Stimmgerät</string>
+    <string name="nav_sonometro">Schallpegelmesser</string>
+    <string name="nav_record_playback">Audiorekorder</string>
+    <string name="nav_ayuda">Handbuch und Hilfe</string>
+    <string name="nav_group_principal">Hauptgruppe</string>
+    <string name="nav_group_tools">Werkzeuge</string>
+    <string name="nav_group_more">Weitere Optionen</string>
+
+    <!-- Willkommen -->
+    <string name="welcome_title">Willkommen bei Fichatech</string>
+    <string name="welcome_question">Was möchten Sie tun?</string>
+    <string name="channel_lists">Kanallisten</string>
+    <string name="stage_plans">Bühnenpläne</string>
+    <string name="audio_monitor">Audiomonitor</string>
+
+    <!-- Fragment Inicio -->
+    <string name="app_title">FICHATECH</string>
+    <string name="app_subtitle">Mit Opus-Technologie</string>
+    <string name="logo_description">FICHATECH Logo</string>
+    <string name="about_title">Willkommen bei FICHATECH</string>
+    <string name="about_description">FICHATECH ist eine App, die für Tontechniker, Bands und Solokünstler entwickelt wurde und darauf abzielt, Ihre Projekte wachsen zu lassen.</string>
+    <string name="features_title">Hauptfunktionen</string>
+    <string name="btn_channels">Kanalliste</string>
+    <string name="btn_stage_plan">Bühnenplan</string>
+    <string name="btn_audio_monitor">Audiomonitor</string>
+    <string name="news_title">Neueste Nachrichten</string>
+    <string name="news_date">13. Januar 2026</string>
+    <string name="news_content">• Neues minimalistisches Design\n• Neue Monitor-Server-Funktion\n• Kleinere Fehlerbehebungen</string>
+    <string name="developer_title">Weitere Informationen unter</string>
+    <string name="developer_url">www.cepalabs.cl/fichatech</string>
+    <string name="developer_description">Entwicklung mobiler Apps, Webseiten, Tondienst und Musikproduktion.</string>
+    <string name="btn_website">Website</string>
+    <string name="btn_instagram">Instagram</string>
+    <string name="fab_description">Rauschgenerator</string>
+
+    <!-- ✅ Info-Button und Datenschutzmenü -->
+    <string name="action_info">Information</string>
+    <string name="menu_privacy_policy">Datenschutzerklärung</string>
+    <string name="menu_terms_conditions">Allgemeine Geschäftsbedingungen</string>
+    <string name="menu_about">Über</string>
+
+    <!-- Sonstige String-Ressourcen -->
+    <string name="navigation_drawer_open">Navigationsmenü öffnen</string>
+    <string name="navigation_drawer_close">Navigationsmenü schließen</string>
+    <string name="nav_grabacion">Aufzeichnung</string>
+    <string name="frequency_text">Frequenz: %.2f Hz</string>
+    <string name="permission_denied">Berechtigung verweigert</string>
+    <string name="note_c">Note C</string>
+    <string name="note_c_sharp">Note C#</string>
+    <string name="note_d">Note D</string>
+    <string name="note_d_sharp">Note D#</string>
+    <string name="note_e">Note E</string>
+    <string name="note_f">Note F</string>
+    <string name="note_f_sharp">Note F#</string>
+    <string name="note_g">Note G</string>
+    <string name="note_g_sharp">Note G#</string>
+    <string name="note_a">Note A</string>
+    <string name="note_a_sharp">Note A#</string>
+    <string name="note_b">Note B</string>
+
+    <!-- Die default_web_client_id wird automatisch von google-services.json generiert -->
+    <string name="default_web_client_id">270188212529-vmj2cio1922veiv6r7t9n7b8boo1e6lk.apps.googleusercontent.com</string>
+
+    <string name="db_value">dB: %.2f</string>
+
+    <!-- Bühnenplan -->
+    <string name="instrument_icon">Instrumentensymbol</string>
+    <string name="add_instrument">Instrument hinzufügen</string>
+    <string name="category_icon">Kategoriesymbol</string>
+    <string name="select_category">Wählen Sie eine Kategorie</string>
+    <string name="select_instrument">Wählen Sie ein Instrument</string>
+    <string name="scene_icon">Bühnensymbol</string>
+    <string name="select_scene">Bühnenplan auswählen</string>
+    <string name="delete_scene">Löschen</string>
+    <string name="scene_name">Name des Bühnenplans</string>
+    <string name="scene_save_info">Geben Sie einen eindeutigen Namen ein, um Ihre Bühnenkonfiguration zu speichern</string>
+
+    <string-array name="microfonia_options">
+        <item>Zu definieren</item>
+        <item>Direktbox</item>
+        <!-- AKG Microphones -->
+        <item>AKG C1000 S</item>
+        <item>AKG C12 VR</item>
+        <item>AKG C214</item>
+        <item>AKG C3000</item>
+        <item>AKG C414 XLS</item>
+        <item>AKG C414 XLII</item>
+        <item>AKG C451 B</item>
+        <item>AKG C451</item>
+        <item>AKG C518 M</item>
+        <item>AKG C555 L</item>
+        <item>AKG C636 WL!</item>
+        <item>AKG C636</item>
+        <item>AKG C7</item>
+        <item>AKG C7 WL!</item>
+        <item>AKG C900</item>
+        <item>AKG D112 MkII</item>
+        <item>AKG D12 VR</item>
+        <item>AKG D5</item>
+        <item>AKG D40</item>
+        <item>AKG D7</item>
+        <item>AKG D7S</item>
+        <item>AKG P120</item>
+        <item>AKG P170</item>
+        <item>AKG P220</item>
+        <item>AKG P420</item>
+        <item>AKG P5 S</item>
+        <!-- Audio-Technica Microphones -->
+        <item>Audio Technica AE3300</item>
+        <item>Audio Technica AE4100</item>
+        <item>Audio Technica AE5400</item>
+        <item>Audio Technica AE6100</item>
+        <item>Audio Technica AT2010</item>
+        <item>Audio Technica AT2020</item>
+        <item>Audio Technica AT2021</item>
+        <item>Audio Technica AT4033</item>
+        <item>Audio Technica AT4040</item>
+        <item>Audio Technica AT4047 SV</item>
+        <item>Audio Technica AT4050</item>
+        <item>Audio Technica AT4053b</item>
+        <item>Audio Technica AT4060</item>
+        <item>Audio Technica AT5040</item>
+        <item>Audio Technica ATM650</item>
+        <item>Audio Technica ATM710</item>
+        <item>Audio Technica AT8010</item>
+        <item>Audio Technica PRO 37</item>
+        <item>Audio Technica PRO 61</item>
+        <!-- Audix Microphones -->
+        <item>Audix OM7</item>
+        <item>Audix OM6</item>
+        <item>Audix OM5</item>
+        <item>Audix OM3</item>
+        <item>Audix i5</item>
+        <item>Audix D6</item>
+        <item>Audix D4</item>
+        <item>Audix D3</item>
+        <item>Audix D2</item>
+        <item>Audix SCX25A</item>
+        <item>Audix ADX 51</item>
+        <item>Audix OM2</item>
+        <item>Audix VX5</item>
+        <item>Audix D1</item>
+        <item>Audix Fireball V</item>
+        <item>Audix MicroD</item>
+        <item>Audix M1255B</item>
+        <!-- Beyerdynamic Microphones -->
+        <item>Beyerdynamic M130</item>
+        <item>Beyerdynamic M160</item>
+        <item>Beyerdynamic M201 TG</item>
+        <item>Beyerdynamic M69 TG</item>
+        <item>Beyerdynamic M88 TG</item>
+        <item>Beyerdynamic Opus 69</item>
+        <item>Beyerdynamic TG D57c</item>
+        <item>Beyerdynamic TG D58</item>
+        <item>Beyerdynamic TG D70 MKII</item>
+        <item>Beyerdynamic TG D70d</item>
+        <item>Beyerdynamic TG D71</item>
+        <item>Beyerdynamic TG I50d</item>
+        <item>Beyerdynamic TG I52d</item>
+        <item>Beyerdynamic TG I55c</item>
+        <item>Beyerdynamic TG V50d</item>
+        <item>Beyerdynamic TG V70d</item>
+        <item>Beyerdynamic TG V90r</item>
+        <!-- Blue Microphones -->
+        <item>Blue Baby Bottle SL</item>
+        <item>Blue Bottle Rocket Stage One</item>
+        <item>Blue Ember</item>
+        <item>Blue enCORE 100</item>
+        <item>Blue enCORE 100i</item>
+        <item>Blue enCORE 200</item>
+        <item>Blue enCORE 300</item>
+        <item>Blue Raspberry</item>
+        <item>Blue Snowball</item>
+        <item>Blue Spark SL</item>
+        <item>Blue Yeti Pro</item>
+        <!-- DPA Microphones -->
+        <item>DPA 2011C</item>
+        <item>DPA 4006</item>
+        <item>DPA 4011</item>
+        <item>DPA 4066</item>
+        <item>DPA 4099</item>
+        <item>DPA d facto 4018</item>
+        <item>DPA d:vote 4099</item>
+        <!-- Electro-Voice Microphones -->
+        <item>Electro Voice 635A</item>
+        <item>Electro Voice ND44</item>
+        <item>Electro Voice ND46</item>
+        <item>Electro Voice ND66</item>
+        <item>Electro Voice ND76</item>
+        <item>Electro Voice ND86</item>
+        <item>Electro Voice ND96</item>
+        <item>Electro Voice N D468</item>
+        <item>Electro Voice N D767a</item>
+        <item>Electro Voice PL37</item>
+        <item>Electro Voice PL80a</item>
+        <item>Electro Voice RE20</item>
+        <item>Electro Voice RE200</item>
+        <item>Electro Voice RE320</item>
+        <item>Electro Voice RE410</item>
+        <item>Electro Voice RE50B</item>
+        <!-- Heil Microphones -->
+        <item>Heil PR20</item>
+        <item>Heil PR22</item>
+        <item>Heil PR22 UT</item>
+        <item>Heil PR28</item>
+        <item>Heil PR30</item>
+        <item>Heil PR30T</item>
+        <item>Heil PR31 BW</item>
+        <item>Heil PR35</item>
+        <item>Heil PR37</item>
+        <item>Heil PR40</item>
+        <item>Heil PR48</item>
+        <!-- Neumann Microphones -->
+        <item>Neumann KM 184</item>
+        <item>Neumann KMS 104</item>
+        <item>Neumann KMS 105</item>
+        <item>Neumann TLM 102</item>
+        <item>Neumann TLM 103</item>
+        <item>Neumann U87 AI</item>
+        <!-- Samson Microphones -->
+        <item>Samson AirLine Micro Camera Wireless</item>
+        <item>Samson AirLine Micro Earset Wireless</item>
+        <item>Samson C01</item>
+        <item>Samson C01U</item>
+        <item>Samson C02</item>
+        <item>Samson C03</item>
+        <item>Samson C03U</item>
+        <item>Samson C05</item>
+        <item>Samson Concert 88 Handheld</item>
+        <item>Samson Concert 88 Headset</item>
+        <item>Samson Concert 88 Lavalier</item>
+        <item>Samson Go Mic</item>
+        <item>Samson G-Track Pro</item>
+        <item>Samson G-Track USB</item>
+        <item>Samson Meteor</item>
+        <item>Samson MTR101</item>
+        <item>Samson MTR201</item>
+        <item>Samson Q2U</item>
+        <item>Samson Q7</item>
+        <item>Samson Stage XPD2 Handheld</item>
+        <item>Samson Stage XPD2 Headset</item>
+        <item>Samson Stage XPD2 Lavalier</item>
+        <!-- Sennheiser Microphones -->
+        <item>Sennheiser e602 II</item>
+        <item>Sennheiser e609</item>
+        <item>Sennheiser e609 Silver</item>
+        <item>Sennheiser e614</item>
+        <item>Sennheiser e835</item>
+        <item>Sennheiser e901</item>
+        <item>Sennheiser e904</item>
+        <item>Sennheiser e906</item>
+        <item>Sennheiser e935</item>
+        <item>Sennheiser e945</item>
+        <item>Sennheiser e965</item>
+        <item>Sennheiser MD 21-U</item>
+        <item>Sennheiser MD421-II</item>
+        <item>Sennheiser MD441-U</item>
+        <item>Sennheiser MK4</item>
+        <item>Sennheiser MK8</item>
+        <item>Sennheiser MKH 416</item>
+        <item>Sennheiser MKH416</item>
+        <item>Sennheiser MKH8020</item>
+        <item>Sennheiser MKH8040</item>
+        <item>Sennheiser MKH8060</item>
+        <item>Sennheiser MKE 2</item>
+        <item>Sennheiser MKE 400</item>
+        <item>Sennheiser MKE 440</item>
+        <item>Sennheiser MKE 600</item>
+        <item>Sennheiser ME 66/K6</item>
+        <!-- Shure Microphones -->
+        <item>Shure Beta 52A</item>
+        <item>Shure Beta 58A</item>
+        <item>Shure Beta 87A</item>
+        <item>Shure Beta 87C</item>
+        <item>Shure Beta 91A</item>
+        <item>Shure KSM141</item>
+        <item>Shure KSM137</item>
+        <item>Shure KSM32</item>
+        <item>Shure KSM44</item>
+        <item>Shure KSM8</item>
+        <item>Shure KSM9</item>
+        <item>Shure MV7</item>
+        <item>Shure PGA48</item>
+        <item>Shure PGA58</item>
+        <item>Shure PGA81</item>
+        <item>Shure PG58</item>
+        <item>Shure PGADRUMKIT7</item>
+        <item>Shure SM27</item>
+        <item>Shure SM48</item>
+        <item>Shure SM57</item>
+        <item>Shure SM58</item>
+        <item>Shure SM81</item>
+        <item>Shure SM86</item>
+        <item>Shure SM98</item>
+        <item>Shure SM7B</item>
+        <item>Shure VP64A</item>
+    </string-array>
+
+    <string-array name="fx_options">
+        <item>Kein Effekt</item>
+        <item>Hall</item>
+        <item>Verzögerung</item>
+        <item>Kompressor</item>
+        <item>Gate</item>
+        <item>Chorus</item>
+        <item>Flanger</item>
+        <item>Phaser</item>
+        <item>Verzerrung</item>
+        <item>Overdrive</item>
+        <item>Tremolo</item>
+        <item>Vibrato</item>
+        <item>Equalizer</item>
+        <item>Begrenzer</item>
+        <item>De-esser</item>
+        <item>Exciter</item>
+        <item>Echo</item>
+        <item>Pitch Shifter</item>
+        <item>Harmonizer</item>
+        <item>Wah-Wah</item>
+        <item>Auto-Tune</item>
+        <item>Rauschunterdrückung</item>
+        <item>Bitcrusher</item>
+        <item>Ring Modulator</item>
+        <item>Sättigung</item>
+        <item>Tape Echo</item>
+        <item>Spring Reverb</item>
+        <item>Plate Reverb</item>
+        <item>Room Reverb</item>
+        <item>Hall Reverb</item>
+        <item>Reverse Reverb</item>
+        <item>Multi-Tap Delay</item>
+        <item>Slapback Delay</item>
+        <item>Ping-Pong Delay</item>
+        <item>Multi-Band Kompressor</item>
+        <item>Brickwall Limiter</item>
+        <item>Multiband Expander</item>
+        <item>Expander</item>
+        <item>Stereo Widener</item>
+        <item>Stereo Enhancer</item>
+        <item>Stereo Imager</item>
+        <item>Sidechain Kompression</item>
+        <item>Parallel Kompression</item>
+        <item>Dynamic EQ</item>
+        <item>Parametrischer EQ</item>
+        <item>Grafischer EQ</item>
+        <item>Shelving EQ</item>
+        <item>Band-Pass Filter</item>
+        <item>Tiefpassfilter</item>
+        <item>Hochpassfilter</item>
+        <item>Notch Filter</item>
+        <item>Kammfilter</item>
+        <item>Formant Filter</item>
+        <item>Envelope Follower</item>
+        <item>Gated Reverb</item>
+        <item>Ducked Delay</item>
+        <item>Modulated Delay</item>
+        <item>Granular Delay</item>
+        <item>Convolution Reverb</item>
+        <item>Algorithmic Reverb</item>
+        <item>Doppler-Effekt</item>
+        <item>Rotationslautsprecher</item>
+        <item>Leslie-Lautsprecher</item>
+        <item>Cabinet Simulation</item>
+        <item>Amp Simulation</item>
+        <item>Tape Sättigung</item>
+        <item>Tube Sättigung</item>
+        <item>Harmonic Exciter</item>
+        <item>Transient Shaper</item>
+        <item>Transient Designer</item>
+        <item>Frequency Shifter</item>
+        <item>Oktaver</item>
+        <item>Fuzz</item>
+        <item>Ring Shifter</item>
+        <item>Auto-Wah</item>
+        <item>Resonator</item>
+        <item>Subharmonic Synth</item>
+        <item>Reverser</item>
+        <item>Grain Delay</item>
+        <item>Spectral Delay</item>
+        <item>Pitch Correction</item>
+        <item>Glitch</item>
+        <item>Scratch</item>
+        <item>Vinyl Simulation</item>
+        <item>Lo-Fi</item>
+        <item>Chorus Ensemble</item>
+        <item>Modulation</item>
+        <item>VCA Kompression</item>
+        <item>Optische Kompression</item>
+        <item>Tube Kompression</item>
+        <item>Parallel Reverb</item>
+        <item>Binaural Panning</item>
+        <item>Haas-Effekt</item>
+        <item>Stereo Delay</item>
+        <item>Dub Delay</item>
+        <item>Frequency Doubling</item>
+        <item>Pitch Bending</item>
+        <item>Formant Shifting</item>
+        <item>Auto-Pan</item>
+        <item>Slow Gear</item>
+        <item>Talkbox</item>
+    </string-array>
+
+    <string name="app_name">Fichatech</string>
+    <string name="start">Starten</string>
+    <string name="stop">Stoppen</string>
+    <string name="initial_level">Schallpegel: — dB</string>
+    <string name="sound_level">Schallpegel: %.2f dB</string>
+
+    <string name="delete_icon_description">Symbol zum Löschen</string>
+    <string name="delete">Datenblatt löschen\n</string>
+    <string name="view">Datenblatt anzeigen</string>
+    <string name="descripci_n_de_la_ficha">Beschreibung</string>
+    <string name="nombre_de_la_ficha">Name</string>
+    <string name="eliminar_canal">Kanal löschen</string>
+    <string name="expandir_canal">Kanal erweitern</string>
+    <string name="descripciondeficha">Beschreibung</string>
+    <string name="nombreficha">Name</string>
+    <string name="info_150db" />
+    <string name="info_90db" />
+    <string name="info_70db" />
+    <string name="info_50db" />
+    <string name="info_30db" />
+    <string name="info_0db" />
+    <string name="activity_avglabel" />
+    <string name="activity_maxlabel" />
+    <string name="activity_curlabel" />
+    <string name="activity_minlabel" />
+    <string name="terminos_ayuda">ALLGEMEINE GESCHÄFTSBEDINGUNGEN - FICHATECH PRO\n\nMit dem Herunterladen oder der Nutzung von Fichatech Pro (\"die Anwendung\") akzeptieren Sie automatisch die folgenden Bedingungen. Wir empfehlen dringend, diese Bedingungen vor der Nutzung der Anwendung zu lesen und zu verstehen.\n\nANBIETER-IDENTIFIKATION\nDiese Anwendung wird entwickelt und gepflegt von CEPALabs (\"wir\", \"unser\" oder \"der Dienstanbieter\"). Kontakt: gabriel.martinez.z@outlook.com und https://cepalabs.cl\n\nALTERSBESCHRÄNKUNG\nDiese Anwendung ist für Benutzer über 13 Jahre bestimmt. Wenn Sie unter 13 sind, sollten Sie diese Anwendung nicht ohne Aufsicht eines Erwachsenen verwenden. Fichatech Pro sammelt nicht absichtlich Informationen von Kindern unter 13 Jahren.\n\nGEISTIGES EIGENTUM\nEs ist strengstens untersagt, die Anwendung, Teile der Anwendung oder unsere Markenzeichen ohne Genehmigung zu kopieren oder zu ändern. Keine Versuche, den Quellcode der Anwendung zu extrahieren, die Anwendung in andere Sprachen zu übersetzen (außer durch offizielle Funktionalität) oder abgeleitete Versionen zu erstellen, sind gestattet. Alle Markenzeichen, Urheberrechte, Datenbankrechte und andere geistige Eigentumsrechte im Zusammenhang mit der Anwendung bleiben Eigentum von CEPALabs.\n\nERFORDERLICHE BERECHTIGUNGEN\nDie Anwendung benötigt folgende Berechtigungen:\n\n• MIKROFON: Für chromatisches Stimmgerät, Schallpegelmesser und Audiorekorder\n• SPEICHER: Zum Speichern technischer Datenblätter und Aufnahmen in PDF/MP3\n• INTERNET: Für Authentifizierung, Synchronisierung und Werbung (Google AdMob)\n• BENACHRICHTIGUNGEN: Für Aufnahme-Benachrichtigungen und Updates\n• WERBE-ID: Zur Anzeige von Werbung, die die App kostenlos hält\n\nDRITTANBIETER-DIENSTE\nDie Anwendung nutzt: Google Play Services, Google Firebase (Authentifizierung), Google AdMob (personalisierte Werbung) und Firebase Crashlytics. Diese Dienste können Daten gemäß ihren eigenen Richtlinien sammeln.\n\nWERBUNG\nDie Anwendung zeigt Werbung über Google AdMob an. Sie können Ihre Einstellungen verwalten unter: https://adssettings.google.com\n\nPERSONENBEZOGENE DATEN\nDie Anwendung speichert E-Mail, technische Datenblätter und Einstellungen. Lesen Sie unsere vollständige Datenschutzerklärung. Es liegt in Ihrer Verantwortung, die Sicherheit Ihres Geräts zu gewährleisten.\n\nINTERNETVERBINDUNG\nEinige Funktionen benötigen eine aktive Verbindung. Es können Datengebühren Ihres Mobilfunkanbieters anfallen. Wir sind nicht verantwortlich, wenn die App aufgrund fehlender Internetverbindung oder erschöpftem Datenvolumen nicht funktioniert.\n\nBENUTZERVERANTWORTUNG\nEs liegt in Ihrer Verantwortung: Gerät aufgeladen halten, stabile Verbindung, sicheres Passwort und Sicherung wichtiger Daten.\n\nHAFTUNGSAUSSCHLUSS\nDIE ANWENDUNG WIRD \"WIE BESEHEN\" OHNE GARANTIEN BEREITGESTELLT. Wir übernehmen keine Verantwortung für Datenverlust, Dienstunterbrechungen oder Ungenauigkeiten im Stimmgerät/Schallpegelmesser (nur Referenz). Google Play Store ist nicht für die Anwendung verantwortlich.\n\nHAFTUNGSBEGRENZUNG\nIn keinem Fall überschreitet unsere Haftung den für die Nutzung der App gezahlten Betrag (derzeit 0€).\n\nENTSCHÄDIGUNG\nSie verpflichten sich, CEPALabs von allen Ansprüchen freizustellen, die sich ergeben aus: Ihrer Nutzung der App, Verletzung dieser Bedingungen oder Verletzung von Rechten Dritter.\n\nAKTUALISIERUNGEN\nWir können die App jederzeit aktualisieren. Die Systemanforderungen können sich ändern. Sie stimmen zu, Updates bei Angebot zu installieren.\n\nBEENDIGUNG\nWir können die Bereitstellung der App jederzeit einstellen. Bei Beendigung müssen Sie die Nutzung einstellen und sie löschen.\n\nÄNDERUNGEN DIESER BEDINGUNGEN\nWir können diese Bedingungen regelmäßig aktualisieren. Wir werden Sie über wesentliche Änderungen informieren.\n\nWirksam ab: 2. Dezember 2024\n\nKONTAKT\nCEPALabs - gabriel.martinez.z@outlook.com - https://cepalabs.cl\n\nDurch die Nutzung von Fichatech Pro bestätigen Sie, dass Sie diese Bedingungen und unsere Datenschutzerklärung gelesen und akzeptiert haben.</string>
+    <string name="ayuda_inicio">Willkommen bei Fichatech. Auf dem Startbildschirm können Sie Schallpegel in dB überwachen und Wellenformen in Echtzeit visualisieren, um die Audiosteuerung präzise durchzuführen. Navigieren Sie einfach zum technischen Datenblatt, zum Bühnenplan, zu gespeicherten Dokumenten und zur Aufzeichnung. Ein interaktives Tutorial kommt bald, um Sie Schritt für Schritt zu führen!</string>
+    <string name="en_ficha_t_cnica_podemos_generar_fichas_para_bandas_en_las_cuales_a_adimos_canales_informaci_n_sobre_la_microfon_a_y_los_efectos_tenemos_la_funci_n_de_al_ver_una_ficha_poder_exportarla_pdf">Erstellen Sie detaillierte technische Datenblätter für Bands oder Ereignisse. Fügen Sie Kanäle mit Mikrofonen, Effekten und Konfigurationen hinzu. Ideal zur Verwaltung von Sound-Setups. Anzeige und Export als PDF, um einfach zu teilen oder auszudrucken.</string>
+    <string name="planta_escena_y_la_mezcla">Entwerfen Sie Bühnenpläne für Live-Ereignisse. Einschließlich Raumdesign, Instrumentenplatzierung, elektrische Routing, Überwachung und Mischung. Visualisieren und planen Sie für optimalen und sicheren Sound.</string>
+    <string name="afinador_croma">Stimmen Sie Saiteninstrumente in Echtzeit mit Präzision. Verwenden Sie das Mikrofon Ihres Geräts, um die Frequenz zu erkennen und die genaue Note anzuzeigen. Kompatibel mit Gitarre, Violine und mehr. Perfekt für schnelle Anpassungen vor dem Spielen.</string>
+    <string name="sonometro_ayuda">Messen Sie Schallpegel in dB, um Ausrüstung, Räume oder Voreinstellungen zu kalibrieren. Nützlich für Musiker und Techniker. Hinweis: Android-Geräte sind auf ca. 90,7 dB begrenzt, nicht für professionelle Hochpräzisions-Messungen.</string>
+    <string name="grabadora_ayuda">Nehmen Sie Audio mühelos auf: benennen, starten, stoppen und geben Sie Aufzeichnungen wieder. Exportieren Sie als MP3 zum Teilen. Ideal für musikalische Ideen, Tests oder schnelle Sitzungen.</string>
+    <string name="ayuda_documentos_guardados">Greifen Sie auf gespeicherte technische Datenblätter und Bühnenpläne zu. Anzeige, Bearbeitung oder Löschung von Dokumenten zur effizienten Verwaltung Ihrer Sound-Projekte.</string>
+    <string name="version_ayuda">Fichatech entwickelt sich kontinuierlich mit Tools wie technisches Datenblatt, Stimmgerät und Schallpegelmesser weiter. Wir integrieren Verbesserungen basierend auf Ihrem Feedback für ein überlegenes Sound-Erlebnis.</string>
+    <string name="imagenfondoinicio" />
+    <string name="imagen_advertencia_para_rotar">Warnung Bild zum Drehen</string>
+    <string name="compartir_por_whatsapp">Per WhatsApp teilen</string>
+    <string name="exportar_pdf">PDF exportieren</string>
+    <string name="toggle_equalizer">Schallmessung aktivieren/deaktivieren</string>
+    <string name="descripcion">Beschreibung</string>
+    <string name="agregar_canal">Kanal hinzufügen</string>
+    <string name="nombre">Name</string>
+    <string name="guardar">Speichern</string>
+    <string name="tuner_title">Stimmgerät</string>
+    <string name="accuracy">Genauigkeit</string>
+    <string name="frequency">Frequenz</string>
+    <string name="audio_level">Audiopegel</string>
+    <string name="start_tuner">Stimmgerät starten</string>
+    <string name="stop_tuner">Stimmgerät stoppen</string>
+    <string name="lista_de_ayuda">Hilfsliste</string>
+    <string name="fichatech_subtitle">Fichatech</string>
+    <string name="ajustes_content">Passen Sie die App nach Ihren Wünschen an. Aktivieren oder deaktivieren Sie derzeit den dunklen Modus für bessere Sichtbarkeit bei verschiedenen Lichtverhältnissen.</string>
+    <string name="label_language">Sprache</string>
+    <string name="spanish">Spanisch</string>
+    <string name="english">Englisch</string>
+    <string name="german">Deutsch</string>
+    <string name="select_language">Sprache auswählen</string>
+    <string name="dark_mode">Dunkler Modus</string>
+    <string name="logout">Abmelden</string>
+    <string name="logout_title">Abmelden</string>
+    <string name="logout_message">Sind Sie sicher, dass Sie sich abmelden möchten?</string>
+    <string name="yes">Ja</string>
+    <string name="no">Nein</string>
+    <string name="clear_data">Alle Daten löschen</string>
+    <string name="export_pdf">PDF exportieren</string>
+    <string name="create_new_list">Neue Liste erstellen</string>
+    <string name="verify_email">E-Mail verifizieren</string>
+    <string name="already_verified">Bereits verifiziert</string>
+    <string name="fichatech_pro">Fichatech</string>
+    <string name="sign_in">Anmelden</string>
+    <string name="sign_up">Registrieren</string>
+    <string name="or_continue_with">Oder fortfahren mit</string>
+    <string name="continue_google">Mit Google fortfahren</string>
+    <string name="continue_guest">Als Gast fortfahren</string>
+    <string name="privacy_policy">Datenschutzrichtlinie</string>
+    <string name="home_app">Startseite</string>
+    <string name="technical_sheet">Technisches Datenblatt</string>
+    <string name="stage_layout">Bühnenplan</string>
+    <string name="chromatic_tuner">Chromatisches Stimmgerät</string>
+    <string name="sound_meter">Schallpegelmesser</string>
+    <string name="audio_recorder">Audiorekorder</string>
+    <string name="settings">Einstellungen</string>
+    <string name="saved_documents">Gespeicherte Dokumente</string>
+    <string name="version">Version</string>
+    <string name="terms_conditions">Geschäftsbedingungen</string>
+    <string name="politica_privacidad_ayuda">Klicken Sie hier, um unsere vollständige Datenschutzerklärung anzuzeigen</string>
+    <string name="ficha_name_label">Datenblattname</string>
+    <string name="ficha_description_label">Datenblattbeschreibung</string>
+    <string name="documento_name_label">Dokumentname</string>
+    <string name="documento_description_label">Dokumentbeschreibung</string>
+    <string name="documento_date_label">Erstellungsdatum</string>
+    <string name="canal_config_label">Kanalkonfiguration</string>
+    <string name="canales_count">0 ch</string>
+    <string name="reference_only">Nur als Referenz</string>
+    <string name="lufs_label">LUFS</string>
+    <string name="db_label">dB</string>
+    <string name="rms_label">RMS</string>
+    <string name="pink_noise">Rosa Rauschen</string>
+    <string name="white_noise">Weißes Rauschen</string>
+    <string name="recording_playback">Aufzeichnung und Wiedergabe</string>
+    <string name="select_doc_toast">Wählen Sie mindestens ein Dokument</string>
+    <string name="export_error">Fehler beim Exportieren: %s</string>
+    <string name="pdf_exported">PDF erfolgreich exportiert</string>
+    <string name="email_not_verified">Sie haben Ihre E-Mail noch nicht verifiziert.</string>
+    <string name="verify_status_error">Fehler beim Überprüfen des Verifizierungsstatus.</string>
+    <string name="sheet_name_required">Der Datenblattname ist erforderlich</string>
+    <string name="duplicate_channels">Es gibt doppelte Kanalnamen</string>
+    <string name="google_token_error">Fehler: Google-Token konnte nicht abgerufen werden</string>
+    <string name="google_signin_error">Google-Anmeldungsfehler: %1$s (Code: %2$d)</string>
+    <string name="null_user_error">Fehler: Null-Benutzer nach Authentifizierung</string>
+    <string name="auth_error">Authentifizierungsfehler: %s</string>
+    <string name="generic_error">Fehler</string>
+    <string name="email_required">Bitte geben Sie Ihre E-Mail-Adresse ein</string>
+    <string name="invalid_email">Bitte geben Sie eine gültige E-Mail-Adresse ein</string>
+    <string name="password_required">Bitte geben Sie Ihr Passwort ein</string>
+    <string name="login_cancelled">Anmeldung abgebrochen</string>
+    <string name="google_signin_error_general">Google-Anmeldungsfehler: %s</string>
+    <string name="auto_login_error">Fehler bei der automatischen Anmeldung</string>
+    <string name="email_unverified_toast">E-Mail nicht verifiziert. Eine neue E-Mail wurde an %s gesendet</string>
+    <string name="registration_error">Registrierungsfehler: %s</string>
+    <string name="weak_password">Das Passwort ist zu schwach (mindestens 6 Zeichen).</string>
+    <string name="email_error">Es gab einen Fehler mit der E-Mail.</string>
+    <string name="verification_email_sent">Eine Bestätigungs-E-Mail wurde an %s gesendet</string>
+    <string name="email_unverified_msg">E-Mail nicht verifiziert. Eine neue E-Mail wurde an %s gesendet</string>
+    <string name="hint_email">E-Mail</string>
+    <string name="hint_password">Passwort</string>
+    <string name="hint_search_stage">Bühne suchen…</string>
+    <string name="hint_recording_name">Name der Aufnahme</string>
+    <string name="hint_select">Auswählen</string>
+    <string name="hint_search_instrument">Instrument suchen…</string>
+
+    <!-- Gemeinsame Layout-Texte zur Vermeidung von Literals -->
+    <string name="footer_brand">FICHATECH</string>
+    <string name="cd_google_logo">Google-Logo</string>
+    <string name="recording_default_time">00:00</string>
+    <string name="recording_item_placeholder">Name der Aufzeichnung</string>
+    <string name="record_button">Aufzeichnung</string>
+    <string name="recordings_saved_title">Gespeicherte Aufzeichnungen</string>
+    <string name="select_recording_prompt">Wählen Sie eine Aufzeichnung</string>
+    <string name="play_action">Abspielen</string>
+    <string name="delete_action">Löschen</string>
+    <string name="export_action">Exportieren</string>
+    <string name="tuner_info_title">Instrumenten-Stimmgerät</string>
+
+    <string name="tuner_default_note">A4</string>
+    <string name="tuner_default_frequency">440.0 Hz</string>
+    <string name="tuner_level_label">Pegel:</string>
+    <string name="tuner_default_level_percentage">50%</string>
+    <string name="tuner_footer_info">Präzises Stimmgerät für Musikinstrumente</string>
+    <string name="switch_graficos">Tondetektor</string>
+    <string name="legal_section">Rechtsdokumente</string>
+    <!-- Dialoge -->
+    <string name="cambiar_idioma_title">Sprache ändern</string>
+    <string name="cambiar_idioma_message">Die Anwendungssprache ändern? Die Aktivität wird neu gestartet.</string>
+    <string name="confirmar_borrado_title">Löschen bestätigen</string>
+    <string name="confirmar_borrado_message">Sind Sie sicher, dass Sie alle Daten löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="datos_borrados_title">✓ Daten gelöscht</string>
+    <string name="datos_borrados_message">Alle Ihre lokalen Daten wurden gelöscht. Die App wird geschlossen.</string>
+    <string name="cerrar">Schließen</string>
+    <string name="eliminar_reporte_title">Bericht löschen</string>
+    <string name="eliminar_reporte_message">Sind Sie sicher, dass Sie diesen Bericht löschen möchten?</string>
+    <string name="opciones_planta_title">Bühnenoptionen</string>
+    <string name="guardar_planta">Bühne speichern</string>
+    <string name="cargar_planta">Bühne laden</string>
+    <string name="cancelar">Abbrechen</string>
+    <string name="seleccionar_subcategoria_instrumentos">Wählen Sie eine Unterkategorie von Instrumenten</string>
+    <string name="nueva_planta">Neue Bühne</string>
+    <string name="confirmar_sobrescritura_title">Überschreiben bestätigen</string>
+    <string name="confirmar_sobrescritura_message">Möchten Sie die Bühne \'%s\' ersetzen?</string>
+    <string name="eliminar_planta_title">Bühne löschen</string>
+    <string name="eliminar_planta_message">Möchten Sie die Bühne \'%s\' löschen?</string>
+    <string name="no_browser_message">Browser konnte nicht geöffnet werden. Besuchen Sie: %s</string>
+    <string name="ok">OK</string>
+    <string name="acerca_de_title">Über FICHATECH</string>
+    <string name="eliminar_cuenta_title">Konto löschen</string>
+    <string name="eliminar_cuenta_message">Um Ihr Konto zu löschen, besuchen Sie:\n\n%s\n\nOder senden Sie eine E-Mail an: contacto.cepalabs@gmail.com</string>
+
+    <!-- Descripciones de accesibilidad para botones e íconos -->
+    <string name="back_button_desc">Zurück</string>
+    <string name="status_icon_desc">Statusanzeige für Verbindungsstatus</string>
+    <string name="scan_button_desc">Netzwerk scannen</string>
+
+    <!-- Cadenas para NativeAudioStreamActivity -->
+    <string name="connecting_rf">RF verbinden...</string>
+    <string name="connecting_rf_status">🔄 RF verbinden...</string>
+    <string name="rf_connected">✅ RF %1$s</string>
+    <string name="disconnect_rf">RF trennen</string>
+    <string name="rf_disconnected">⭕ RF %1$s</string>
+    <string name="connect_rf">RF verbinden</string>
+
+    <!-- Recursos para el canal de audio (view_channelficha.xml) -->
+    <string name="channel_label" translatable="false">CH 1</string>
+    <string name="channel_off" translatable="false">OFF</string>
+    <string name="channel_on" translatable="false">ON</string>
+    <string name="default_db_value" translatable="false">0dB</string>
+    <string name="default_pan_center" translatable="false">C</string>
+    <string name="pan_left" translatable="false">L</string>
+    <string name="pan_right" translatable="false">R</string>
+    <string name="mute_indicator_description">Kanal stummgeschaltet. Rotes Vorhängeschloss-Symbol, das anzeigt, dass der Ton stummgeschaltet ist.</string>
+    <string name="channel_label_description">Kennzeichnung des Audiokanals</string>
+    <string name="power_button_description">Ein-/Ausschaltknopf des Kanals</string>
+    <string name="vu_meter_description">Echtzeit-Pegelanzeige. Grün bei normal, gelb als Warnung und rot bei Clipping.</string>
+    <string name="volume_slider_description">Vertikaler Fader zur Lautstärkeregelung. Bereich: -60dB bis +12dB</string>
+    <string name="pan_slider_description">Panorama-Regler zur Verteilung des Tons zwischen linkem und rechtem Kanal</string>
+    <string name="volume_value_description">Aktueller Lautstärkewert in Dezibel</string>
+    <string name="pan_value_description">Aktuelle Panorama-Position: L (links), C (zentriert) oder R (rechts)</string>
+    <!-- Placeholders para valores dinámicos -->
+    <string name="volume_db_value" translatable="false">%1$.0f dB</string>
+    <string name="pan_value_left" translatable="false">L %1$d%%</string>
+    <string name="pan_value_right" translatable="false">R %1$d%%</string>
+    <string name="pan_value_center" translatable="false">C</string>
+
+    <!-- Recursos de cadena para activity_native_receiver.xml -->
+    <string name="monitor_title" translatable="false">FICHATECH MONITOR</string>
+    <string name="connection_title">🌐 VERBINDUNG</string>
+    <string name="ip_label">IP:</string>
+    <string name="ip_hint" translatable="false">192.168.1.100</string>
+    <string name="ip_default" translatable="false">192.168.1.7</string>
+    <string name="port_label">Port:</string>
+    <string name="port_default" translatable="false">5101</string>
+    <string name="connect_button">Verbinden</string>
+    <string name="master_label">Master</string>
+    <string name="volume_label">Lautstärke:</string>
+    <string name="volume_default" translatable="false">0 dB</string>
+    <string name="mute_on">🔊 Ton EIN</string>
+    <string name="info_title">📊 INFORMATIONEN</string>
+    <string name="info_text">• Verbinden Sie sich mit demselben WiFi-Netzwerk wie der Server\n• Halten Sie den Access Point nahe der Bühne und dem System.</string>
+    <string name="latency_default" translatable="false">-- ms</string>
+    <string name="latency_label">Android-Latenz</string>
+
+    <string name="password_min_length">Das Passwort muss mindestens 6 Zeichen lang sein</string>
+    <string name="password_required_signup">Bitte geben Sie ein Passwort ein</string>
+    <string name="invalid_credentials">Falsches Passwort oder E-Mail.</string>
+    <string name="user_collision">Diese E-Mail ist bereits registriert.</string>
+    <string name="user_not_found">Benutzer nicht gefunden. Sind Sie registriert?</string>
+    <string name="visualizers_disabled">Visualisierer sind deaktiviert</string>
+    <string name="pink_noise_started">Rosa Rauschen gestartet</string>
+    <string name="pink_noise_stopped">Rosa Rauschen gestoppt</string>
+    <string name="error_playing_noise">Fehler beim Abspielen von Rauschen</string>
+    <string name="could_not_open_browser">Browser konnte nicht geöffnet werden</string>
+    <string name="could_not_open_email_client">E-Mail-Client konnte nicht geöffnet werden</string>
+    <string name="permission_title">Mikrofon-Berechtigung</string>
+    <string name="permission_message">FICHATECH benötigt Zugriff auf das Mikrofon, um Echtzeit-Visualisierungen anzuzeigen und Audiopegel zu messen.\n\nOhne diese Berechtigung funktionieren die dekorativen Visualisierer nicht.</string>
+    <string name="grant_button">GEWÄHREN</string>
+    <string name="not_now_button">JETZT NICHT</string>
+    <string name="permission_required_title">Berechtigung erforderlich</string>
+    <string name="permission_required_message">Die Benachrichtigungsberechtigung ist notwendig, damit der Audiodienst im Hintergrund ordnungsgemäß funktioniert. Ohne sie kann die Anwendung die Verbindung nicht aktiv halten, wenn sie minimiert ist.</string>
+    <string name="go_to_settings">Zu Einstellungen gehen</string>
+    <string name="cancel">Abbrechen</string>
+
+    <!-- Strings for native receiver -->
+    <string name="app_title_native">FICHATECH RETRO</string>
+    <string name="subtitle_native">WIFI Audio Monitor</string>
+    <string name="connection_settings">Verbindungs-Einstellungen</string>
+    <string name="ultra_low_latency">Extrem niedrige Latenz</string>
+    <string name="ultra_low_latency_desc">Optimierter Puffer für Live-Stimme</string>
+    <string name="ip_address">IP-Adresse</string>
+    <string name="port">Port</string>
+    <string name="connect_server_button">Mit Server verbinden</string>
+    <string name="volume">Lautstärke</string>
+    <string name="audio_on">Audio EIN</string>
+
+    <!-- Neue Strings für Buttons und Nachrichten -->
+    <string name="disconnect_button">Trennen</string>
+    <string name="connecting_button">Verbinden...</string>
+    <string name="audio_off">Audio AUS</string>
+    <string name="enter_ip_warning">⚠️ IP-Adresse eingeben</string>
+    <string name="notifications_enabled">✅ Benachrichtigungen aktiviert</string>
+    <string name="notifications_disabled">⚠️ Benachrichtigungen sind deaktiviert</string>
+    <string name="battery_ignored">✅ Batterieoptimierungen ignoriert</string>
+    <string name="battery_active">⚠️ Batterieoptimierungen aktiv - Streaming kann unterbrochen werden</string>
+    <string name="ultra_low_latency_mode">Extrem niedrige Latenz-Modus.</string>
+    <string name="compatibility_mode">Kompatibilitätsmodus.</string>
+
+    <!-- Dialog für Batterieoptimierungen -->
+    <string name="battery_optimization_title">Batterieoptimierungen</string>
+    <string name="battery_optimization_message">Für kontinuierliches Streaming erlaube der App, Batterieoptimierungen zu ignorieren. Gehe zu Einstellungen > Apps > Fichatech Pro > Batterie, um es zu ändern.</string>
+    <string name="go_to_battery_settings">Zu Einstellungen gehen</string>
+    <string name="continue_anyway">Fortfahren</string>
+</resources>

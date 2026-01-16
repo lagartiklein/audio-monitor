@@ -1,8 +1,16 @@
 # config.py - ACTUALIZADO CON SOPORTE DE 64 CANALES
 
 # ============================================================================
-# âœ… NUEVA SECCIÓN: CONFIGURACIÓN DE CANALES (64 CANALES)
+# ✅ NUEVO: CONFIGURACIÓN DE TIMEOUTS Y TOLERANCIA PARA SUSCRIPCIONES
 # ============================================================================
+
+# Timeouts críticos para evitar reinicios al suscribir
+SOCKET_READ_TIMEOUT = 5.0  # Aumentado de 2s para mensajes grandes
+CLIENT_ALIVE_TIMEOUT = 60.0  # Aumentado de 30s para actividad general
+CLIENT_BUFFER_GRACE = 90.0  # Aumentado de 30s para buffers llenos temporales
+MAX_MAGIC_ERRORS = 10  # Aumentado de 3 para tolerar más errores de corrupción
+MAX_SEND_FAILURES = 20  # Aumentado de 10 para suscripciones grandes
+ZOMBIE_CHECK_TIMEOUT = 15.0  # Aumentado de 1s para detección zombie menos agresiva
 
 # Máximo número de canales lógicos soportados
 # Hardware típico: 8, 16, 24, 32, 48, 64 canales
@@ -90,8 +98,8 @@ RF_STATE_CACHE_TIMEOUT = 0  # âœ… 0 = no expira (persiste hasta reiniciar se
 RF_MAX_RECONNECT_ATTEMPTS = 10
 RF_MAX_PERSISTENT_STATES = 50
 
-CLIENT_ALIVE_TIMEOUT = 15.0
-CLIENT_MAX_CONSECUTIVE_FAILURES = 5
+CLIENT_ALIVE_TIMEOUT = 60.0  # ✅ AUMENTADO: 15s → 60s para tolerar suscripciones lentas
+CLIENT_MAX_CONSECUTIVE_FAILURES = 20  # ✅ AUMENTADO: 5 → 20 para suscripciones grandes
 MAINTENANCE_INTERVAL = 5.0
 
 NATIVE_HEARTBEAT_INTERVAL = 5000  # âš ï¸ AUMENTADO: 3s → 5s
@@ -101,12 +109,12 @@ NATIVE_HEARTBEAT_TIMEOUT = 60
 # DEPURACIÓN Y LOGGING
 # ============================================================================
 
-DEBUG = False
+DEBUG = False  # ✅ Desactivado para mejor rendimiento en producción
 LOG_QUEUE_STATS = False
-LOG_LEVEL = 'WARNING'
+LOG_LEVEL = 'WARNING'  # ✅ Reducido de DEBUG para mejor rendimiento
 STATS_INTERVAL = 10.0
 
-VALIDATE_PACKETS = False
+VALIDATE_PACKETS = False  # ✅ Mantenido desactivado para rendimiento
 VALIDATE_AUDIO = False
 
 # ============================================================================

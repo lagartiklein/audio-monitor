@@ -1,0 +1,108 @@
+{
+  "df2380cd-f502-4a3d-8f05-02419094606a": {
+    "device_uuid": "df2380cd-f502-4a3d-8f05-02419094606a",
+    "client_type": "native",
+    "custom_name": null,
+    "channels": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "gains": {
+      "0": 0.18836490894898006,
+      "1": 0.06309573444801933,
+      "2": 0.001,
+      "3": 0.001,
+      "4": 0.001,
+      "5": 0.001,
+      "6": 0.001,
+      "7": 0.001
+    },
+    "pans": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0
+    },
+    "mutes": {
+      "0": false,
+      "1": false,
+      "2": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false
+    },
+    "master_gain": 1.0,
+    "created_at": 1768520298.931502,
+    "last_modified": 1768601292.0929215,
+    "last_session_duration": 0.0,
+    "reconnection_count": 2149,
+    "channel_names": {},
+    "data_hash": "92a6fdf9a0d10db733e9057b055a51e43b1460ed4c3a247fc00c2e9698cc379a",
+    "schema_version": 1
+  },
+  "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae": {
+    "device_uuid": "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae",
+    "client_type": "native",
+    "custom_name": null,
+    "channels": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "gains": {
+      "0": 2.51188643150958,
+      "1": 1.4125375446227544,
+      "2": 0.001,
+      "3": 0.001,
+      "4": 0.001,
+      "5": 0.001,
+      "6": 0.001,
+      "7": 0.001
+    },
+    "pans": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 0.0,
+      "6": 0.0,
+      "7": 0.0
+    },
+    "mutes": {
+      "0": false,
+      "1": false,
+      "2": false,
+      "3": false,
+      "4": false,
+      "5": false,
+      "6": false,
+      "7": false
+    },
+    "master_gain": 1.0,
+    "created_at": 1768520552.867899,
+    "last_modified": 1768601293.6492996,
+    "last_session_duration": 0.0,
+    "reconnection_count": 2173,
+    "channel_names": {},
+    "data_hash": "cac59b22b980b9b9af366a068a1d4915e33b4666cf05fb3316681bde16d67085",
+    "schema_version": 1
+  }
+}

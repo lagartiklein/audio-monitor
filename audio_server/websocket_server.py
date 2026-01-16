@@ -402,6 +402,9 @@ def init_server(manager, native_server=None):
             audio_mixer.set_audio_callback(broadcast_master_audio_internal)
             logger.info(f"[WebSocket] ✅ Audio Mixer conectado")
     
+    # ✅ NUEVO: Inicializar persistencia unificada
+    init_persistence()
+    
     logger.info(f"[WebSocket] ✅ Inicializado (Control Central)")
     logger.info(f"[WebSocket]    Puerto: {config.WEB_PORT}")
     logger.info(f"[WebSocket]    Frontend: {FRONTEND_DIR}")
@@ -566,7 +569,7 @@ def handle_connect(auth=None):
             'last_activity': time.time(),
             'address': _get_request_ip(),
             'user_agent': request.headers.get('User-Agent', 'Unknown'),
-            'device_uuid': web_device_uuid  # ✅ SIEMPRE tendrá valor
+            'device_uuid': web_device_uuid  # ✅ NUEVO
         }
     
     logger.info(f"[WebSocket] ✅ Cliente web conectado: {client_id[:8]} ({request.remote_addr})")
@@ -628,16 +631,47 @@ def handle_connect(auth=None):
                     except Exception:
                         pass
                     logger.info(f"[WebSocket] 🔄 Cliente restaurado desde device_registry: {len(config_prev.get('channels', []))} canales")
+                    
+                    # ✅ Obtener nombres de canales globales para incluir en la restauración
+                    channel_names = channel_manager.get_all_channel_names()
+                    
                     emit('auto_resubscribed', {
                         'channels': config_prev.get('channels', []),
                         'gains': config_prev.get('gains', {}),
                         'pans': config_prev.get('pans', {}),
                         'mutes': config_prev.get('mutes', {}),
-                        'master_gain': config_prev.get('master_gain', 1.0)
+                        'master_gain': config_prev.get('master_gain', 1.0),
+                        'channel_names': channel_names
                     })
                     restored_from_registry = True
                 except Exception as e:
                     logger.error(f"[WebSocket] Error restaurando config de device_registry: {e}")
+
+        # ✅ NUEVO: Intentar restaurar configuración anterior
+        try:
+            from audio_server.unified_persistence import get_unified_persistence
+            unified_persistence = get_unified_persistence()
+            saved_config = unified_persistence.get_config(web_device_uuid)
+            if saved_config:
+                logger.info(f"[WebSocket] 🛠️ Restaurando config Web: {web_device_uuid[:12]} "
+                           f"({len(saved_config.channels)} canales, nombre: {saved_config.custom_name})")
+                # Restaurar usando channel_manager
+                success = channel_manager.restore_client_config(web_device_uuid, client_id)
+                if success:
+                    # Notificar al cliente que se restauraron sus canales
+                    emit('config_restored', {
+                        'device_uuid': web_device_uuid,
+                        'channels': saved_config.channels,
+                        'gains': saved_config.gains,
+                        'pans': saved_config.pans,
+                        'mutes': saved_config.mutes,
+                        'master_gain': saved_config.master_gain,
+                        'custom_name': saved_config.custom_name
+                    })
+            else:
+                logger.info(f"[WebSocket] ✅ Cliente web nuevo: {web_device_uuid[:12]}")
+        except Exception as e:
+            logger.error(f"[WebSocket] Error restaurando config: {e}")
 
         # ✅ CONFIGURACIÓN DE SESIÓN: No restaurar desde web_persistent_state (legacy)
         # Las configuraciones se pierden al desconectar - no hay auto-restauración entre sesiones
@@ -646,6 +680,10 @@ def handle_connect(auth=None):
         # ✅ Enviar lista de clientes conectados (nativos + web)
         clients_info = get_all_clients_info()
         emit('clients_update', {'clients': clients_info})
+
+        # ✅ Enviar nombres de canales globales actuales
+        current_channel_names = channel_manager.get_all_channel_names()
+        emit('channel_names_init', {'channel_names': current_channel_names})
 
         # ✅ Enviar estadísticas del servidor
         server_stats = get_server_stats()
@@ -676,30 +714,20 @@ def handle_connect(auth=None):
 def handle_disconnect():
     """Cliente web desconectado"""
     client_id = request.sid
-    
-    # ✅ CONFIGURACIÓN DE SESIÓN: No guardar estado persistente
-    # Las configuraciones de clientes web se pierden al desconectar (solo durante la sesión)
-    
-    # ✅ NUEVO: Desregistrar listener de audio maestro si estaba activo
+    # ✅ NO eliminar config - solo desuscribir
     unregister_master_audio_listener(client_id)
-    
-    # ✅ Remover de tracking
     with web_clients_lock:
         client_info = web_clients.pop(client_id, None)
-    
-    if client_info:
-        connection_duration = time.time() - client_info['connected_at']
-        logger.info(f"[WebSocket] 🔌 Cliente web desconectado: {client_id[:8]} "
-                   f"({connection_duration:.1f}s)")
-    
-    # ✅ Desuscribir del channel manager
     if channel_manager:
         try:
             channel_manager.unsubscribe_client(client_id)
         except Exception as e:
-            logger.error(f"[WebSocket] Error desuscribiendo: {e}")
-    
-    # ✅ Notificar a otros clientes
+            logger.error(f"[WebSocket] Error desinscribiendo: {e}")
+    if client_info:
+        device_uuid = client_info.get('device_uuid')
+        connection_duration = time.time() - client_info['connected_at']
+        logger.info(f"[WebSocket] 👋 Web desconectado: {device_uuid[:12]} "
+                   f"({connection_duration:.1f}s, config persistida)")
     try:
         broadcast_clients_update()
     except:
@@ -757,12 +785,16 @@ def handle_subscribe(data):
                 web_device_uuid = web_clients[client_id].get('device_uuid')
         
         # ✅ Si no hay canales y hay device_uuid, intentar restaurar de device_registry
-        if not channels and web_device_uuid and hasattr(channel_manager, 'device_registry') and channel_manager.device_registry:
+        if not channels and web_device_uuid and hasattr(channel_manager, 'device_registry'):
             try:
                 saved_config = channel_manager.device_registry.get_configuration(web_device_uuid)
                 if saved_config and saved_config.get('channels'):
                     channels = saved_config.get('channels', [])
+                    # ✅ Asegurar que gains no estén vacíos
                     gains_int = saved_config.get('gains', {})
+                    for ch in channels:
+                        if ch not in gains_int:
+                            gains_int[ch] = 10**(-60/20)  # -60 dB mínimo
                     pans_int = saved_config.get('pans', {})
                     logger.info(f"[WebSocket] 📂 Configuración restaurada desde device_registry: {len(channels)} canales")
             except Exception as e:
@@ -778,10 +810,14 @@ def handle_subscribe(data):
             device_uuid=web_device_uuid  # ✅ Pasar device_uuid
         )
         
+        # ✅ Obtener nombres de canales globales
+        channel_names = channel_manager.get_all_channel_names()
+        
         emit('subscribed', {
             'channels': channels,
             'gains': gains_int,
-            'pans': pans_int
+            'pans': pans_int,
+            'channel_names': channel_names
         })
         
         logger.info(f"[WebSocket] 📡 {client_id[:8]} suscrito: {len(channels)} canales")
@@ -1220,6 +1256,59 @@ def handle_update_pan(data):
             
             if config.DEBUG:
                 logger.debug(f"[WebSocket] ⚡ Pan CH{channel}: {pan:.2f} ({client_id[:8]}) [synced]")
+    
+    except Exception as e:
+        if config.DEBUG:
+            logger.error(f"[WebSocket] Error update_pan: {e}")
+        emit('pan_updated', {'status': 'error', 'channel': data.get('channel')})
+
+@socketio.on('update_channel_name')
+def handle_update_channel_name(data):
+    """
+    ✅ Actualizar nombre de canal global (persiste en todos los clientes)
+    data: {
+        'channel': int,
+        'name': str
+    }
+    """
+    update_client_activity(request.sid)
+    
+    if not channel_manager:
+        emit('channel_name_updated', {'status': 'error', 'channel': data.get('channel')})
+        return
+    
+    try:
+        channel = data.get('channel')
+        name = data.get('name', '').strip()
+        
+        if channel is None:
+            return
+        
+        channel = int(channel)
+        
+        # ✅ Actualizar nombre de canal global en channel_manager
+        channel_manager.set_channel_name(channel, name)
+        
+        # ✅ Respuesta inmediata al cliente que solicitó
+        emit('channel_name_updated', {
+            'channel': channel,
+            'name': name,
+            'timestamp': int(time.time() * 1000)
+        }, to=request.sid)
+        
+        # ✅ SINCRONIZACIÓN GLOBAL: Propagar a TODOS los clientes (broadcast)
+        socketio.emit('channel_name_updated', {
+            'channel': channel,
+            'name': name,
+            'timestamp': int(time.time() * 1000)
+        }, skip_sid=request.sid)  # No enviar al que ya lo cambió
+        
+        if config.DEBUG:
+            logger.debug(f"[WebSocket] 📝 Channel {channel} name: '{name}' [global sync]")
+            
+    except Exception as e:
+        logger.error(f"[WebSocket] ❌ Error updating channel name: {e}")
+        emit('channel_name_updated', {'status': 'error', 'channel': data.get('channel')})
     
     except Exception as e:
         if config.DEBUG:
@@ -1898,6 +1987,18 @@ def start_maintenance_thread():
 
 # ✅ Iniciar thread de mantenimiento al importar
 start_maintenance_thread()
+
+
+def init_persistence():
+    """✅ Inicializar UnifiedPersistence"""
+    try:
+        from audio_server.unified_persistence import init_unified_persistence
+        init_unified_persistence(
+            config_dir=os.path.join(os.path.dirname(__file__), 'config')
+        )
+        logger.info("[WebSocket] ✅ UnifiedPersistence inicializado")
+    except Exception as e:
+        logger.error(f"[WebSocket] Error inicializando persistencia: {e}")
 
 
 # ============================================================================

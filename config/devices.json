@@ -1,306 +1,23 @@
 {
-  "ccf60cb2-4bd4-40d5-9fd5-001388cc5cb0": {
-    "uuid": "ccf60cb2-4bd4-40d5-9fd5-001388cc5cb0",
+  "df2380cd-f502-4a3d-8f05-02419094606a": {
+    "uuid": "df2380cd-f502-4a3d-8f05-02419094606a",
     "type": "android",
-    "name": "android-ccf60cb2",
-    "custom_name": null,
+    "name": "android-df2380cd",
+    "custom_name": "oppo",
     "mac_address": null,
-    "primary_ip": null,
+    "primary_ip": "192.168.1.9",
     "device_info": {
-      "type": "native",
-      "name": "native-ccf60cb2",
-      "primary_ip": null,
-      "client_id": "ccf60cb2-4bd4-40d5-9fd5-001388cc5cb0",
+      "type": "android",
+      "name": "android-df2380cd",
+      "primary_ip": "192.168.1.9",
+      "client_id": "3b7916f4-7bbf-4d5d-a258-04b992a47860",
       "protocol_version": 2,
       "rf_mode": true,
       "user_agent": null
     },
-    "first_seen": 1768007271.5138474,
-    "last_seen": 1768013479.0151289,
-    "reconnections": 287,
-    "configuration": {
-      "channels": [
-        1
-      ],
-      "gains": {
-        "0": 1.0,
-        "1": 1.4125375446227544,
-        "2": 1.0592537251772889,
-        "3": 0.6683439175686147,
-        "4": 0.5623413251903491,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
-      },
-      "pans": {
-        "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "0": false,
-        "1": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
-      "solos": [],
-      "master_gain": 1.0,
-      "timestamp": 1768013479015
-    },
-    "configuration_session_id": null,
-    "tags": [],
-    "active": true
-  },
-  "09ddacad-ae0b-4d9b-8ce8-bd46fb30e569": {
-    "uuid": "09ddacad-ae0b-4d9b-8ce8-bd46fb30e569",
-    "type": "android",
-    "name": "android-09ddacad",
-    "custom_name": null,
-    "mac_address": null,
-    "primary_ip": null,
-    "device_info": {
-      "type": "native",
-      "name": "native-09ddacad",
-      "primary_ip": null,
-      "client_id": "09ddacad-ae0b-4d9b-8ce8-bd46fb30e569",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
-    },
-    "first_seen": 1768012740.2897344,
-    "last_seen": 1768013545.579416,
-    "reconnections": 59,
-    "configuration": {
-      "channels": [
-        1
-      ],
-      "gains": {
-        "1": 2.51188643150958,
-        "0": 1.2589254117941673,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
-      },
-      "pans": {
-        "1": 0.0,
-        "0": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "1": false,
-        "0": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
-      "master_gain": 1.0,
-      "timestamp": 1768013545579
-    },
-    "configuration_session_id": null,
-    "tags": [],
-    "active": true
-  },
-  "af0c3832-c3d3-486b-aa15-10c19087c06c": {
-    "uuid": "af0c3832-c3d3-486b-aa15-10c19087c06c",
-    "type": "android",
-    "name": "android-af0c3832",
-    "custom_name": null,
-    "mac_address": null,
-    "primary_ip": null,
-    "device_info": {
-      "type": "native",
-      "name": "native-af0c3832",
-      "primary_ip": null,
-      "client_id": "af0c3832-c3d3-486b-aa15-10c19087c06c",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
-    },
-    "first_seen": 1768183203.4551983,
-    "last_seen": 1768183712.4525898,
-    "reconnections": 31,
-    "configuration": {
-      "channels": [],
-      "gains": {
-        "7": 1.0,
-        "1": 1.0,
-        "0": 1.0
-      },
-      "pans": {
-        "7": 0.0,
-        "1": 0.0,
-        "0": 0.0
-      },
-      "mutes": {
-        "7": false,
-        "1": false,
-        "0": false
-      },
-      "master_gain": 1.0,
-      "timestamp": 1768183712452
-    },
-    "configuration_session_id": null,
-    "tags": [],
-    "active": true
-  },
-  "053f3ab7-1523-4b50-a6fe-b332b86cc1ae": {
-    "uuid": "053f3ab7-1523-4b50-a6fe-b332b86cc1ae",
-    "type": "android",
-    "name": "android-053f3ab7",
-    "custom_name": null,
-    "mac_address": null,
-    "primary_ip": null,
-    "device_info": {
-      "type": "native",
-      "name": "native-053f3ab7",
-      "primary_ip": null,
-      "client_id": "053f3ab7-1523-4b50-a6fe-b332b86cc1ae",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
-    },
-    "first_seen": 1768261854.730051,
-    "last_seen": 1768262779.0331388,
-    "reconnections": 21,
-    "configuration": {
-      "channels": [],
-      "gains": {
-        "0": 3.9810717055349722,
-        "1": 1.0,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
-      },
-      "pans": {
-        "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "0": false,
-        "1": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
-      "master_gain": 1.0,
-      "timestamp": 1768262779033
-    },
-    "configuration_session_id": null,
-    "tags": [],
-    "active": true
-  },
-  "36f2d666-21fd-4490-8ec8-160fb7f70b95": {
-    "uuid": "36f2d666-21fd-4490-8ec8-160fb7f70b95",
-    "type": "android",
-    "name": "android-36f2d666",
-    "custom_name": null,
-    "mac_address": null,
-    "primary_ip": null,
-    "device_info": {
-      "type": "native",
-      "name": "native-36f2d666",
-      "primary_ip": null,
-      "client_id": "36f2d666-21fd-4490-8ec8-160fb7f70b95",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
-    },
-    "first_seen": 1768261854.8941295,
-    "last_seen": 1768262758.3821402,
-    "reconnections": 71,
-    "configuration": {
-      "channels": [
-        0
-      ],
-      "gains": {
-        "0": 3.9810717055349722,
-        "1": 1.0,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 3.9810717055349722
-      },
-      "pans": {
-        "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "0": false,
-        "1": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
-      "solos": [],
-      "master_gain": 1.0,
-      "timestamp": 1768262758382
-    },
-    "configuration_session_id": null,
-    "tags": [],
-    "active": true
-  },
-  "b8230a92-6155-45e7-a3c5-871a0d53dae2": {
-    "uuid": "b8230a92-6155-45e7-a3c5-871a0d53dae2",
-    "type": "android",
-    "name": "android-b8230a92",
-    "custom_name": null,
-    "mac_address": null,
-    "primary_ip": null,
-    "device_info": {
-      "type": "native",
-      "name": "native-b8230a92",
-      "primary_ip": null,
-      "client_id": "b8230a92-6155-45e7-a3c5-871a0d53dae2",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
-    },
-    "first_seen": 1768261855.1552255,
-    "last_seen": 1768262078.9783797,
-    "reconnections": 429,
+    "first_seen": 1768520298.9300804,
+    "last_seen": 1768601292.0933154,
+    "reconnections": 4571,
     "configuration": {
       "channels": [
         0,
@@ -313,14 +30,14 @@
         7
       ],
       "gains": {
-        "0": 1.0,
-        "1": 1.0,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
+        "0": 0.18836490894898006,
+        "1": 0.06309573444801933,
+        "2": 0.001,
+        "3": 0.001,
+        "4": 0.001,
+        "5": 0.001,
+        "6": 0.001,
+        "7": 0.001
       },
       "pans": {
         "0": 0.0,
@@ -344,68 +61,7 @@
       },
       "solos": [],
       "master_gain": 1.0,
-      "timestamp": 1768262078978
-    },
-    "configuration_session_id": null,
-    "tags": [],
-    "active": false
-  },
-  "2d2e13bc-ae93-452d-bf03-a9f53925d4f0": {
-    "uuid": "2d2e13bc-ae93-452d-bf03-a9f53925d4f0",
-    "type": "android",
-    "name": "android-2d2e13bc",
-    "custom_name": null,
-    "mac_address": null,
-    "primary_ip": null,
-    "device_info": {
-      "type": "native",
-      "name": "native-2d2e13bc",
-      "primary_ip": null,
-      "client_id": "2d2e13bc-ae93-452d-bf03-a9f53925d4f0",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
-    },
-    "first_seen": 1768262399.0528038,
-    "last_seen": 1768262756.3061948,
-    "reconnections": 15,
-    "configuration": {
-      "channels": [
-        0
-      ],
-      "gains": {
-        "0": 3.9810717055349722,
-        "1": 1.0,
-        "2": 1.0,
-        "3": 1.0,
-        "4": 1.0,
-        "5": 1.0,
-        "6": 1.0,
-        "7": 1.0
-      },
-      "pans": {
-        "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
-      },
-      "mutes": {
-        "0": false,
-        "1": false,
-        "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
-      },
-      "solos": [],
-      "master_gain": 1.0,
-      "timestamp": 1768262756306
+      "timestamp": 1768601292093
     },
     "configuration_session_id": null,
     "tags": [],
@@ -415,78 +71,144 @@
     "uuid": "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae",
     "type": "android",
     "name": "android-3ccfcd8f",
-    "custom_name": null,
+    "custom_name": "gabriel",
     "mac_address": null,
-    "primary_ip": null,
+    "primary_ip": "192.168.1.13",
     "device_info": {
-      "type": "native",
-      "name": "native-3ccfcd8f",
-      "primary_ip": null,
-      "client_id": "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae",
+      "type": "android",
+      "name": "android-3ccfcd8f",
+      "primary_ip": "192.168.1.13",
+      "client_id": "5cbd9c0b-e1d9-4d67-a7cd-0d8e8c0f869d",
       "protocol_version": 2,
       "rf_mode": true,
       "user_agent": null
     },
-    "first_seen": 1768490367.2891197,
-    "last_seen": 1768491901.29217,
-    "reconnections": 55,
+    "first_seen": 1768520552.8655303,
+    "last_seen": 1768601293.6497116,
+    "reconnections": 3241,
     "configuration": {
       "channels": [
-        0
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
       ],
       "gains": {
-        "0": 1.0
+        "0": 2.51188643150958,
+        "1": 1.4125375446227544,
+        "2": 0.001,
+        "3": 0.001,
+        "4": 0.001,
+        "5": 0.001,
+        "6": 0.001,
+        "7": 0.001
       },
       "pans": {
-        "0": 0.0
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 0.0,
+        "5": 0.0,
+        "6": 0.0,
+        "7": 0.0
       },
       "mutes": {
-        "0": false
+        "0": false,
+        "1": false,
+        "2": false,
+        "3": false,
+        "4": false,
+        "5": false,
+        "6": false,
+        "7": false
       },
       "solos": [],
       "master_gain": 1.0,
-      "timestamp": 1768491901292
+      "timestamp": 1768601293649
     },
     "configuration_session_id": null,
     "tags": [],
     "active": true
   },
-  "617176a1-c5bf-4745-9cac-7f81e8c145a8": {
-    "uuid": "617176a1-c5bf-4745-9cac-7f81e8c145a8",
-    "type": "android",
-    "name": "android-617176a1",
+  "test_device_123": {
+    "uuid": "test_device_123",
+    "type": "web",
+    "name": "Test Device",
     "custom_name": null,
     "mac_address": null,
     "primary_ip": null,
     "device_info": {
-      "type": "native",
-      "name": "native-617176a1",
-      "primary_ip": null,
-      "client_id": "617176a1-c5bf-4745-9cac-7f81e8c145a8",
-      "protocol_version": 2,
-      "rf_mode": true,
-      "user_agent": null
+      "type": "web",
+      "name": "Test Audio Device",
+      "max_input_channels": 8,
+      "default_sample_rate": 48000
     },
-    "first_seen": 1768492697.3439052,
-    "last_seen": 1768492741.5426612,
-    "reconnections": 45,
-    "configuration": {
-      "channels": [
-        0
-      ],
-      "gains": {
-        "0": 1.0
-      },
-      "pans": {
-        "0": 0.0
-      },
-      "mutes": {
-        "0": false
-      },
-      "solos": [],
-      "master_gain": 1.0,
-      "timestamp": 1768492741542
+    "first_seen": 1768573661.5717874,
+    "last_seen": 1768601116.7941737,
+    "reconnections": 5,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "web1": {
+    "uuid": "web1",
+    "type": "web",
+    "name": "Web Device 1",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "web",
+      "name": "Web Device 1"
     },
+    "first_seen": 1768601116.7722683,
+    "last_seen": 1768601116.7722683,
+    "reconnections": 0,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "android1": {
+    "uuid": "android1",
+    "type": "android",
+    "name": "Android Device 1",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "android",
+      "name": "Android Device 1"
+    },
+    "first_seen": 1768601116.7736022,
+    "last_seen": 1768601116.7736022,
+    "reconnections": 0,
+    "configuration": {},
+    "configuration_session_id": null,
+    "tags": [],
+    "active": true
+  },
+  "web2": {
+    "uuid": "web2",
+    "type": "web",
+    "name": "Web Device 2",
+    "custom_name": null,
+    "mac_address": null,
+    "primary_ip": null,
+    "device_info": {
+      "type": "web",
+      "name": "Web Device 2"
+    },
+    "first_seen": 1768601116.7750244,
+    "last_seen": 1768601116.7750244,
+    "reconnections": 0,
+    "configuration": {},
     "configuration_session_id": null,
     "tags": [],
     "active": true

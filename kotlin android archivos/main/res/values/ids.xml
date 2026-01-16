@@ -1,0 +1,12 @@
+<resources>
+    <item name="tag_last_touch_event" type="id" />
+    <item name="pos_x_rel" type="id" />
+    <item name="pos_y_rel" type="id" />
+
+    <item name="original_scale_x" type="id"/>
+    <item name="original_scale_y" type="id"/>
+
+    <item name="touch_start_time" type="id"/>
+    <item type="id" name="ip_input" />
+    <item type="id" name="port_input" />
+</resources>

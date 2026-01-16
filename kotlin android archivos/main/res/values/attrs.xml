@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="EqualizerFFTView">
+        <attr name="sampleRate" format="float" />
+        <attr name="bandCount" format="integer" />
+        <attr name="startFreq" format="float" />
+        <attr name="endFreq" format="float" />
+        <attr name="smoothFactor" format="float" />
+        <attr name="animationEnabled" format="boolean" />
+        <attr name="useStandardFrequencies" format="boolean" />
+    </declare-styleable>
+</resources>

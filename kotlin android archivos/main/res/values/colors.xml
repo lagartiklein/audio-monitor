@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Colores Principales -->
+    <color name="colorPrimary">#121212</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="colorAccent">#E9E9E9</color>
+    <color name="colorText">#000000</color>
+    <color name="colorText2">#000000</color>
+    <color name="colorBackground">#FFFFFF</color>
+    <color name="background_color">#FFFFFF</color>
+    <color name="colorBackground2">#FFFFFF</color>
+    <color name="botonesnegrosyblancostexto">#000000</color> <!-- Texto negro -->
+    <color name="botonesnegrosyblancos">#FFFFFF</color> <!-- Fondo blanco por defecto -->
+    <!-- Colores Especiales -->
+    <color name="progress_background">#CCCCCC</color>
+    <color name="progress_secondary">#BFBEBE</color>
+    <color name="progress_primary">#00AA00</color>
+    <!-- Barra de Estado y Navegación -->
+    <color name="dialog_background">#FFFFFF</color>
+    <color name="dialog_text_color">#000000</color>
+    <color name="channel_active_border">#FF9800</color>
+    <!-- Afinador -->
+    <color name="tuner_high">#FF0000</color>
+    <color name="tuner_low">#0000FF</color>
+    <color name="tuner_ok">#13C113</color>
+    <!-- Otros -->
+    <color name="external_progress2">#BB86FC</color>
+    <color name="mygreen">#00AA00</color>
+    <!-- Navigation Drawer -->
+    <color name="colornavlateral">#F0F0F0</color>
+    <color name="colorItemCheckedBackground">#E0E0E0</color>
+    <!-- Colores personalizados -->
+    <color name="itemfichaycanalficha">#FFFFFF</color>
+    <color name="itemficha">#CCCCCC</color>
+    <!-- Modo claro y oscuro -->
+    <color name="status_bar_color">#000000</color>
+    <color name="navigation_bar_color">#4B5962FF</color>
+    <color name="canal_azul">#2196F3</color>
+    <color name="canal_verde">#4CAF50</color>
+    <color name="canal_rojo">#F44336</color>
+    <color name="canal_amarillo">#FFF176</color>
+    <color name="canal_gris">#BDBDBD</color>
+    <color name="gray">#FFF176</color>
+    <color name="negro">#000000</color>
+    <color name="blanco">#FFFFFF</color>
+
+
+    <!-- Estados de conexión -->
+    <color name="color_connected">#4CAF50</color>
+    <color name="color_disconnected">#F44336</color>
+    <color name="color_connecting">#FF9800</color>
+    <color name="color_error">#F44336</color>
+    <!-- Estados de riesgo -->
+    <color name="state_safe">#10B981</color>
+    <color name="state_warning">#F59E0B</color>
+    <color name="state_danger">#EF4444</color>
+    <color name="state_critical">#DC2626</color>
+    <!-- Calidad de audio -->
+    <color name="color_quality_excellent">#4CAF50</color>
+    <color name="color_quality_good">#8BC34A</color>
+    <color name="color_quality_fair">#FFC107</color>
+    <color name="color_quality_poor">#F44336</color>
+
+    <!-- VU Meter -->
+    <color name="vu_green">#4CAF50</color>
+    <color name="vu_yellow">#FFC107</color>
+    <color name="vu_red">#F44336</color>
+    <color name="vu_blue">#2196F3</color>
+
+    <!-- Canales -->
+    <color name="channel_active_background">#2F3F2F</color>
+    <color name="channel_inactive_background">#2A2A2A</color>
+    <color name="channel_active_text">#FFFFFF</color>
+    <color name="channel_inactive_text">#888888</color>
+    <color name="channel_power_active">#4CAF50</color>
+    <color name="channel_power_inactive">#666666</color>
+
+    <!-- Textos -->
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#888888</color>
+    <color name="text_hint">#666666</color>
+    <!-- Colores para fader, pan y power button -->
+    <color name="pan_halo">#802196F3</color>
+    <color name="pan_inactive">#BDBDBD</color>
+    <color name="pan_active">#2196F3</color>
+    <color name="pan_thumb">#2196F3</color>
+    <color name="fader_halo">#80FF9800</color>
+    <color name="fader_inactive">#BDBDBD</color>
+    <color name="fader_active">#FF9800</color>
+    <color name="fader_thumb">#FF9800</color>
+    <color name="power_button_bg">#FFEB3B</color>
+    <!-- Fondos -->
+    <color name="background_dark">#1A1A1A</color>
+    <color name="background_medium">#2D2D2D</color>
+    <color name="background_light">#3A3A3A</color>
+    <color name="slider_track_bg">#EEEEEE</color>
+    <color name="vu_meter_bg">#EEEEEE</color>
+
+
+
+</resources>
