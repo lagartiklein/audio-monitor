@@ -7,21 +7,31 @@
       0
     ],
     "gains": {
-      "0": 3.9810717055349722
+      "0": 1.5848931924611136,
+      "2": 0.5011872336272722,
+      "3": 0.47315125896148047,
+      "1": 1.4125375446227544,
+      "6": 3.9810717055349722
     },
     "pans": {
-      "0": 0.0
+      "0": 0.0,
+      "2": -1.0,
+      "3": 1.0,
+      "1": 0.0
     },
     "mutes": {
-      "0": false
+      "0": false,
+      "2": false,
+      "3": false,
+      "1": false
     },
     "master_gain": 1.0,
     "created_at": 1768520652.8938606,
-    "last_modified": 1768532640.018288,
+    "last_modified": 1768763562.3463063,
     "last_session_duration": 0.0,
-    "reconnection_count": 644,
+    "reconnection_count": 648,
     "channel_names": {},
-    "data_hash": "49458c9ba15437de6312d4a7b5129c375aab6425b70d84b28f3f1f1c8cd2ae86",
+    "data_hash": "a737f0bcb828654e5bedd10d571f26a2de6a34bbd0f9ee5e04ac32e12cc285cc",
     "schema_version": 1
   },
   "df2380cd-f502-4a3d-8f05-02419094606a": {
@@ -29,25 +39,33 @@
     "client_type": "native",
     "custom_name": null,
     "channels": [
-      0
+      0,
+      2,
+      3
     ],
     "gains": {
-      "0": 3.9810717055349722,
-      "1": 0.06309573444801933
+      "0": 1.9952623149688795,
+      "1": 0.06309573444801933,
+      "2": 0.3981071705534972,
+      "3": 0.3758374042884442
     },
     "pans": {
-      "0": 0.0
+      "0": 0.0,
+      "2": -1.0,
+      "3": 1.0
     },
     "mutes": {
-      "0": false
+      "0": false,
+      "2": false,
+      "3": false
     },
     "master_gain": 1.0,
     "created_at": 1768520652.9164531,
-    "last_modified": 1768532640.763286,
+    "last_modified": 1768758330.7667015,
     "last_session_duration": 0.0,
-    "reconnection_count": 1584,
+    "reconnection_count": 1589,
     "channel_names": {},
-    "data_hash": "800661652118e0fac12ac3ec4e35ab23618aaa7d9eb0e2afbb4e7de26e328d65",
+    "data_hash": "dee30a76116240c1ed411ec3f46f2da7979a22f4b06ec331a47b41e3bac9faf0",
     "schema_version": 1
   }
 }

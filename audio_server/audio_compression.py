@@ -28,11 +28,12 @@ class AudioCompressor:
         
         if use_opus and OPUS_AVAILABLE:
             try:
-                self.opus_encoder = opuslib.Encoder(sample_rate, channels, 'audio')
+                self.opus_encoder = opuslib.Encoder(sample_rate, channels, 'voip')  # Cambiado a 'voip' para ultra baja latencia
                 self.opus_decoder = opuslib.Decoder(sample_rate, channels)
                 self.opus_encoder.bitrate = bitrate
+                self.opus_encoder.ctl(opuslib.CTL_SET_COMPLEXITY, 0)  # Complexity mínima para menos latencia
                 self.compression_method = "opus"
-                logger.info(f"[AudioCompressor] Opus: {channels}ch, {sample_rate}Hz, {bitrate}bps")
+                logger.info(f"[AudioCompressor] Opus (VoIP mode): {channels}ch, {sample_rate}Hz, {bitrate}bps, complexity=0")
             except Exception as e:
                 logger.error(f"[AudioCompressor] Error Opus: {e}")
                 self.compression_method = "none"
@@ -53,11 +54,15 @@ class AudioCompressor:
             return self._decompress_none(compressed_data)
 
     def _compress_none(self, audio_data: np.ndarray) -> bytes:
-        """Sin compresión, solo normalización a int16"""
+        """Sin compresión, solo normalización a int16 - OPTIMIZADO: evitar copia si posible"""
         try:
-            audio = audio_data.copy().astype(np.float32)
+            # ✅ OPTIMIZACIÓN: Evitar copia si ya es float32
+            if audio_data.dtype == np.float32:
+                audio = audio_data  # No copiar
+            else:
+                audio = audio_data.astype(np.float32)  # Solo convertir tipo
             
-            # Limitar sin normalización
+            # Limitar sin normalización (in-place)
             np.clip(audio, -1.0, 1.0, out=audio)
             
             # Convertir a int16
@@ -98,11 +103,15 @@ class AudioCompressor:
             return np.zeros(512, dtype=np.float32)
 
     def _compress_opus(self, audio_data: np.ndarray) -> bytes:
-        """Comprimir con Opus sin normalización extra"""
+        """Comprimir con Opus sin normalización extra - OPTIMIZADO: evitar copia si posible"""
         try:
-            audio = audio_data.copy().astype(np.float32)
+            # ✅ OPTIMIZACIÓN: Evitar copia si ya es float32 y no necesita modificación
+            if audio_data.dtype == np.float32:
+                audio = audio_data  # No copiar
+            else:
+                audio = audio_data.astype(np.float32)  # Solo convertir tipo si necesario
             
-            # Solo limitar
+            # Solo limitar (in-place si posible)
             np.clip(audio, -1.0, 1.0, out=audio)
             
             # Convertir a int16 para Opus

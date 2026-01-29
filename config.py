@@ -1,3 +1,8 @@
+# ============================================================================
+# WIDENING ESTÉREO (Haas effect)
+# ============================================================================
+STEREO_WIDENING_ENABLED = False  # 🚀 DESACTIVADO: Elimina delay de 1-2 ms para ultra-baja latencia
+STEREO_WIDENING_DELAY_MS = 15   # Retardo en ms para el canal derecho
 # config.py - ACTUALIZADO CON SOPORTE DE 64 CANALES
 
 # ============================================================================
@@ -5,12 +10,12 @@
 # ============================================================================
 
 # Timeouts críticos para evitar reinicios al suscribir
-SOCKET_READ_TIMEOUT = 5.0  # Aumentado de 2s para mensajes grandes
-CLIENT_ALIVE_TIMEOUT = 60.0  # Aumentado de 30s para actividad general
-CLIENT_BUFFER_GRACE = 90.0  # Aumentado de 30s para buffers llenos temporales
-MAX_MAGIC_ERRORS = 10  # Aumentado de 3 para tolerar más errores de corrupción
-MAX_SEND_FAILURES = 20  # Aumentado de 10 para suscripciones grandes
-ZOMBIE_CHECK_TIMEOUT = 15.0  # Aumentado de 1s para detección zombie menos agresiva
+SOCKET_READ_TIMEOUT = 2.0  # Reducido de 5s para respuestas más rápidas
+CLIENT_ALIVE_TIMEOUT = 30.0  # Reducido de 60s para detección más agresiva de desconexiones
+CLIENT_BUFFER_GRACE = 45.0  # Reducido de 90s para buffers más estrictos
+MAX_MAGIC_ERRORS = 5  # Reducido de 10 para tolerar menos errores
+MAX_SEND_FAILURES = 10  # Reducido de 20 para reconexiones más rápidas
+ZOMBIE_CHECK_TIMEOUT = 10.0  # Reducido de 15s para limpieza más frecuente
 
 # Máximo número de canales lógicos soportados
 # Hardware típico: 8, 16, 24, 32, 48, 64 canales
@@ -40,7 +45,7 @@ CHANNEL_LABELS = {
 
 DEFAULT_SAMPLE_RATE = 48000
 SAMPLE_RATE = DEFAULT_SAMPLE_RATE
-BLOCKSIZE = 120
+BLOCKSIZE = 120  # Ajustado a 120 frames para compatibilidad con Opus (mínimo 2.5ms frame)
 DEFAULT_NUM_CHANNELS = 2  # Solo fallback; se usa el conteo real del dispositivo
 FORCE_MONO_CAPTURE = False
 
@@ -48,16 +53,16 @@ FORCE_MONO_CAPTURE = False
 # CONFIGURACIÓN DE WEBSOCKET
 # ============================================================================
 
-WEBSOCKET_PARAM_DEBOUNCE_MS = 50
+WEBSOCKET_PARAM_DEBOUNCE_MS = 10  # 🚀 REDUCIDO: 50ms → 10ms para updates más rápidos
 WEBSOCKET_BATCH_UPDATES = True
 WEBSOCKET_LATENCY_LOG = False
 WEBSOCKET_QUICK_RESPONSE = True
-SEND_QUEUE_SIZE = 8
+SEND_QUEUE_SIZE = 0  # 🚀 ELIMINADO: Sin buffering extra (Opus ya maneja latencia)
 SEND_THREAD_COUNT = 1
-AUDIO_SEND_POOL_SIZE = 6
+AUDIO_SEND_POOL_SIZE = 1  # 🚀 REDUCIDO: 2 → 1 (un thread directo)
 QUEUE_SIZE = 0
 NATIVE_QUEUE_SIZE = 0
-WEB_QUEUE_SIZE = 2
+WEB_QUEUE_SIZE = 0  # 🚀 ELIMINADO: Sin cola web para mínima latencia
 
 WEB_PORT = 5100
 WEB_HOST = '0.0.0.0'
@@ -79,7 +84,7 @@ VU_ENABLED = False  # âš ï¸ DESACTIVADO para ultra-baja latencia
 SOCKET_SNDBUF = 4096   # âœ… 8 packets máximo (~5ms)
 SOCKET_RCVBUF = 4096   # âœ… Simétrico
 SOCKET_NODELAY = True
-SOCKET_TIMEOUT = 0.010  # âœ… 10ms (15 packets)
+SOCKET_TIMEOUT = 0.005  # 🚀 ULTRA-BAJA: 10ms → 5ms para timeout más agresivo
 
 TCP_KEEPALIVE = True
 TCP_KEEPIDLE = 10
@@ -100,9 +105,9 @@ RF_MAX_PERSISTENT_STATES = 50
 
 CLIENT_ALIVE_TIMEOUT = 60.0  # ✅ AUMENTADO: 15s → 60s para tolerar suscripciones lentas
 CLIENT_MAX_CONSECUTIVE_FAILURES = 20  # ✅ AUMENTADO: 5 → 20 para suscripciones grandes
-MAINTENANCE_INTERVAL = 5.0
+MAINTENANCE_INTERVAL = 10.0  # ⬇️ AUMENTADO: 5s → 10s para menos mantenimiento
 
-NATIVE_HEARTBEAT_INTERVAL = 5000  # âš ï¸ AUMENTADO: 3s → 5s
+NATIVE_HEARTBEAT_INTERVAL = 10000  # ⬇️ AUMENTADO: 5s → 10s para menos heartbeats y overhead
 NATIVE_HEARTBEAT_TIMEOUT = 60
 
 # ============================================================================
@@ -112,7 +117,7 @@ NATIVE_HEARTBEAT_TIMEOUT = 60
 DEBUG = False  # ✅ Desactivado para mejor rendimiento en producción
 LOG_QUEUE_STATS = False
 LOG_LEVEL = 'WARNING'  # ✅ Reducido de DEBUG para mejor rendimiento
-STATS_INTERVAL = 10.0
+STATS_INTERVAL = 30.0  # ⬇️ AUMENTADO: 10s → 30s para menos overhead de logging
 
 VALIDATE_PACKETS = False  # ✅ Mantenido desactivado para rendimiento
 VALIDATE_AUDIO = False
@@ -123,11 +128,11 @@ VALIDATE_AUDIO = False
 
 USE_INT16_ENCODING = False
 AUDIO_THREAD_PRIORITY = True
-CPU_AFFINITY = None
+CPU_AFFINITY = [0]  # Asignar al core 0 para exclusividad
 USE_MEMORYVIEW = True
 WEB_COMPRESSION = False
 WEB_ASYNC_SEND = True
-WEB_MAX_WORKERS = 4
+WEB_MAX_WORKERS = 2  # ⬇️ REDUCIDO: 4 → 2 para menos threads web y carga CPU
 WEB_BINARY_MODE = True
 
 # ============================================================================
@@ -135,14 +140,14 @@ WEB_BINARY_MODE = True
 # ============================================================================
 
 AUDIO_COMPRESSION_ENABLED = True  # âœ… Opus activado - ~90% reducción de ancho de banda
-AUDIO_COMPRESSION_BITRATE = 32000  # Bitrate para Opus (baja latencia)
+AUDIO_COMPRESSION_BITRATE = 16000  # Restaurado a 16kbps para mejor calidad con baja latencia
 
 MAX_CHANNELS_PER_CLIENT = 128
 MAX_GAIN_VALUE = 10.0
 MAX_MASTER_GAIN = 5.0
 
-AUDIO_BUFFER_POOL_SIZE = 10
-MAX_CONCURRENT_SENDS = 4
+AUDIO_BUFFER_POOL_SIZE = 3  # ⬇️ REDUCIDO: 10 → 3 para menos buffers en pool
+MAX_CONCURRENT_SENDS = 2  # ⬇️ REDUCIDO: 4 → 2 para envíos más directos
 
 # ============================================================================
 # CLIENTE MAESTRO (MASTER CLIENT)
@@ -153,5 +158,5 @@ MASTER_CLIENT_ENABLED = False
 MASTER_CLIENT_UUID = "__master_server_client__"
 MASTER_CLIENT_NAME = "Control"
 MASTER_CLIENT_DEFAULT_CHANNELS = []
-WEB_AUDIO_BUFFER_SIZE = 2048
+WEB_AUDIO_BUFFER_SIZE = 512  # ⬇️ REDUCIDO: 2048 → 512 para buffer web más pequeño
 WEB_AUDIO_STREAM_ENABLED = False

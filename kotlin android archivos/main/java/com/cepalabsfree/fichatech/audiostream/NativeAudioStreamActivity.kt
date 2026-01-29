@@ -244,7 +244,7 @@ class NativeAudioStreamActivity : AppCompatActivity() {
 
         ultraLowLatencySwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                audioStreamService?.setBufferSize(16)
+                audioStreamService?.setBufferSize(32)
                 showToast(getString(R.string.ultra_low_latency_mode))
             } else {
                 audioStreamService?.setBufferSize(120)

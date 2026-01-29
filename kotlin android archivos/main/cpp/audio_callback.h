@@ -1,8 +1,8 @@
-// audio_callback.h - SIN PROCESAMIENTO PLC/JITTER
-// Audio natural sin procesamiento artificial
+// audio_callback.h - BUFFER ULTRA REDUCIDO PARA 3MS
+// 🎯 Buffer reducido de 1024 → 128 frames (~2.6ms @ 48kHz)
 
 #ifndef FICHATECH_AUDIO_CALLBACK_H
-#define FICHITECH_AUDIO_CALLBACK_H
+#define FICHATECH_AUDIO_CALLBACK_H
 
 #include <oboe/Oboe.h>
 #include <android/log.h>
@@ -12,12 +12,14 @@
 #include <memory>
 #include <algorithm>
 #include <chrono>
+#include <sched.h>
+#include <pthread.h>
 
 #define LOG_TAG "AudioCallback"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// Lock-free SPSC buffer
+// 🎯 Lock-free SPSC buffer OPTIMIZADO
 template<typename T>
 class LockFreeAudioBuffer {
 private:
@@ -76,31 +78,32 @@ public:
 
 class AudioCallback : public oboe::AudioStreamDataCallback {
 private:
-    static constexpr int BUFFER_SIZE_FRAMES = 1024; // valor por defecto, configurable en el constructor
+    // 🎯 BUFFER ULTRA-REDUCIDO: 2024 → 128 frames (~2.6ms @ 48kHz)
+    static constexpr int BUFFER_SIZE_FRAMES = 128;
     static constexpr int SILENCE_TIMEOUT_MS = 5000;
 
-    // ahora es un puntero para poder reconstruir el buffer si cambiamos tamaño en ejecución
     std::unique_ptr<LockFreeAudioBuffer<float>> circularBuffer;
     int channelCount = 2;
-    int bufferFrames = BUFFER_SIZE_FRAMES; // frames configurables
-    int sampleRate = 48000; // sample rate configurable (por defecto 48k)
+    int bufferFrames = BUFFER_SIZE_FRAMES;
+    int sampleRate = 48000;
 
     std::atomic<int64_t> lastAudioTime{0};
     std::atomic<bool> wasSilent{false};
 
+    // 🎯 Thread priority configurado
+    bool threadPrioritySet = false;
+
 public:
-    // Ahora se puede pasar bufferFrames y sampleRate para reducir latencia
     explicit AudioCallback(int channels, int bufferFrames_ = BUFFER_SIZE_FRAMES, int sampleRate_ = 48000)
             : channelCount(channels),
               bufferFrames(bufferFrames_),
               sampleRate(sampleRate_) {
-        // crear el buffer circular con capacidad = frames * canales + 1
         circularBuffer = std::make_unique<LockFreeAudioBuffer<float>>(bufferFrames * channels + 1);
         lastAudioTime = getCurrentTimeMillis();
-        LOGD("✅ AudioCallback simplificado: %d canales, bufferFrames=%d, sampleRate=%d", channels, bufferFrames_, sampleRate_);
+        LOGD("✅ AudioCallback ultra-low latency: %d canales, bufferFrames=%d (~%.2fms)",
+             channels, bufferFrames_, (bufferFrames_ * 1000.0f / sampleRate_));
     }
 
-    // Permite ajustar el tamaño del buffer en tiempo de ejecución (p. ej. usando framesPerBurst del stream)
     void setBufferFrames(int newBufferFrames, int newChannelCount = -1) {
         if (newBufferFrames <= 0) return;
         int ch = (newChannelCount > 0) ? newChannelCount : channelCount;
@@ -110,13 +113,14 @@ public:
         LOGD("⚙️ Buffer reconstruido: canales=%d, bufferFrames=%d", channelCount, bufferFrames);
     }
 
-    // Ajustar bufferFrames automáticamente basado en framesPerBurst del stream
-    // Se recomienda: bufferFrames = framesPerBurst * multiplier (1..4). Menor multiplier = menor latencia, mayor riesgo de underrun.
-    void adaptToFramesPerBurst(int framesPerBurst, int multiplier = 2) {
+    // 🎯 Adaptar buffer basado en framesPerBurst del device
+    void adaptToFramesPerBurst(int framesPerBurst, int multiplier = 1) {
         if (framesPerBurst <= 0) return;
+        // Para MMAP: usar 1x burst, sin MMAP: 2x burst
         int target = framesPerBurst * std::max(1, multiplier);
         setBufferFrames(target);
-        LOGD("🔧 Adaptado a framesPerBurst=%d, multiplier=%d => bufferFrames=%d", framesPerBurst, multiplier, target);
+        LOGD("🔧 Adaptado a framesPerBurst=%d, multiplier=%d => bufferFrames=%d",
+             framesPerBurst, multiplier, target);
     }
 
     AudioCallback(const AudioCallback&) = delete;
@@ -127,15 +131,19 @@ public:
             void *audioData,
             int32_t numFrames) override {
 
-        (void) audioStream;
+        // 🎯 Configurar thread priority (solo primera vez)
+        if (!threadPrioritySet) {
+            setThreadPriority();
+            threadPrioritySet = true;
+        }
+
         auto *outputBuffer = static_cast<float *>(audioData);
         const int samplesNeeded = numFrames * channelCount;
 
-        // Verificar si hay audio disponible
         int framesInBuffer = circularBuffer->getAvailable() / channelCount;
 
         if (framesInBuffer <= 0) {
-            // SIN PLC: Silencio natural cuando no hay datos
+            // Silencio cuando no hay datos
             std::memset(outputBuffer, 0, samplesNeeded * sizeof(float));
 
             const int64_t silentTime = getCurrentTimeMillis() - lastAudioTime.load();
@@ -147,12 +155,12 @@ public:
             return oboe::DataCallbackResult::Continue;
         }
 
-        // Leer audio disponible (sin procesamiento adicional)
+        // Leer audio disponible
         const int framesToRead = std::min(framesInBuffer, numFrames);
         const int samplesToRead = framesToRead * channelCount;
         const int samplesRead = circularBuffer->read(outputBuffer, samplesToRead);
 
-        // Rellenar con silencio si faltan frames (natural, sin PLC)
+        // Rellenar con silencio si faltan frames
         if (samplesRead < samplesNeeded) {
             std::memset(outputBuffer + samplesRead, 0,
                         (samplesNeeded - samplesRead) * sizeof(float));
@@ -163,7 +171,7 @@ public:
         }
 
         if (wasSilent.load() && samplesRead > 0) {
-            LOGD("🔊 Audio recuperado naturalmente");
+            LOGD("🔊 Audio recuperado");
             wasSilent = false;
         }
 
@@ -193,12 +201,10 @@ public:
     }
 
     float getLatencyMs() const {
-        // usar sampleRate real en el cálculo de latencia
         int sr = sampleRate > 0 ? sampleRate : 48000;
         return (static_cast<float>(getAvailableFrames()) / static_cast<float>(sr)) * 1000.0f;
     }
 
-    // Añadir helpers para actualizar sample rate si es necesario
     void setSampleRate(int sr) {
         if (sr > 0) sampleRate = sr;
     }
@@ -214,6 +220,18 @@ private:
         using namespace std::chrono;
         return duration_cast<milliseconds>(
                 system_clock::now().time_since_epoch()).count();
+    }
+
+    // 🎯 Configurar thread priority para callback de audio
+    void setThreadPriority() {
+        struct sched_param param;
+        param.sched_priority = sched_get_priority_max(SCHED_FIFO) - 1;
+
+        if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) == 0) {
+            LOGD("✅ Thread priority configurado: SCHED_FIFO");
+        } else {
+            LOGD("⚠️ No se pudo configurar thread priority (requiere permisos)");
+        }
     }
 };
 

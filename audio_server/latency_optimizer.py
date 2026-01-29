@@ -22,17 +22,20 @@ class LatencyOptimizer:
     - Latency tracking: mide tiempos de respuesta
     """
 
-    def __init__(self, debounce_ms: int = 50):
+    def __init__(self, debounce_ms: int = 10):  # Reducido de 50ms para latencia ultra baja
         self.debounce_ms = debounce_ms / 1000.0  # convertir a segundos
         self.pending_updates = {}  # client_id -> {'gains': {...}, 'pans': {...}, ...}
         self.debounce_timers = {}  # client_id -> threading.Timer
-        self.lock = threading.Lock()
-        
+
         # Latency tracking
         self.latency_samples = defaultdict(list)  # event_type -> [latencies_ms]
-        self.max_samples = 100  # Mantener último 100 muestras
-        
-        logger.info(f"[LatencyOptimizer] ✅ Inicializado (debounce: {debounce_ms}ms)")
+        self.max_samples = 50  # Reducido de 100 para menos memoria
+
+        # 🎯 NUEVO: Pre-buffering para priority queuing
+        self.priority_queue = []  # Lista de updates prioritarios
+        self.pre_buffer_size = 5  # Pre-buffer 5 updates para estabilidad
+
+        logger.info(f"[LatencyOptimizer] ✅ Inicializado (debounce: {debounce_ms}ms, pre-buffer: {self.pre_buffer_size})")
 
     def queue_parameter_update(self, client_id: str, param_type: str, channel: int, value: float):
         """
@@ -133,12 +136,36 @@ class LatencyOptimizer:
                 logger.info(f"  {event_type}: avg={data['avg']:.2f}ms, "
                            f"min={data['min']:.2f}ms, max={data['max']:.2f}ms")
 
+    def add_priority_update(self, client_id: str, updates: Dict[str, Dict[int, float]], priority: int = 1):
+        """🎯 NUEVO: Agregar update prioritario al pre-buffer"""
+        with self.lock:
+            self.priority_queue.append({
+                'client_id': client_id,
+                'updates': updates,
+                'priority': priority,
+                'timestamp': time.time()
+            })
+
+            # Mantener solo los más recientes
+            if len(self.priority_queue) > self.pre_buffer_size:
+                self.priority_queue.sort(key=lambda x: (x['priority'], x['timestamp']))
+                self.priority_queue.pop(0)
+
+    def get_next_priority_update(self) -> Dict[str, Any] | None:
+        """🎯 NUEVO: Obtener el próximo update prioritario"""
+        with self.lock:
+            if self.priority_queue:
+                # Ordenar por prioridad (menor número = mayor prioridad) y timestamp
+                self.priority_queue.sort(key=lambda x: (x['priority'], x['timestamp']))
+                return self.priority_queue.pop(0)
+        return None
+
 
 # Instancia global
 _optimizer_instance = None
 
 
-def get_optimizer(debounce_ms: int = 50) -> LatencyOptimizer:
+def get_optimizer(debounce_ms: int = 10) -> LatencyOptimizer:
     """Obtener o crear instancia global del optimizer"""
     global _optimizer_instance
     if _optimizer_instance is None:

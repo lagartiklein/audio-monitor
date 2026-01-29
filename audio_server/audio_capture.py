@@ -101,9 +101,9 @@ class AudioCapture:
 
                 
 
-                # SCHED_FIFO = 1, prioridad 50
+                # SCHED_FIFO = 1, prioridad 99 (máxima para RT)
 
-                param = SchedParam(50)
+                param = SchedParam(99)
 
                 result = libc.sched_setscheduler(0, 1, ctypes.byref(param))
 
@@ -173,13 +173,13 @@ class AudioCapture:
                 return
             
             try:
-                # Establecer prioridad HIGH (más seguro que REALTIME)
-                success = ctypes.windll.kernel32.SetPriorityClass(handle, HIGH_PRIORITY_CLASS)
+                # Establecer prioridad REALTIME para mínima latencia (usar con precaución)
+                success = ctypes.windll.kernel32.SetPriorityClass(handle, REALTIME_PRIORITY_CLASS)
                 
                 if success:
-                    print("[RF] ✅ Prioridad ALTA establecida (Windows - HIGH_PRIORITY_CLASS)")
+                    print("[RF] ✅ Prioridad REAL-TIME establecida (Windows - REALTIME_PRIORITY_CLASS)")
                 else:
-                    print("[RF] ⚠️ No se pudo establecer prioridad en Windows")
+                    print("[RF] ⚠️ No se pudo establecer prioridad RT en Windows")
             finally:
                 ctypes.windll.kernel32.CloseHandle(handle)
                 

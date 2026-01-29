@@ -1,8 +1,6 @@
 package com.cepalabsfree.fichatech.audiostream
 
 import android.os.Process
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -26,14 +24,13 @@ class NativeAudioClient(private val context: Context) {
 
     companion object {
         private const val TAG = "NativeAudioClient"
-        private const val CONNECT_TIMEOUT = 5000            // 5 segundos
-        private const val READ_TIMEOUT = 5000             // ✅ 5 segundos
+        private const val CONNECT_TIMEOUT = 1000  // ⬇️ REDUCIDO: 2000 → 1000 ms para conexión más rápida
+        private const val READ_TIMEOUT = 10000
         private const val HEADER_SIZE = 16
         private const val MAGIC_NUMBER = 0xA1D10A7C.toInt()
         private const val PROTOCOL_VERSION = 2
         private const val MSG_TYPE_AUDIO = 0x01
         private const val MSG_TYPE_CONTROL = 0x02
-        private const val MSG_TYPE_HEARTBEAT = 0x03  // ✅ NUEVO
         private const val FLAG_FLOAT32 = 0x01
         private const val FLAG_INT16 = 0x02
         private const val FLAG_COMPRESSED = 0x04  // Zlib
@@ -47,11 +44,9 @@ class NativeAudioClient(private val context: Context) {
         private const val SOCKET_RCVBUF = 4096
 
         private const val AUTO_RECONNECT = true
-        private const val RECONNECT_DELAY_MS = 300L
-        private const val MAX_RECONNECT_DELAY_MS = 10000L // ⬆️ Delay máximo aumentado
+        private const val RECONNECT_DELAY_MS = 100L  // ⬇️ REDUCIDO: 300 → 100 ms para reconexión ultra-rápida
+        private const val MAX_RECONNECT_DELAY_MS = 2000L
         private const val RECONNECT_BACKOFF = 1.3
-        private const val MAX_RECONNECT_ATTEMPTS = 20  // ✅ Límite de intentos
-        private const val TOTAL_RECONNECT_TIMEOUT_MS = 60000L  // ✅ 60s total
 
         private const val HEADER_BUFFER_POOL_SIZE = 4
         private const val PAYLOAD_BUFFER_POOL_SIZE = 8
@@ -75,21 +70,11 @@ class NativeAudioClient(private val context: Context) {
 
     private var reconnectJob: Job? = null
     private var currentReconnectDelay = RECONNECT_DELAY_MS
-    private var reconnectAttempts = 0
-    private var reconnectStartTime = 0L
 
     @Volatile private var rfMode = true
 
     // ✅ NUEVO: Control de inicialización Opus
     private var opusInitialized = false
-
-    // ✅ NUEVO: Variables para heartbeat
-    private var lastHeartbeatTime = System.currentTimeMillis()
-    private val HEARTBEAT_TIMEOUT_MS = 15000L  // ✅ 15s (más realista para RF)
-    private var lastHeartbeatSent = 0L
-
-    // ✅ NUEVO: Canales operacionales
-    private var operationalChannels = emptySet<Int>()
 
     var onAudioData: ((FloatAudioData) -> Unit)? = null
     var onConnectionStatus: ((Boolean, String) -> Unit)? = null
@@ -106,7 +91,6 @@ class NativeAudioClient(private val context: Context) {
     private val payloadBufferPool = ArrayDeque<ByteArray>()
     private val jsonBuilder = StringBuilder(1024)
     private val jsonLock = Any()
-    private val uiHandler = Handler(Looper.getMainLooper())
 
     init {
         // ✅ Inicializar decoder Opus al crear el cliente
@@ -150,191 +134,93 @@ class NativeAudioClient(private val context: Context) {
 
     private suspend fun connectInternal(): Boolean = withContext(Dispatchers.IO) {
         try {
-            // ✅ PASO 1: Cerrar conexión anterior si existe
-            closeResourcesSafely()
-            
-            // ✅ PASO 2: Crear socket con timeouts apropiados
             socket = Socket().apply {
-                soTimeout = 2000  // ✅ 2s timeout para reads
+                soTimeout = READ_TIMEOUT
                 tcpNoDelay = true
                 keepAlive = true
                 sendBufferSize = SOCKET_SNDBUF
                 receiveBufferSize = SOCKET_RCVBUF
+                connect(InetSocketAddress(serverIp, serverPort), CONNECT_TIMEOUT)
             }
-            
-            // ✅ PASO 3: Conectar con timeout
-            val connectResult = withTimeoutOrNull(CONNECT_TIMEOUT.toLong()) {
-                socket?.connect(InetSocketAddress(serverIp, serverPort), CONNECT_TIMEOUT)
-                true
-            }
-            
-            if (connectResult != true) {
-                Log.w(TAG, "⏰ Timeout conectando al servidor")
-                closeResourcesSafely()
-                return@withContext false
-            }
-            
-            // ✅ PASO 4: Crear streams
+
             inputStream = DataInputStream(socket?.getInputStream()?.buffered(4096))
             outputStream = DataOutputStream(socket?.getOutputStream()?.buffered(4096))
-            
-            // ✅ PASO 5: Enviar handshake con timeout
-            val handshakeResult = withTimeoutOrNull(3000L) {
-                sendHandshake()
-                true
-            }
-            
-            if (handshakeResult != true) {
-                Log.w(TAG, "⏰ Timeout en handshake")
-                closeResourcesSafely()
-                return@withContext false
-            }
-            
-            // ✅ PASO 6: Actualizar estado
+
             isConnected = true
             consecutiveMagicErrors = 0
             currentReconnectDelay = RECONNECT_DELAY_MS
-            lastHeartbeatTime = System.currentTimeMillis()
-            
-            // ✅ PASO 7: Iniciar reader thread
+
+            sendHandshake()
             startReaderThread()
-            
-            // ✅ PASO 8: Notificar UI
+
+            Log.d(TAG, "✅ Conectado RF (ID: ${clientId.take(8)}, Opus: $opusInitialized)")
+
             withContext(Dispatchers.Main) {
                 onConnectionStatus?.invoke(true, "ONLINE")
             }
-            
-            // ✅ PASO 9: Re-suscribir canales
+
             val channelsToResubscribe = synchronized(subscriptionLock) {
                 persistentChannels.toList()
             }
-            
+
             if (channelsToResubscribe.isNotEmpty()) {
-                Log.d(TAG, "🔄 Auto-restaurando ${channelsToResubscribe.size} canales")
+                Log.d(TAG, "🔄 Auto-restaurando canales: $channelsToResubscribe")
                 subscribe(channelsToResubscribe)
             }
-            
-            Log.i(TAG, "✅ Conectado exitosamente a $serverIp:$serverPort")
+
             true
-            
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error en connectInternal: ${e.message}")
-            closeResourcesSafely()
+            Log.e(TAG, "❌ Error conectando: ${e.message}")
+            handleConnectionLost("Error: ${e.message}")
             false
         }
     }
 
-    private val connectionLostLock = Any()
-    private var isHandlingConnectionLost = false
-
     private fun handleConnectionLost(reason: String) {
-        // ✅ Evitar llamadas concurrentes
-        synchronized(connectionLostLock) {
-            if (isHandlingConnectionLost) {
-                Log.d(TAG, "⚠️ Ya manejando pérdida de conexión, ignorando")
-                return
-            }
-            isHandlingConnectionLost = true
-        }
-        
-        try {
-            Log.w(TAG, "📡 Señal RF perdida: $reason")
-            
-            val wasConnected = isConnected
-            isConnected = false
-            
-            // ✅ Cerrar recursos
-            closeResourcesSafely()
-            
-            // ✅ Notificar UI
+        Log.w(TAG, "📡 Señal RF perdida: $reason")
+
+        val wasConnected = isConnected
+        isConnected = false
+        closeResources()
+
+        CoroutineScope(Dispatchers.Main).launch {
             if (wasConnected) {
-                CoroutineScope(Dispatchers.Main).launch {
-                    onConnectionStatus?.invoke(false, "BUSCANDO SEÑAL...")
-                }
+                onConnectionStatus?.invoke(false, "BUSCANDO SEÑAL...")
             }
-            
-            // ✅ Iniciar reconexión
-            if (AUTO_RECONNECT && !shouldStop && rfMode) {
-                startAutoReconnect()
-            }
-            
-        } finally {
-            synchronized(connectionLostLock) {
-                isHandlingConnectionLost = false
-            }
+        }
+
+        if (AUTO_RECONNECT && !shouldStop && rfMode) {
+            startAutoReconnect()
         }
     }
 
     private fun startAutoReconnect() {
         reconnectJob?.cancel()
-        
-        // ✅ Resetear contadores si es primer intento
-        if (reconnectAttempts == 0) {
-            reconnectStartTime = System.currentTimeMillis()
-            currentReconnectDelay = RECONNECT_DELAY_MS
-        }
-        
+
         reconnectJob = CoroutineScope(Dispatchers.IO).launch {
+            var attempt = 1
+
             while (!shouldStop && !isConnected && rfMode) {
-                reconnectAttempts++
-                
-                // ✅ CHECK 1: Límite de intentos
-                if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-                    Log.e(TAG, "❌ Límite de intentos alcanzado ($MAX_RECONNECT_ATTEMPTS)")
-                    handleReconnectFailure("Demasiados intentos")
-                    break
-                }
-                
-                // ✅ CHECK 2: Timeout total
-                val elapsed = System.currentTimeMillis() - reconnectStartTime
-                if (elapsed > TOTAL_RECONNECT_TIMEOUT_MS) {
-                    Log.e(TAG, "❌ Timeout total de reconexión (${elapsed}ms)")
-                    handleReconnectFailure("Timeout total")
-                    break
-                }
-                
-                Log.d(TAG, "🔄 Reconexión #$reconnectAttempts (delay=${currentReconnectDelay}ms)")
-                
-                // ✅ Esperar antes de intentar
                 delay(currentReconnectDelay)
-                
-                // ✅ Intentar conexión
+
                 try {
                     val success = connectInternal()
-                    
                     if (success) {
-                        Log.i(TAG, "✅ Reconexión exitosa después de $reconnectAttempts intentos")
-                        reconnectAttempts = 0
+                        Log.i(TAG, "✅ Reconexión RF exitosa después de $attempt intentos")
+                        currentReconnectDelay = RECONNECT_DELAY_MS
                         return@launch
-                    } else {
-                        Log.w(TAG, "⚠️ Intento #$reconnectAttempts falló")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "⚠️ Excepción en intento #$reconnectAttempts: ${e.message}")
+                    Log.w(TAG, "❌ Intento #$attempt falló: ${e.message}")
                 }
-                
-                // ✅ Backoff exponencial con límite
+
                 currentReconnectDelay = (currentReconnectDelay * RECONNECT_BACKOFF)
                     .toLong()
                     .coerceAtMost(MAX_RECONNECT_DELAY_MS)
+
+                attempt++
             }
-            
-            Log.w(TAG, "🛑 Ciclo de reconexión terminado")
         }
-    }
-    
-    private fun handleReconnectFailure(reason: String) {
-        """✅ Manejar fallo total de reconexión"""
-        reconnectAttempts = 0
-        shouldStop = true
-        
-        CoroutineScope(Dispatchers.Main).launch {
-            onConnectionStatus?.invoke(false, "OFFLINE - $reason")
-            onError?.invoke("No se pudo reconectar: $reason")
-        }
-        
-        // ✅ Opcionalmente, notificar al usuario para reconexión manual
-        // showNotification("Conexión perdida", "Toca para reconectar")
     }
 
     fun disconnect(reason: String = "Desconexión manual") {
@@ -343,7 +229,7 @@ class NativeAudioClient(private val context: Context) {
         shouldStop = true
         rfMode = false
         reconnectJob?.cancel()
-        closeResourcesSafely()
+        closeResources()
         isConnected = false
 
         // ✅ Liberar decoder Opus
@@ -354,32 +240,11 @@ class NativeAudioClient(private val context: Context) {
         }
     }
 
-    private fun closeResourcesSafely() {
-        """✅ Cierre garantizado de recursos"""
-        try { 
-            outputStream?.close() 
-        } catch (e: Exception) { 
-            Log.d(TAG, "Error cerrando outputStream: ${e.message}") 
-        }
-        
-        try { 
-            inputStream?.close() 
-        } catch (e: Exception) { 
-            Log.d(TAG, "Error cerrando inputStream: ${e.message}") 
-        }
-        
-        try {
-            socket?.let { s ->
-                if (!s.isClosed) {
-                    s.shutdownInput()
-                    s.shutdownOutput()
-                    s.close()
-                }
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "Error cerrando socket: ${e.message}")
-        }
-        
+    private fun closeResources() {
+        try { outputStream?.close() } catch (_: Exception) {}
+        try { inputStream?.close() } catch (_: Exception) {}
+        try { socket?.close() } catch (_: Exception) {}
+
         outputStream = null
         inputStream = null
         socket = null
@@ -446,19 +311,6 @@ class NativeAudioClient(private val context: Context) {
         )
     }
 
-    private fun startHeartbeatSender() {
-        CoroutineScope(Dispatchers.IO).launch {
-            while (!shouldStop && isConnected) {
-                delay(5000L)  // ✅ Enviar cada 5s
-                
-                if (System.currentTimeMillis() - lastHeartbeatSent > 5000L) {
-                    sendHeartbeat()
-                    lastHeartbeatSent = System.currentTimeMillis()
-                }
-            }
-        }
-    }
-
     private fun startReaderThread() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -466,26 +318,6 @@ class NativeAudioClient(private val context: Context) {
             } catch (_: Exception) {}
 
             val headerBuffer = acquireHeaderBuffer()
-
-            val heartbeatCheckRunnable = object : Runnable {
-                override fun run() {
-                    if (isConnected) {
-                        val timeSinceHeartbeat = System.currentTimeMillis() - lastHeartbeatTime
-                        if (timeSinceHeartbeat > HEARTBEAT_TIMEOUT_MS) {
-                            Log.w(TAG, "❌ Heartbeat timeout: ${timeSinceHeartbeat}ms sin respuesta")
-                            handleConnectionLost("Heartbeat timeout")
-                        }
-                    }
-                    if (!shouldStop) {
-                        uiHandler.postDelayed(this, 5000)  // Check cada 5s
-                    }
-                }
-            }
-            
-            // ✅ Iniciar envío periódico de heartbeat
-            startHeartbeatSender()
-            
-            uiHandler.post(heartbeatCheckRunnable)
 
             while (!shouldStop) {
                 try {
@@ -498,9 +330,6 @@ class NativeAudioClient(private val context: Context) {
 
                     input.readFully(headerBuffer)
                     val header = decodeHeader(headerBuffer)
-
-                    // ✅ Actualizar timestamp
-                    lastHeartbeatTime = System.currentTimeMillis()
 
                     if (header.magic != MAGIC_NUMBER) {
                         consecutiveMagicErrors++
@@ -590,12 +419,6 @@ class NativeAudioClient(private val context: Context) {
                     )
 
                     CoroutineScope(Dispatchers.Main).launch { onServerInfo?.invoke(serverInfo) }
-                    
-                    // ✅ NUEVO: Enviar ACK
-                    sendControlMessage("handshake_ack", mapOf(
-                        "client_id" to clientId,
-                        "timestamp" to System.currentTimeMillis()
-                    ))
                 }
                 "subscription_confirmed" -> {
                     val compressionMode = json.optString("compression_mode", "none")
@@ -658,55 +481,6 @@ class NativeAudioClient(private val context: Context) {
                     }
 
                     CoroutineScope(Dispatchers.Main).launch { onMixStateUpdate?.invoke(mixState) }
-                }
-                // ✅ NUEVO: Sincronización completa de estado
-                "full_state_sync" -> {
-                    val gains = mutableMapOf<Int, Float>()
-                    synchronized(subscriptionLock) {
-                        // Extraer canales operacionales
-                        val opChannelsArray = json.optJSONArray("operational_channels")
-                        operationalChannels = if (opChannelsArray != null) {
-                            (0 until opChannelsArray.length()).map { 
-                                opChannelsArray.getInt(it) 
-                            }.toSet()
-                        } else {
-                            emptySet()
-                        }
-                        // Extraer canales solicitados
-                        val requestedChannels = mutableListOf<Int>()
-                        val channelsArray = json.optJSONArray("channels")
-                        if (channelsArray != null) {
-                            for (i in 0 until channelsArray.length()) {
-                                requestedChannels.add(channelsArray.getInt(i))
-                            }
-                        }
-                        // ✅ VALIDAR: Solo aceptar canales operacionales
-                        val validChannels = requestedChannels.filter { ch -> 
-                            ch in operationalChannels
-                        }
-                        if (validChannels.size < requestedChannels.size) {
-                            val invalid = requestedChannels - validChannels.toSet()
-                            Log.w(TAG, "⚠️  Canales inválidos ignorados: $invalid")
-                        }
-                        persistentChannels = validChannels
-                        // Extraer gains, pans, mutes
-                        val gainsObj = json.optJSONObject("gains")
-                        if (gainsObj != null) {
-                            for (key in gainsObj.keys()) {
-                                gains[key.toInt()] = gainsObj.getDouble(key).toFloat()
-                            }
-                        }
-                        // Similar para pans y mutes...
-                    }
-                    // Notificar UI
-                    CoroutineScope(Dispatchers.Main).launch {
-                        onMixStateUpdate?.invoke(mapOf(
-                            "channels" to persistentChannels,
-                            "gains" to gains,
-                            "operational_channels" to operationalChannels.toList()
-                        ))
-                    }
-                    Log.d(TAG, "✅ Estado completo sincronizado: ${persistentChannels.size} canales")
                 }
             }
         } catch (e: Exception) {
@@ -820,47 +594,11 @@ class NativeAudioClient(private val context: Context) {
                 header.putInt((System.currentTimeMillis() % Int.MAX_VALUE).toInt())
                 header.putInt(messageBytes.size)
 
-                // ✅ NUEVO: Timeout breve para writes (no-blocking)
-                val originalTimeout = socket?.soTimeout ?: 0
-                socket?.soTimeout = 500  // 500ms timeout para writes
-                
-                try {
-                    outputStream?.write(header.array())
-                    outputStream?.write(messageBytes)
-                    outputStream?.flush()
-                    
-                    Log.d(TAG, "📤 Mensaje $type enviado (${messageBytes.size} bytes)")
-                    
-                } finally {
-                    // Restaurar timeout para reads
-                    if (socket != null) {
-                        socket!!.soTimeout = originalTimeout
-                    }
-                }
-
-            } catch (e: java.net.SocketTimeoutException) {
-                Log.w(TAG, "⏱️  Timeout enviando mensaje $type - buffer servidor lleno")
-                handleConnectionLost("Timeout enviando control")
-                
+                outputStream?.write(header.array())
+                outputStream?.write(messageBytes)
+                outputStream?.flush()
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error enviando $type: ${e.message}")
-                handleConnectionLost("Error enviando: ${e.message}")
-            }
-        }
-    }
-
-    // Nuevo método para enviar heartbeat
-    private fun sendHeartbeat(samplePosition: Long = 0L) {
-        if (isConnected) {
-            CoroutineScope(Dispatchers.IO).launch {
-                sendControlMessage(
-                    "heartbeat",
-                    mapOf(
-                        "client_id" to clientId,
-                        "sample_position" to samplePosition,
-                        "timestamp" to System.currentTimeMillis()
-                    )
-                )
+                handleConnectionLost("Error enviando")
             }
         }
     }

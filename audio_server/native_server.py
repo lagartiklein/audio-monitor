@@ -48,6 +48,9 @@ class NativeClient:
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config.SOCKET_SNDBUF)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config.SOCKET_RCVBUF)
+            # ✅ Prioridad alta para tráfico de audio
+            if hasattr(socket, 'SO_PRIORITY'):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)  # Prioridad alta (0-6)
             # ✅ ZERO-LATENCY: Socket NO-BLOQUEANTE para envío directo (tipo RF)
             self.socket.setblocking(False)  # Non-blocking para envío sin esperas
             # self.socket.settimeout() = ELIMINADO (incompatible con non-blocking)
@@ -453,6 +456,9 @@ class NativeAudioServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        # ✅ Prioridad alta para tráfico de audio
+        if hasattr(socket, 'SO_PRIORITY'):
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)
         
         if config.SOCKET_NODELAY:
             self.server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

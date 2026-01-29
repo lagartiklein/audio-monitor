@@ -10,58 +10,39 @@
       "type": "android",
       "name": "android-df2380cd",
       "primary_ip": "192.168.1.9",
-      "client_id": "3b7916f4-7bbf-4d5d-a258-04b992a47860",
+      "client_id": "13ee57e9-da9a-46be-95e6-1fe20066a547",
       "protocol_version": 2,
       "rf_mode": true,
       "user_agent": null
     },
     "first_seen": 1768520298.9300804,
-    "last_seen": 1768601292.0933154,
-    "reconnections": 4571,
+    "last_seen": 1768758330.7669005,
+    "reconnections": 5273,
     "configuration": {
       "channels": [
         0,
-        1,
         2,
-        3,
-        4,
-        5,
-        6,
-        7
+        3
       ],
       "gains": {
-        "0": 0.18836490894898006,
+        "0": 1.9952623149688795,
         "1": 0.06309573444801933,
-        "2": 0.001,
-        "3": 0.001,
-        "4": 0.001,
-        "5": 0.001,
-        "6": 0.001,
-        "7": 0.001
+        "2": 0.3981071705534972,
+        "3": 0.3758374042884442
       },
       "pans": {
         "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
+        "2": -1.0,
+        "3": 1.0
       },
       "mutes": {
         "0": false,
-        "1": false,
         "2": false,
-        "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
+        "3": false
       },
       "solos": [],
       "master_gain": 1.0,
-      "timestamp": 1768601292093
+      "timestamp": 1768758330766
     },
     "configuration_session_id": null,
     "tags": [],
@@ -78,58 +59,40 @@
       "type": "android",
       "name": "android-3ccfcd8f",
       "primary_ip": "192.168.1.13",
-      "client_id": "5cbd9c0b-e1d9-4d67-a7cd-0d8e8c0f869d",
+      "client_id": "defecde7-4e5e-4398-a2d1-10d2f3ad96e4",
       "protocol_version": 2,
       "rf_mode": true,
       "user_agent": null
     },
     "first_seen": 1768520552.8655303,
-    "last_seen": 1768601293.6497116,
-    "reconnections": 3241,
+    "last_seen": 1768776617.5935092,
+    "reconnections": 4703,
     "configuration": {
       "channels": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
+        0
       ],
       "gains": {
-        "0": 2.51188643150958,
+        "0": 2.113489039836647,
+        "2": 0.5011872336272722,
+        "3": 0.47315125896148047,
         "1": 1.4125375446227544,
-        "2": 0.001,
-        "3": 0.001,
-        "4": 0.001,
-        "5": 0.001,
-        "6": 0.001,
-        "7": 0.001
+        "6": 3.9810717055349722
       },
       "pans": {
         "0": 0.0,
-        "1": 0.0,
-        "2": 0.0,
-        "3": 0.0,
-        "4": 0.0,
-        "5": 0.0,
-        "6": 0.0,
-        "7": 0.0
+        "2": -1.0,
+        "3": 1.0,
+        "1": 0.0
       },
       "mutes": {
         "0": false,
-        "1": false,
         "2": false,
         "3": false,
-        "4": false,
-        "5": false,
-        "6": false,
-        "7": false
+        "1": false
       },
       "solos": [],
       "master_gain": 1.0,
-      "timestamp": 1768601293649
+      "timestamp": 1768776511704
     },
     "configuration_session_id": null,
     "tags": [],

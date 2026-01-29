@@ -68,8 +68,8 @@ class AudioStreamService : Service() {
         const val EXTRA_SERVER_IP = "server_ip"
         const val EXTRA_SERVER_PORT = "server_port"
 
-        // Reconexión automática
-        private const val RECONNECT_DELAY_MS = 300L
+        // Reconexión automática ultra-rápida
+        private const val RECONNECT_DELAY_MS = 100L  // ⬇️ REDUCIDO: 300 → 100 ms para reconexión más rápida
         private const val MAX_RECONNECT_DELAY_MS = 3000L
         private const val RECONNECT_BACKOFF = 1.5
     }

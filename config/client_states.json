@@ -1,38 +1,57 @@
 {
   "df2380cd-f502-4a3d-8f05-02419094606a": {
-    "channels": [],
+    "channels": [
+      0,
+      2,
+      3
+    ],
     "gains": {
-      "0": 0.18836490894898006,
-      "1": 0.06309573444801933
-    },
-    "pans": {
-      "0": 0.0
-    },
-    "mutes": {
-      "0": false
-    },
-    "master_gain": 1.0,
-    "last_seen": 1768601129.7266667,
-    "reconnection_count": 1,
-    "client_type": "native"
-  },
-  "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae": {
-    "channels": [],
-    "gains": {
-      "0": 2.2387211385683394,
-      "1": 1.4125375446227544
+      "0": 1.9952623149688795,
+      "1": 0.06309573444801933,
+      "2": 0.3981071705534972,
+      "3": 0.3758374042884442
     },
     "pans": {
       "0": 0.0,
+      "2": -1.0,
+      "3": 1.0
+    },
+    "mutes": {
+      "0": false,
+      "2": false,
+      "3": false
+    },
+    "master_gain": 1.0,
+    "last_seen": 1768758466.018001,
+    "reconnection_count": 5,
+    "client_type": "native"
+  },
+  "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae": {
+    "channels": [
+      0
+    ],
+    "gains": {
+      "0": 2.113489039836647,
+      "2": 0.5011872336272722,
+      "3": 0.47315125896148047,
+      "1": 1.4125375446227544,
+      "6": 3.9810717055349722
+    },
+    "pans": {
+      "0": 0.0,
+      "2": -1.0,
+      "3": 1.0,
       "1": 0.0
     },
     "mutes": {
       "0": false,
+      "2": false,
+      "3": false,
       "1": false
     },
     "master_gain": 1.0,
-    "last_seen": 1768601129.782038,
-    "reconnection_count": 1,
+    "last_seen": 1768776711.415084,
+    "reconnection_count": 0,
     "client_type": "native"
   },
   "test_android_client": {

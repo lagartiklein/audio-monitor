@@ -98,9 +98,9 @@ Java_com_cepalabsfree_fichatech_audiostream_OboeAudioRenderer_nativeCreateStream
             return 0;
         }
 
-        // Buffer size óptimo (2x burst size)
+        // Buffer size óptimo (4x burst size para estabilidad)
         int32_t framesPerBurst = stream->getFramesPerBurst();
-        int32_t optimalBufferSize = framesPerBurst * 2;
+        int32_t optimalBufferSize = framesPerBurst * 4;  // ✅ AJUSTADO: 1 → 4 para mejor estabilidad sin perder mucha latencia
         stream->setBufferSizeInFrames(optimalBufferSize);
 
         auto wrapper = std::make_shared<AudioStreamWrapper>(stream, callback, channelId);

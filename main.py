@@ -74,6 +74,35 @@ from gui_monitor import AudioMonitorGUI
 
 
 
+def set_process_priority():
+    """Configurar prioridad alta del proceso principal para baja latencia"""
+    try:
+        if sys.platform == 'win32':
+            import ctypes
+            PROCESS_SET_INFORMATION = 0x0200
+            HIGH_PRIORITY_CLASS = 0x00000080
+            pid = os.getpid()
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_SET_INFORMATION, False, pid)
+            if handle:
+                ctypes.windll.kernel32.SetPriorityClass(handle, HIGH_PRIORITY_CLASS)
+                ctypes.windll.kernel32.CloseHandle(handle)
+                print("[Main] ✅ Prioridad ALTA del proceso principal (Windows)")
+        elif sys.platform.startswith('linux'):
+            import ctypes
+            libc = ctypes.CDLL(ctypes.util.find_library('c'))
+            # Aumentar prioridad del proceso
+            libc.setpriority(0, 0, -20)  # PRIO_PROCESS, PID, priority
+            print("[Main] ✅ Prioridad ALTA del proceso principal (Linux)")
+        elif sys.platform == 'darwin':
+            import ctypes
+            libc = ctypes.CDLL('libc.dylib')
+            libc.setpriority(0, 0, -20)
+            print("[Main] ✅ Prioridad ALTA del proceso principal (macOS)")
+    except Exception as e:
+        print(f"[Main] ⚠️ No se pudo establecer prioridad del proceso: {e}")
+
+
+
 class AudioServerApp:
     def export_scene(self, filename):
         """✅ Guardar escena actual a archivo JSON"""
@@ -1319,6 +1348,12 @@ def main():
         
 
         print(f"{'='*70}\n")
+
+        
+
+        # Configurar prioridad del proceso principal para baja latencia
+
+        set_process_priority()
 
         
 

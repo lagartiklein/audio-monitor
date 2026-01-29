@@ -4,52 +4,31 @@
     "client_type": "native",
     "custom_name": null,
     "channels": [
-      0,
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7
+      0
     ],
     "gains": {
-      "0": 0.18836490894898006,
+      "0": 2.51188643150958,
       "1": 0.06309573444801933,
-      "2": 0.001,
-      "3": 0.001,
-      "4": 0.001,
-      "5": 0.001,
-      "6": 0.001,
-      "7": 0.001
+      "2": 0.3981071705534972,
+      "3": 0.44668359215096315
     },
     "pans": {
       "0": 0.0,
-      "1": 0.0,
-      "2": 0.0,
-      "3": 0.0,
-      "4": 0.0,
-      "5": 0.0,
-      "6": 0.0,
-      "7": 0.0
+      "2": -1.0,
+      "3": 1.0
     },
     "mutes": {
       "0": false,
-      "1": false,
       "2": false,
-      "3": false,
-      "4": false,
-      "5": false,
-      "6": false,
-      "7": false
+      "3": false
     },
     "master_gain": 1.0,
     "created_at": 1768520298.931502,
-    "last_modified": 1768601292.0929215,
+    "last_modified": 1768758309.8693423,
     "last_session_duration": 0.0,
-    "reconnection_count": 2149,
+    "reconnection_count": 2578,
     "channel_names": {},
-    "data_hash": "92a6fdf9a0d10db733e9057b055a51e43b1460ed4c3a247fc00c2e9698cc379a",
+    "data_hash": "253db4860524cb8c5830115c2b7200fb534c29aceb482bb74fd248d1adae494a",
     "schema_version": 1
   },
   "3ccfcd8f-45f5-468a-b0ba-f03813fbe4ae": {
@@ -57,52 +36,34 @@
     "client_type": "native",
     "custom_name": null,
     "channels": [
-      0,
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7
+      0
     ],
     "gains": {
-      "0": 2.51188643150958,
+      "0": 2.113489039836647,
+      "2": 0.5011872336272722,
+      "3": 0.47315125896148047,
       "1": 1.4125375446227544,
-      "2": 0.001,
-      "3": 0.001,
-      "4": 0.001,
-      "5": 0.001,
-      "6": 0.001,
-      "7": 0.001
+      "6": 3.9810717055349722
     },
     "pans": {
       "0": 0.0,
-      "1": 0.0,
-      "2": 0.0,
-      "3": 0.0,
-      "4": 0.0,
-      "5": 0.0,
-      "6": 0.0,
-      "7": 0.0
+      "2": -1.0,
+      "3": 1.0,
+      "1": 0.0
     },
     "mutes": {
       "0": false,
-      "1": false,
       "2": false,
       "3": false,
-      "4": false,
-      "5": false,
-      "6": false,
-      "7": false
+      "1": false
     },
     "master_gain": 1.0,
     "created_at": 1768520552.867899,
-    "last_modified": 1768601293.6492996,
+    "last_modified": 1768776617.5953736,
     "last_session_duration": 0.0,
-    "reconnection_count": 2173,
+    "reconnection_count": 3353,
     "channel_names": {},
-    "data_hash": "cac59b22b980b9b9af366a068a1d4915e33b4666cf05fb3316681bde16d67085",
+    "data_hash": "616edef40b360a47cc71d21c0e6fca5696c40d30f5299c86922c42e231f10ace",
     "schema_version": 1
   }
 }
